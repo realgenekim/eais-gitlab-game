@@ -41,7 +41,8 @@
     (set (positions-in-radius [(:x player) (:y player)] radius (:map game-state)))))
 
 (defn player-view
-  "Build the fog-of-war view for a specific player."
+  "Build the fog-of-war view for a specific player.
+   Includes visible shots (bullet tracers) so bots can dodge."
   [game-state player-id]
   (let [visible (visible-positions game-state player-id)
         me (get-in game-state [:players player-id])
@@ -55,13 +56,23 @@
         passengers (->> (:passengers game-state)
                         (filter (fn [p] (and (nil? (:picked-up-by p))
                                              (visible [(:x p) (:y p)]))))
-                        (map #(select-keys % [:id :x :y :dest])))]
+                        (map #(select-keys % [:id :x :y :dest])))
+        ;; Shots with any tracer cell in visibility range
+        shots (->> (:recent-shots game-state)
+                   (filter (fn [shot]
+                             (some visible (:path shot))))
+                   (map (fn [shot]
+                          {:shooter-id (:shooter-id shot)
+                           :origin (:origin shot)
+                           :direction (:direction shot)
+                           :path (vec (filter visible (:path shot)))})))]
     {:tick (:tick game-state)
      :you (-> me
               (select-keys [:x :y :hp :score :passenger :ammo :grenades :alive?])
               (assoc :id player-id))
      :visible {:players (vec others)
-               :passengers (vec passengers)}
+               :passengers (vec passengers)
+               :shots (vec shots)}
      :map {:width (get-in game-state [:map :width])
            :height (get-in game-state [:map :height])}}))
 
@@ -130,48 +141,66 @@
             (< (:ammo player) 1)
             (= [dx dy] [0 0]))
       state
-      (let [;; Trace the shot along the direction
-            hit-pos (loop [x (+ (:x player) dx)
-                           y (+ (:y player) dy)
-                           dist 1]
-                      (cond
-                        (> dist range-) nil
-                        (not (in-bounds? (:map state) [x y])) nil
-                        (wall? state [x y]) nil
-                        :else (or
-                               ;; Check for player at this position
-                               (first (keep (fn [[id p]]
-                                              (when (and (not= id player-id)
-                                                         (:alive? p)
-                                                         (= (:x p) x)
-                                                         (= (:y p) y))
-                                                id))
-                                            (:players state)))
-                               (recur (+ x dx) (+ y dy) (inc dist)))))
-            state (update-in state [:players player-id :ammo] dec)]
-        (if hit-pos
-          (let [new-hp (- (get-in state [:players hit-pos :hp]) damage)]
+      (let [;; Trace the shot — collect path cells AND find hit target
+            {:keys [path hit-id]}
+            (loop [x (+ (:x player) dx)
+                   y (+ (:y player) dy)
+                   dist 1
+                   cells []]
+              (cond
+                (> dist range-)
+                {:path cells :hit-id nil}
+
+                (not (in-bounds? (:map state) [x y]))
+                {:path cells :hit-id nil}
+
+                (wall? state [x y])
+                {:path cells :hit-id nil}
+
+                :else
+                (let [target (first (keep (fn [[id p]]
+                                            (when (and (not= id player-id)
+                                                       (:alive? p)
+                                                       (= (:x p) x)
+                                                       (= (:y p) y))
+                                              id))
+                                          (:players state)))]
+                  (if target
+                    {:path (conj cells [x y]) :hit-id target}
+                    (recur (+ x dx) (+ y dy) (inc dist)
+                           (conj cells [x y]))))))
+            ;; Record shot for API visibility
+            shot {:shooter-id player-id
+                  :origin [(:x player) (:y player)]
+                  :direction (keyword direction)
+                  :path path
+                  :hit-id hit-id}
+            state (-> state
+                      (update-in [:players player-id :ammo] dec)
+                      (update :recent-shots conj shot))]
+        (if hit-id
+          (let [new-hp (- (get-in state [:players hit-id :hp]) damage)]
             (if (<= new-hp 0)
               ;; Kill!
               (-> state
-                  (assoc-in [:players hit-pos :hp] 0)
-                  (assoc-in [:players hit-pos :alive?] false)
-                  (assoc-in [:players hit-pos :respawn-at]
+                  (assoc-in [:players hit-id :hp] 0)
+                  (assoc-in [:players hit-id :alive?] false)
+                  (assoc-in [:players hit-id :respawn-at]
                             (+ (:tick state) 10))
                   ;; Drop passenger if carrying
-                  (cond-> (get-in state [:players hit-pos :passenger])
+                  (cond-> (get-in state [:players hit-id :passenger])
                     (update :passengers
                             (fn [ps]
-                              (mapv #(if (= (:id %) (get-in state [:players hit-pos :passenger :id]))
+                              (mapv #(if (= (:id %) (get-in state [:players hit-id :passenger :id]))
                                        (assoc % :picked-up-by nil
-                                              :x (get-in state [:players hit-pos :x])
-                                              :y (get-in state [:players hit-pos :y]))
+                                              :x (get-in state [:players hit-id :x])
+                                              :y (get-in state [:players hit-id :y]))
                                        %)
                                     ps))))
-                  (assoc-in [:players hit-pos :passenger] nil)
+                  (assoc-in [:players hit-id :passenger] nil)
                   (update-in [:players player-id :score] + 50))
               ;; Damage only
-              (assoc-in state [:players hit-pos :hp] new-hp)))
+              (assoc-in state [:players hit-id :hp] new-hp)))
           state)))))
 
 (defmethod apply-action :default
@@ -250,6 +279,7 @@
   "Pure function: old state + commands → new state."
   [state commands]
   (-> state
+      (assoc :recent-shots []) ;; clear previous tick's shots
       (apply-commands commands)
       (respawn-dead-players)
       (maybe-spawn-passengers)
@@ -267,13 +297,14 @@
    :map game-map
    :players {}
    :passengers []
+   :recent-shots []
    :config {:tick-ms 250
             :visibility-radius 5
             :shoot-range 20
             :shoot-damage 30
             :max-passengers 6
             :max-players 8
-            :ammo-regen-ticks 5 ;; regen 1 ammo every 5 ticks
+            :ammo-regen-ticks 5
             :max-ammo 10
             :game-duration-ticks 1000}}) ;; 1000 ticks × 500ms = ~8 min per round
 
