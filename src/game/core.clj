@@ -267,7 +267,7 @@
    :map game-map
    :players {}
    :passengers []
-   :config {:tick-ms 500
+   :config {:tick-ms 250
             :visibility-radius 5
             :shoot-range 20
             :shoot-damage 30
