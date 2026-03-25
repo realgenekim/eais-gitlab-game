@@ -14,13 +14,27 @@
   (+ (abs (- x1 x2)) (abs (- y1 y2))))
 
 (defn toward
-  "Pick direction that moves [x1 y1] closer to [x2 y2]."
-  [[x1 y1] [x2 y2]]
-  (let [dx (- x2 x1) dy (- y2 y1)]
-    (cond
-      (and (zero? dx) (zero? dy)) (rand-nth directions)
-      (> (abs dx) (abs dy))       (if (pos? dx) :east :west)
-      :else                       (if (pos? dy) :south :north))))
+  "Pick direction that moves [x1 y1] closer to [x2 y2], avoiding walls.
+   Falls back to perpendicular or random if direct path is blocked."
+  [state [x1 y1] [x2 y2]]
+  (let [dx (- x2 x1) dy (- y2 y1)
+        preferred (cond
+                    (and (zero? dx) (zero? dy)) (rand-nth directions)
+                    (> (abs dx) (abs dy)) (if (pos? dx) :east :west)
+                    :else (if (pos? dy) :south :north))
+        try-dir (fn [dir]
+                  (let [[ddx ddy] (dir-deltas dir)
+                        nx (+ x1 ddx) ny (+ y1 ddy)]
+                    (when (core/walkable? state [nx ny]) dir)))
+        ;; Try preferred, then other axis, then perpendiculars, then random
+        alt (if (> (abs dx) (abs dy))
+              (if (pos? dy) :south :north)
+              (if (pos? dx) :east :west))]
+    (or (try-dir preferred)
+        (try-dir alt)
+        (try-dir (rand-nth directions))
+        (try-dir (rand-nth directions))
+        preferred)))
 
 (defn away-from
   "Pick direction that moves away from [x2 y2]."
@@ -28,8 +42,8 @@
   (let [dx (- x1 x2) dy (- y1 y2)]
     (cond
       (and (zero? dx) (zero? dy)) (rand-nth directions)
-      (> (abs dx) (abs dy))       (if (pos? dx) :east :west)
-      :else                       (if (pos? dy) :south :north))))
+      (> (abs dx) (abs dy)) (if (pos? dx) :east :west)
+      :else (if (pos? dy) :south :north))))
 
 (defn line-of-sight-dir
   "If target is on same row/col, return the shooting direction. Else nil."
@@ -54,7 +68,7 @@
   [shot-direction]
   (case shot-direction
     (:north :south) (rand-nth [:east :west])
-    (:east :west)   (rand-nth [:north :south])
+    (:east :west) (rand-nth [:north :south])
     (rand-nth directions)))
 
 ;;; ---------------------------------------------------------------------------
@@ -87,28 +101,28 @@
         ;; 3. CHASE — move toward nearest enemy
         (if (seq enemies)
           (let [nearest (apply min-key #(distance my-pos (:pos %)) enemies)]
-            [{:type :move :direction (toward my-pos (:pos nearest))}
+            [{:type :move :direction (toward state my-pos (:pos nearest))}
              {:type :pickup}])
           ;; 4. DELIVER — go for passengers
           (if (:passenger me)
-            [{:type :move :direction (toward my-pos [(get-in me [:passenger :dest :x])
-                                                     (get-in me [:passenger :dest :y])])}
+            [{:type :move :direction (toward state my-pos [(get-in me [:passenger :dest :x])
+                                                           (get-in me [:passenger :dest :y])])}
              {:type :dropoff}]
             (if (seq passengers)
               (let [nearest-pax (apply min-key #(distance my-pos (:pos %)) passengers)]
-                [{:type :move :direction (toward my-pos (:pos nearest-pax))}
+                [{:type :move :direction (toward state my-pos (:pos nearest-pax))}
                  {:type :pickup}])
               [{:type :move :direction (rand-nth directions)}]))))
 
       ;; Out of ammo — deliver passengers or roam
       :else
       (if (:passenger me)
-        [{:type :move :direction (toward my-pos [(get-in me [:passenger :dest :x])
-                                                 (get-in me [:passenger :dest :y])])}
+        [{:type :move :direction (toward state my-pos [(get-in me [:passenger :dest :x])
+                                                       (get-in me [:passenger :dest :y])])}
          {:type :dropoff}]
         (if (seq passengers)
           (let [nearest-pax (apply min-key #(distance my-pos (:pos %)) passengers)]
-            [{:type :move :direction (toward my-pos (:pos nearest-pax))}
+            [{:type :move :direction (toward state my-pos (:pos nearest-pax))}
              {:type :pickup}])
           [{:type :move :direction (rand-nth directions)}])))))
 
@@ -137,14 +151,14 @@
 
       ;; 2. DELIVER — if carrying, go to destination
       (:passenger me)
-      [{:type :move :direction (toward my-pos [(get-in me [:passenger :dest :x])
-                                               (get-in me [:passenger :dest :y])])}
+      [{:type :move :direction (toward state my-pos [(get-in me [:passenger :dest :x])
+                                                     (get-in me [:passenger :dest :y])])}
        {:type :dropoff}]
 
       ;; 3. PICKUP — go to nearest passenger
       (seq passengers)
       (let [nearest-pax (apply min-key #(distance my-pos (:pos %)) passengers)]
-        [{:type :move :direction (toward my-pos (:pos nearest-pax))}
+        [{:type :move :direction (toward state my-pos (:pos nearest-pax))}
          {:type :pickup}])
 
       ;; 4. SELF-DEFENSE — shoot if enemy aligned
@@ -154,7 +168,7 @@
 
       ;; 5. ROAM toward center (more passengers spawn there)
       :else
-      [{:type :move :direction (toward my-pos [10 9])}])))
+      [{:type :move :direction (toward state my-pos [10 9])}])))
 
 ;;; ---------------------------------------------------------------------------
 ;;; Bot: Random Walker (baseline)
@@ -174,19 +188,22 @@
 ;;; ---------------------------------------------------------------------------
 
 (defn start-bot!
-  "Start a bot with the given think function. Returns the future."
+  "Start a bot with the given think function. Returns the future.
+   Survives pause/resume — sleeps when paused instead of exiting."
   [bot-creds think-fn]
   (future
     (let [sys @engine/system
-          id  (:id bot-creds)
+          id (:id bot-creds)
           tick-ms (get-in @(:game-state sys) [:config :tick-ms] 250)]
       (loop []
-        (when (some? @(:game-timer sys))
-          (let [state @(:game-state sys)
-                me (get-in state [:players id])]
-            (when (:alive? me)
-              (doseq [action (think-fn state id)]
-                (engine/enqueue-command! sys id action))))
+        (when @(:game-state sys) ;; only exit if system is gone
+          (if (some? @(:game-timer sys))
+            (let [state @(:game-state sys)
+                  me (get-in state [:players id])]
+              (when (:alive? me)
+                (doseq [action (think-fn state id)]
+                  (engine/enqueue-command! sys id action))))
+            nil) ;; paused — just sleep
           (Thread/sleep tick-ms)
           (recur))))))
 
