@@ -138,9 +138,11 @@
       (reset! (:game-state sys) new-state)
       ;; Append events
       (append-events! sys (conj events {:type :tick :tick (:tick new-state)}))
-      ;; Notify SSE subscribers
+      ;; Notify SSE subscribers (deref var for REPL reload)
       (when-let [on-tick (:on-tick sys)]
-        (on-tick sys new-state))
+        (if (var? on-tick)
+          (@on-tick sys new-state)
+          (on-tick sys new-state)))
       ;; Check game over
       (when (>= (:tick new-state) (get-in new-state [:config :game-duration-ticks]))
         (log/info :game-over :tick (:tick new-state))

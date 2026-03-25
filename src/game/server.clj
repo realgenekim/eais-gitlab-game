@@ -165,7 +165,7 @@
 ;;; ---------------------------------------------------------------------------
 
 (defn -main [& _args]
-  (engine/start-game! {:on-tick sse/on-tick})
+  (engine/start-game! {:on-tick #'sse/on-tick})
   (let [port (Integer/parseInt (or (System/getenv "PORT") "33333"))]
     (http/run-server #'app {:port port})
     (log/info :server-started :port port
