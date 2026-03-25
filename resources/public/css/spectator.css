@@ -224,14 +224,18 @@ body {
 }
 
 /* ===== LASER BEAM TRACERS ===== */
-/* 3-cell beam that traverses the screen with staggered animation.
-   --d = distance from shooter, --md = max distance bullet travels.
-   Animation delay = (d / md) * tick duration, so beam sweeps across. */
+/* Beam sweeps across the screen during a tick.
+   --d  = this cell's distance from shooter (1-based)
+   --tt = total travel distance (cells the beam traverses)
+   --tl = tracer length (cells visible at once)
+   Each cell: appears at (d/tt), stays lit for (tl/tt) of the animation period.
+   Result: a tl-cell beam sliding across tt cells. */
 .cell.tracer {
   position: relative;
   overflow: hidden;
-  animation: laser-sweep 0.45s ease-out both;
-  animation-delay: calc((var(--d) / var(--md)) * 0.35s);
+  --anim-period: 0.45s;
+  animation: laser-cell calc(var(--tl) / var(--tt) * var(--anim-period)) ease-in-out both;
+  animation-delay: calc((var(--d) - 1) / var(--tt) * var(--anim-period));
 }
 
 /* Horizontal beams — thin bright line through middle */
@@ -282,11 +286,11 @@ body {
   box-shadow: 0 0 6px #ff4400, 0 0 12px #ff8800, 0 0 20px rgba(255,200,0,0.5);
 }
 
-@keyframes laser-sweep {
+@keyframes laser-cell {
   0% { opacity: 0; }
-  20% { opacity: 1; }
-  70% { opacity: 1; }
-  100% { opacity: 0.15; }
+  15% { opacity: 1; }
+  85% { opacity: 1; }
+  100% { opacity: 0; }
 }
 
 /* ===== HIT — sparks burst from car ===== */

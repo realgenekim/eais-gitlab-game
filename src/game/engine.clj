@@ -128,10 +128,10 @@
   "Advance the game one tick. Called by the timer."
   [sys]
   (try
-    (let [commands  (drain-commands! sys)
+    (let [commands (drain-commands! sys)
           old-state @(:game-state sys)
           new-state (core/advance-tick old-state commands)
-          events    (detect-events old-state new-state commands)]
+          events (detect-events old-state new-state commands)]
       ;; Record for replay
       (replay/record-tick! (:recorder sys) (:tick old-state) commands new-state)
       ;; Advance state
@@ -162,26 +162,48 @@
   "Start a new game. Returns the system map."
   ([] (start-game! {}))
   ([opts]
-   (let [game-map  (:game-map opts maps/arena-map)
-         on-tick   (:on-tick opts)
-         state     (core/make-initial-state game-map)
-         sys       {:game-state     (atom state)
-                    :recorder       (replay/make-recorder state)
-                    :command-queue  (atom [])
-                    :token->player  (atom {})
-                    :event-log      (atom [])
-                    :game-timer     (atom nil)
-                    :on-tick        on-tick}
-         tick-ms   (get-in state [:config :tick-ms] 500)
-         timer     (Timer. "game-tick" true)
-         task      (proxy [TimerTask] []
-                     (run [] (tick! sys)))]
+   (let [game-map (:game-map opts maps/arena-map)
+         on-tick (:on-tick opts)
+         state (core/make-initial-state game-map)
+         sys {:game-state (atom state)
+              :recorder (replay/make-recorder state)
+              :command-queue (atom [])
+              :token->player (atom {})
+              :event-log (atom [])
+              :game-timer (atom nil)
+              :on-tick on-tick}
+         tick-ms (get-in state [:config :tick-ms] 500)
+         timer (Timer. "game-tick" true)
+         task (proxy [TimerTask] []
+                (run [] (tick! sys)))]
      (.scheduleAtFixedRate timer task (long tick-ms) (long tick-ms))
      (reset! (:game-timer sys) timer)
      (reset! system sys)
      (log/info :game-started :tick-ms tick-ms :map-size
                (str (get-in state [:map :width]) "x" (get-in state [:map :height])))
      sys)))
+
+(defn pause-game!
+  "Pause the tick timer. Game state frozen, server still responds."
+  ([] (pause-game! @system))
+  ([sys]
+   (when-let [timer @(:game-timer sys)]
+     (.cancel timer)
+     (reset! (:game-timer sys) nil)
+     (log/info :game-paused :tick (:tick @(:game-state sys))))))
+
+(defn resume-game!
+  "Resume a paused game."
+  ([] (resume-game! @system))
+  ([sys]
+   (when (and sys (nil? @(:game-timer sys)))
+     (let [tick-ms (get-in @(:game-state sys) [:config :tick-ms] 500)
+           timer (Timer. "game-tick" true)
+           task (proxy [TimerTask] []
+                  (run [] (tick! sys)))]
+       (.scheduleAtFixedRate timer task (long tick-ms) (long tick-ms))
+       (reset! (:game-timer sys) timer)
+       (log/info :game-resumed :tick (:tick @(:game-state sys)))))))
 
 (defn stop-game!
   "Stop the current game, save replay."
