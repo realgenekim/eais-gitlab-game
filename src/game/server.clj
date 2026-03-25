@@ -137,6 +137,24 @@
 (defn handle-spectate [request]
   (sse/handle-spectate request))
 
+(defn handle-restart [_request]
+  (engine/stop-game!)
+  (let [sys (engine/start-game! {:on-tick #'sse/on-tick})]
+    ;; Start 5 demo bots
+    (require 'game.bots)
+    (let [start-team! (resolve 'game.bots/start-team!)
+          hunter      (resolve 'game.bots/hunter-think)
+          courier     (resolve 'game.bots/courier-think)
+          random      (resolve 'game.bots/random-think)]
+      (start-team!
+       [{:name "Hunter-1"  :think-fn @hunter}
+        {:name "Hunter-2"  :think-fn @hunter}
+        {:name "Courier-1" :think-fn @courier}
+        {:name "Courier-2" :think-fn @courier}
+        {:name "RandomBot" :think-fn @random}]))
+    (sse/reload-browsers!)
+    (json-response 200 {:status "restarted" :tick 0})))
+
 ;;; ---------------------------------------------------------------------------
 ;;; Router
 ;;; ---------------------------------------------------------------------------
@@ -154,7 +172,8 @@
          ["/game/ascii" {:get {:handler #'handle-ascii}}]
          ;; Spectator
          ["/" {:get {:handler #'handle-spectator-page}}]
-         ["/spectate" {:get {:handler #'handle-spectate}}]])
+         ["/spectate" {:get {:handler #'handle-spectate}}]
+         ["/game/restart" {:post {:handler #'handle-restart}}]])
        (reitit/create-default-handler)
        {:middleware [wrap-params wrap-json]})
       (wrap-resource "public")

@@ -34,6 +34,8 @@
 
       [:div.header
        [:h1 "CAB BATTLE"]
+       [:div.header-controls
+        [:button.restart-btn {:data-star-on:click "@post('/game/restart')"} "NEW GAME"]]
        [:div#game-info
         [:span.tick "Tick: 0"]
         [:span.players "Players: 0"]
