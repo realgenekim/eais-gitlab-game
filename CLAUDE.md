@@ -45,3 +45,30 @@ make mcp-configure   # One-time: Configure Clojure MCP for Claude Code
 make runtests-once   # Fast fail-first test run
 ```
 Tests mirror source: `src/game/core.clj` → `test/game/core_test.clj`
+
+## Logging
+Use Timbre with structured keyword args, never println:
+```clojure
+(require '[taoensso.timbre :as log])
+(log/info :server-started :port 8080)
+(log/error :tick-error :msg (.getMessage e) :error e)
+```
+
+## Route Handler Convention
+Always extract route handlers as named `defn handle-xxx` functions with `#'var` references in the route table for REPL reload:
+```clojure
+(defn handle-home [_] (resp/response (str (views/home-page))))
+(defn make-routes [] [["/" {:get {:handler #'handle-home}}]])
+```
+
+## Reitit Hot-Reload
+Use `reitit.ring/reloading-ring-handler` in dev mode so new route paths work without restart.
+
+## ENV=dev Convention
+Single env var gates all dev behavior: browser-reload, code reloading, DEV banner, auth bypass.
+
+## REPL Workflow
+- Always have nREPL running (`make nrepl`)
+- Use `(comment ...)` blocks for REPL exploration
+- Test functions in REPL before writing unit tests
+- `dev/user.clj` loaded automatically for REPL utilities

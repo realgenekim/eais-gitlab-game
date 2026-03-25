@@ -13,7 +13,7 @@ import time
 import argparse
 import random
 
-SERVER = "http://localhost:8080"
+SERVER = "http://localhost:33333"
 TOKEN = None
 PLAYER_ID = None
 

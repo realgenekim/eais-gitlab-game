@@ -5,7 +5,7 @@
 export PATH := $(HOME)/bin:$(PATH)
 
 # Server port (default: 8080)
-PORT ?= 8080
+PORT ?= 33333
 
 # Start nREPL server (auto-assigns port, writes to .nrepl-port)
 nrepl:
@@ -72,6 +72,10 @@ server-dev:
 server-prod:
 	@echo "🚕 Starting Cab Battle server (port $(PORT), production mode)..."
 	PORT=$(PORT) clojure -M -m game.server
+
+# Run starter Python bot
+bot:
+	PYTHONUNBUFFERED=1 python3 starter-bots/python/bot.py --server http://localhost:$(PORT) --name "PyBot-$$$$"
 
 # Stop server running on configured port
 stop:

@@ -1,23 +1,27 @@
 (ns game.server
-  "HTTP server — REST API for the game. Owns the game loop."
+  "HTTP server — REST API + spectator SSE. Delegates state to game.engine."
   (:require [game.core :as core]
             [game.maps :as maps]
-            [game.replay :as replay]
+            [game.engine :as engine]
+            [game.sse :as sse]
+            [game.views :as views]
             [org.httpkit.server :as http]
             [reitit.ring :as reitit]
+            [ring.util.response :as resp]
             [clojure.data.json :as json]
             [clojure.string :as str]
-            [clojure.java.io :as io])
-  (:import [java.util Timer TimerTask]))
+            [clojure.java.io :as io]
+            [ring.middleware.params :refer [wrap-params]]
+            [taoensso.timbre :as log]))
 
 ;;; ---------------------------------------------------------------------------
 ;;; Game State (mutable world)
 ;;; ---------------------------------------------------------------------------
 
 (defonce game-state (atom nil))
-(defonce recorder   (atom nil))
-(defonce command-queue (atom []))  ;; commands pending for next tick
-(defonce token->player (atom {}))  ;; token → player-id lookup
+(defonce recorder (atom nil))
+(defonce command-queue (atom [])) ;; commands pending for next tick
+(defonce token->player (atom {})) ;; token → player-id lookup
 (defonce game-timer (atom nil))
 
 ;;; ---------------------------------------------------------------------------
@@ -25,9 +29,9 @@
 ;;; ---------------------------------------------------------------------------
 
 (defn json-response [status body]
-  {:status  status
+  {:status status
    :headers {"Content-Type" "application/json"}
-   :body    (json/write-str body)})
+   :body (json/write-str body)})
 
 (defn parse-json-body
   "Parse JSON request body into a map with string keys."
@@ -52,7 +56,8 @@
 
 (defn authenticate [request]
   (let [token (or (get-in request [:headers "authorization"])
-                  (get-in request [:params :token])
+                  (get-in request [:query-params "token"])
+                  (get-in request [:params "token"])
                   (get-in request [:body "token"]))]
     (get @token->player token)))
 
@@ -61,10 +66,10 @@
 ;;; ---------------------------------------------------------------------------
 
 (defn handle-join [request]
-  (let [body      (:body request)
-        name      (get body "name" "anonymous")
-        state     @game-state
-        max-p     (get-in state [:config :max-players] 8)]
+  (let [body (:body request)
+        name (get body "name" "anonymous")
+        state @game-state
+        max-p (get-in state [:config :max-players] 8)]
     (if (>= (count (:players state)) max-p)
       (json-response 400 {:error "Game is full"})
       (let [[new-state creds] (core/add-player state name)]
@@ -75,8 +80,8 @@
           (swap! recorder assoc :initial-state new-state
                  :snapshots {0 new-state}))
         (json-response 200 {:player-id (:id creds)
-                            :token     (:token creds)
-                            :message   (str "Welcome, " name "!")})))))
+                            :token (:token creds)
+                            :message (str "Welcome, " name "!")})))))
 
 (defn handle-state [request]
   (if-let [player-id (authenticate request)]
@@ -85,12 +90,12 @@
 
 (defn handle-action [request]
   (if-let [player-id (authenticate request)]
-    (let [body   (:body request)
-          action {:type      (keyword (get body "action"))
+    (let [body (:body request)
+          action {:type (keyword (get body "action"))
                   :direction (get body "direction")
-                  :angle     (get body "angle")
-                  :dx        (get body "dx")
-                  :dy        (get body "dy")}]
+                  :angle (get body "angle")
+                  :dx (get body "dx")
+                  :dy (get body "dy")}]
       (swap! command-queue conj {:player-id player-id :action action})
       (json-response 200 {:status "queued" :tick (:tick @game-state)}))
     (json-response 401 {:error "Invalid token"})))
@@ -99,40 +104,40 @@
   (let [state @game-state
         scores (->> (:players state)
                     (map (fn [[id p]]
-                           {:id    id
-                            :name  (:name p)
+                           {:id id
+                            :name (:name p)
                             :score (:score p)
                             :alive (:alive? p)
-                            :kills 0}))  ;; TODO track kills
+                            :kills 0})) ;; TODO track kills
                     (sort-by :score >))]
-    (json-response 200 {:tick   (:tick state)
+    (json-response 200 {:tick (:tick state)
                         :scores scores})))
 
 (defn handle-map [_request]
   (let [state @game-state]
-    (json-response 200 {:width  (get-in state [:map :width])
+    (json-response 200 {:width (get-in state [:map :width])
                         :height (get-in state [:map :height])
-                        :walls  (vec (get-in state [:map :walls]))
-                        :ascii  (maps/render-state-ascii state)})))
+                        :walls (vec (get-in state [:map :walls]))
+                        :ascii (maps/render-state-ascii state)})))
 
 (defn handle-status [_request]
   (let [state @game-state]
     (json-response 200
-                   {:tick      (:tick state)
-                    :players   (count (:players state))
+                   {:tick (:tick state)
+                    :players (count (:players state))
                     :passengers (count (filter #(nil? (:picked-up-by %))
                                                (:passengers state)))
-                    :running   (some? @game-timer)})))
+                    :running (some? @game-timer)})))
 
 (defn handle-ascii [_request]
-  {:status  200
+  {:status 200
    :headers {"Content-Type" "text/plain"}
-   :body    (str (maps/render-state-ascii @game-state) "\n"
-                 "Tick: " (:tick @game-state) "\n"
-                 "Scores: "
-                 (str/join ", "
-                           (map (fn [[id p]] (str (:name p) ":" (:score p)))
-                                (:players @game-state))))})
+   :body (str (maps/render-state-ascii @game-state) "\n"
+              "Tick: " (:tick @game-state) "\n"
+              "Scores: "
+              (str/join ", "
+                        (map (fn [[id p]] (str (:name p) ":" (:score p)))
+                             (:players @game-state))))})
 
 ;;; ---------------------------------------------------------------------------
 ;;; Router
@@ -141,15 +146,15 @@
 (def app
   (reitit/ring-handler
    (reitit/router
-    [["/game/join"       {:post {:handler #'handle-join}}]
-     ["/game/state"      {:get  {:handler #'handle-state}}]
-     ["/game/action"     {:post {:handler #'handle-action}}]
-     ["/game/scoreboard" {:get  {:handler #'handle-scoreboard}}]
-     ["/game/map"        {:get  {:handler #'handle-map}}]
-     ["/game/status"     {:get  {:handler #'handle-status}}]
-     ["/game/ascii"      {:get  {:handler #'handle-ascii}}]])
+    [["/game/join" {:post {:handler #'handle-join}}]
+     ["/game/state" {:get {:handler #'handle-state}}]
+     ["/game/action" {:post {:handler #'handle-action}}]
+     ["/game/scoreboard" {:get {:handler #'handle-scoreboard}}]
+     ["/game/map" {:get {:handler #'handle-map}}]
+     ["/game/status" {:get {:handler #'handle-status}}]
+     ["/game/ascii" {:get {:handler #'handle-ascii}}]])
    (reitit/create-default-handler)
-   {:middleware [wrap-json]}))
+   {:middleware [wrap-params wrap-json]}))
 
 ;;; ---------------------------------------------------------------------------
 ;;; Game Loop
@@ -158,9 +163,9 @@
 (declare stop-game!)
 
 (defn tick! []
-  (let [commands  (let [cmds @command-queue]
-                    (reset! command-queue [])
-                    cmds)
+  (let [commands (let [cmds @command-queue]
+                   (reset! command-queue [])
+                   cmds)
         old-state @game-state
         new-state (core/advance-tick old-state commands)]
     ;; Record for replay
@@ -184,12 +189,12 @@
      (reset! recorder (replay/make-recorder state))
      (reset! command-queue [])
      (reset! token->player {})
-     (let [timer    (Timer. true)
-           tick-ms  (get-in state [:config :tick-ms] 500)
-           task     (proxy [TimerTask] []
-                      (run [] (try (tick!)
-                                   (catch Exception e
-                                     (println "Tick error:" (.getMessage e))))))]
+     (let [timer (Timer. true)
+           tick-ms (get-in state [:config :tick-ms] 500)
+           task (proxy [TimerTask] []
+                  (run [] (try (tick!)
+                               (catch Exception e
+                                 (println "Tick error:" (.getMessage e))))))]
        (.scheduleAtFixedRate timer task (long tick-ms) (long tick-ms))
        (reset! game-timer timer)
        (println (str "🎮 Game started! Tick every " tick-ms "ms"))
@@ -211,7 +216,7 @@
 
 (defn -main [& _args]
   (start-game!)
-  (let [port 8080]
+  (let [port (Integer/parseInt (or (System/getenv "PORT") "33333"))]
     (http/run-server #'app {:port port})
     (println (str "🚕 Cab Battle server running on http://localhost:" port))
     (println "Endpoints:")
