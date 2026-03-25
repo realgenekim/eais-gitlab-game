@@ -275,7 +275,7 @@
             :max-players 8
             :ammo-regen-ticks 5 ;; regen 1 ammo every 5 ticks
             :max-ammo 10
-            :game-duration-ticks 300}}) ;; 300 ticks × 500ms = 2.5 min per round
+            :game-duration-ticks 1000}}) ;; 1000 ticks × 500ms = ~8 min per round
 
 (defn add-player
   "Add a player to the game. Returns [updated-state token]."

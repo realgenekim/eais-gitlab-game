@@ -223,34 +223,70 @@ body {
   padding: 1rem 0;
 }
 
-/* ===== DIRECTIONAL BULLET TRACERS ===== */
+/* ===== LASER BEAM TRACERS ===== */
+/* 3-cell beam that traverses the screen with staggered animation.
+   --d = distance from shooter, --md = max distance bullet travels.
+   Animation delay = (d / md) * tick duration, so beam sweeps across. */
 .cell.tracer {
-  animation: tracer-flash 0.4s ease-out;
-  overflow: hidden;
   position: relative;
+  overflow: hidden;
+  animation: laser-sweep 0.45s ease-out both;
+  animation-delay: calc((var(--d) / var(--md)) * 0.35s);
 }
 
-/* Directional gradients — bright head, fading tail */
-.cell.tracer-east {
-  background: linear-gradient(to right, rgba(255,200,50,0.1), rgba(255,200,50,0.7)) !important;
-  box-shadow: inset -4px 0 8px rgba(255,200,50,0.8);
-}
+/* Horizontal beams — thin bright line through middle */
+.cell.tracer-east,
 .cell.tracer-west {
-  background: linear-gradient(to left, rgba(255,200,50,0.1), rgba(255,200,50,0.7)) !important;
-  box-shadow: inset 4px 0 8px rgba(255,200,50,0.8);
+  background: var(--open) !important;
 }
-.cell.tracer-south {
-  background: linear-gradient(to bottom, rgba(255,200,50,0.1), rgba(255,200,50,0.7)) !important;
-  box-shadow: inset 0 -4px 8px rgba(255,200,50,0.8);
+.cell.tracer-east::after,
+.cell.tracer-west::after {
+  content: '';
+  position: absolute;
+  top: 40%;
+  left: 0;
+  right: 0;
+  height: 20%;
+  border-radius: 1px;
 }
-.cell.tracer-north {
-  background: linear-gradient(to top, rgba(255,200,50,0.1), rgba(255,200,50,0.7)) !important;
-  box-shadow: inset 0 4px 8px rgba(255,200,50,0.8);
+.cell.tracer-east::after {
+  background: linear-gradient(to right, rgba(255,60,20,0.3), #ff4400 40%, #ffcc00 80%, #fff);
+  box-shadow: 0 0 6px #ff4400, 0 0 12px #ff8800, 0 0 20px rgba(255,200,0,0.5);
+}
+.cell.tracer-west::after {
+  background: linear-gradient(to left, rgba(255,60,20,0.3), #ff4400 40%, #ffcc00 80%, #fff);
+  box-shadow: 0 0 6px #ff4400, 0 0 12px #ff8800, 0 0 20px rgba(255,200,0,0.5);
 }
 
-@keyframes tracer-flash {
-  0% { filter: brightness(2.5); }
-  100% { filter: brightness(1); }
+/* Vertical beams — thin bright line through center */
+.cell.tracer-north,
+.cell.tracer-south {
+  background: var(--open) !important;
+}
+.cell.tracer-north::after,
+.cell.tracer-south::after {
+  content: '';
+  position: absolute;
+  left: 40%;
+  top: 0;
+  bottom: 0;
+  width: 20%;
+  border-radius: 1px;
+}
+.cell.tracer-south::after {
+  background: linear-gradient(to bottom, rgba(255,60,20,0.3), #ff4400 40%, #ffcc00 80%, #fff);
+  box-shadow: 0 0 6px #ff4400, 0 0 12px #ff8800, 0 0 20px rgba(255,200,0,0.5);
+}
+.cell.tracer-north::after {
+  background: linear-gradient(to top, rgba(255,60,20,0.3), #ff4400 40%, #ffcc00 80%, #fff);
+  box-shadow: 0 0 6px #ff4400, 0 0 12px #ff8800, 0 0 20px rgba(255,200,0,0.5);
+}
+
+@keyframes laser-sweep {
+  0% { opacity: 0; }
+  20% { opacity: 1; }
+  70% { opacity: 1; }
+  100% { opacity: 0.15; }
 }
 
 /* ===== HIT — sparks burst from car ===== */
@@ -304,13 +340,14 @@ body {
   60% { transform: translate(-1px, -1px); }
 }
 
-/* ===== NUCLEAR KILL — smoke + sparks ===== */
+/* ===== NUCLEAR KILL — 3x smoke + massive sparks ===== */
 .cell.nuke {
   position: relative;
   overflow: visible;
   z-index: 10;
-  background: rgba(255, 68, 0, 0.4) !important;
-  animation: nuke-cell 0.6s ease-out;
+  background: rgba(255, 68, 0, 0.6) !important;
+  animation: nuke-cell 0.8s ease-out;
+  box-shadow: 0 0 50px rgba(255,68,0,1), 0 0 100px rgba(255,200,0,0.5);
 }
 
 .nuke-fx {
@@ -319,17 +356,22 @@ body {
   height: 100%;
 }
 
-/* Smoke cloud */
+/* Massive smoke cloud — 3x bigger */
 .smoke {
   position: absolute;
-  inset: -40%;
+  inset: -150%;
   border-radius: 50%;
-  background: radial-gradient(circle, rgba(80,80,80,0.8) 0%, rgba(40,40,40,0.4) 40%, transparent 70%);
-  animation: smoke-rise 0.8s ease-out forwards;
+  background: radial-gradient(circle,
+    rgba(255,100,0,0.7) 0%,
+    rgba(120,60,0,0.5) 25%,
+    rgba(80,80,80,0.6) 45%,
+    rgba(40,40,40,0.3) 65%,
+    transparent 80%);
+  animation: smoke-rise 1s ease-out forwards;
   z-index: 1;
 }
 
-/* Sparks burst outward */
+/* Sparks burst outward — bigger, more */
 .sparks {
   position: absolute;
   inset: 0;
@@ -339,30 +381,38 @@ body {
 
 .sparks .spark {
   position: absolute;
-  width: 4px;
-  height: 4px;
+  width: 5px;
+  height: 5px;
   border-radius: 50%;
   top: 50%;
   left: 50%;
 }
 
-.sparks .spark:nth-child(1) { background: #fff; box-shadow: 0 0 6px #ff8800; animation: spark-fly 0.5s ease-out forwards; --sx: -18px; --sy: -14px; }
-.sparks .spark:nth-child(2) { background: #ffcc00; box-shadow: 0 0 6px #ff4400; animation: spark-fly 0.5s 0.04s ease-out forwards; --sx: 16px; --sy: -12px; }
-.sparks .spark:nth-child(3) { background: #ff8800; box-shadow: 0 0 6px #ff0000; animation: spark-fly 0.5s 0.08s ease-out forwards; --sx: -14px; --sy: 16px; }
-.sparks .spark:nth-child(4) { background: #fff; box-shadow: 0 0 6px #ffcc00; animation: spark-fly 0.5s 0.02s ease-out forwards; --sx: 18px; --sy: 10px; }
-.sparks .spark:nth-child(5) { background: #ffcc00; box-shadow: 0 0 6px #ff8800; animation: spark-fly 0.5s 0.06s ease-out forwards; --sx: -6px; --sy: -18px; }
-.sparks .spark:nth-child(6) { background: #ff4400; box-shadow: 0 0 6px #ff0000; animation: spark-fly 0.5s 0.1s ease-out forwards; --sx: 8px; --sy: 18px; }
+.sparks .spark:nth-child(1)  { background: #fff; box-shadow: 0 0 10px #ff8800, 0 0 20px #ff4400; animation: spark-fly 0.7s ease-out forwards; --sx: -45px; --sy: -35px; }
+.sparks .spark:nth-child(2)  { background: #ffcc00; box-shadow: 0 0 10px #ff4400, 0 0 20px #ff0000; animation: spark-fly 0.7s 0.03s ease-out forwards; --sx: 40px; --sy: -30px; }
+.sparks .spark:nth-child(3)  { background: #ff8800; box-shadow: 0 0 10px #ff0000, 0 0 20px #cc0000; animation: spark-fly 0.7s 0.06s ease-out forwards; --sx: -35px; --sy: 40px; }
+.sparks .spark:nth-child(4)  { background: #fff; box-shadow: 0 0 10px #ffcc00, 0 0 20px #ff8800; animation: spark-fly 0.7s 0.02s ease-out forwards; --sx: 45px; --sy: 25px; }
+.sparks .spark:nth-child(5)  { background: #ffcc00; box-shadow: 0 0 10px #ff8800, 0 0 20px #ff4400; animation: spark-fly 0.7s 0.05s ease-out forwards; --sx: -15px; --sy: -48px; }
+.sparks .spark:nth-child(6)  { background: #ff4400; box-shadow: 0 0 10px #ff0000, 0 0 20px #cc0000; animation: spark-fly 0.7s 0.08s ease-out forwards; --sx: 20px; --sy: 48px; }
+.sparks .spark:nth-child(7)  { background: #fff; box-shadow: 0 0 8px #ffcc00; animation: spark-fly 0.8s 0.04s ease-out forwards; --sx: -50px; --sy: 5px; width: 4px; height: 4px; }
+.sparks .spark:nth-child(8)  { background: #ffcc00; box-shadow: 0 0 8px #ff8800; animation: spark-fly 0.8s 0.07s ease-out forwards; --sx: 50px; --sy: -8px; width: 4px; height: 4px; }
+.sparks .spark:nth-child(9)  { background: #ff8800; box-shadow: 0 0 8px #ff4400; animation: spark-fly 0.8s 0.1s ease-out forwards; --sx: 5px; --sy: 52px; width: 3px; height: 3px; }
+.sparks .spark:nth-child(10) { background: #fff; box-shadow: 0 0 8px #ff8800; animation: spark-fly 0.8s 0.02s ease-out forwards; --sx: -8px; --sy: -52px; width: 3px; height: 3px; }
+.sparks .spark:nth-child(11) { background: #ffcc00; box-shadow: 0 0 12px #ff4400; animation: spark-fly 0.9s 0.06s ease-out forwards; --sx: -38px; --sy: -38px; width: 6px; height: 6px; }
+.sparks .spark:nth-child(12) { background: #ff4400; box-shadow: 0 0 12px #ff0000; animation: spark-fly 0.9s 0.09s ease-out forwards; --sx: 38px; --sy: 38px; width: 6px; height: 6px; }
 
 @keyframes smoke-rise {
-  0% { transform: scale(0.3); opacity: 0; }
-  30% { transform: scale(1.2); opacity: 0.9; }
-  100% { transform: scale(1.8) translateY(-30%); opacity: 0; }
+  0% { transform: scale(0.2); opacity: 0; }
+  15% { transform: scale(0.8); opacity: 1; }
+  40% { transform: scale(1.2); opacity: 0.8; }
+  100% { transform: scale(2) translateY(-20%); opacity: 0; }
 }
 
 @keyframes nuke-cell {
-  0% { background: #ffffff !important; box-shadow: 0 0 40px rgba(255,255,255,1); }
-  20% { background: #ff8800 !important; box-shadow: 0 0 30px rgba(255,136,0,0.8); }
-  100% { background: rgba(255,68,0,0.2) !important; box-shadow: none; }
+  0% { background: #ffffff !important; box-shadow: 0 0 80px rgba(255,255,255,1), 0 0 150px rgba(255,200,0,0.8); transform: scale(1.3); }
+  15% { background: #ffcc00 !important; box-shadow: 0 0 60px rgba(255,200,0,1); transform: scale(1.2); }
+  35% { background: #ff8800 !important; box-shadow: 0 0 40px rgba(255,136,0,0.8); transform: scale(1.1); }
+  100% { background: rgba(255,68,0,0.2) !important; box-shadow: none; transform: scale(1); }
 }
 
 /* ===== BASE ANIMATIONS ===== */

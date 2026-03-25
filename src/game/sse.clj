@@ -15,13 +15,29 @@
 (defn subscriber-count [] (count @subscribers))
 
 (defn handle-spectate
-  "SSE endpoint — browser connects once, stays open."
+  "SSE endpoint — browser connects once, stays open.
+   Pushes initial state immediately so spectators don't see 'Waiting for game data'."
   [request]
   (hk/->sse-response request
                      {hk/on-open
                       (fn [sse-gen]
                         (swap! subscribers conj sse-gen)
-                        (log/info :sse-connect :subscribers (inc (count @subscribers))))
+                        (log/info :sse-connect :subscribers (count @subscribers))
+       ;; Push current state immediately to this new subscriber
+                        (try
+                          (when-let [sys @game.engine/system]
+                            (let [state @(:game-state sys)
+                                  events @(:event-log sys)
+                                  html-map (str (h/html (views/game-map-fragment state events)))
+                                  html-sb (str (h/html (views/scoreboard-fragment state)))
+                                  html-ef (str (h/html (views/event-feed-fragment events)))
+                                  html-info (str (h/html (views/game-info-fragment state)))]
+                              (d*/patch-elements! sse-gen html-map {d*/selector "#game-map" d*/patch-mode d*/pm-inner})
+                              (d*/patch-elements! sse-gen html-sb {d*/selector "#scoreboard" d*/patch-mode d*/pm-inner})
+                              (d*/patch-elements! sse-gen html-ef {d*/selector "#event-feed" d*/patch-mode d*/pm-inner})
+                              (d*/patch-elements! sse-gen html-info {d*/selector "#game-info" d*/patch-mode d*/pm-inner})))
+                          (catch Exception e
+                            (log/warn :sse-initial-push-error :msg (.getMessage e)))))
 
                       hk/on-close
                       (fn [sse-gen _status]

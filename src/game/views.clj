@@ -95,26 +95,41 @@
                                          (get-in pax [:dest :y])]
                                         {:player-name (:name p)}]))
                                    (map (fn [[_ p]] p) players)))
-        ;; Compute bullet tracers with direction from shoot commands
-        tracer-map (atom {}) ;; [x y] -> direction keyword
+        ;; Compute bullet tracers with direction + distance for staggered animation
+        tracer-map (atom {}) ;; [x y] -> {:dir :east :dist 1 :max-dist 3}
         _ (doseq [evt events]
             (when (and (= :command (:type evt))
                        (= :shoot (get-in evt [:action :type])))
-              (let [pid (:player-id evt)
+              (let [pid    (:player-id evt)
                     player (get-in game-state [:players pid])
-                    dir (keyword (get-in evt [:action :direction]))
-                    [dx dy] (get directions dir [0 0])]
+                    dir    (keyword (get-in evt [:action :direction]))
+                    [dx dy] (get directions dir [0 0])
+                    range- 20]
                 (when (and player (not= [dx dy] [0 0]))
-                  (loop [x (+ (:x player) dx)
-                         y (+ (:y player) dy)
-                         dist 1]
-                    (when (and (<= dist 5)
-                               (>= x 0) (< x width)
-                               (>= y 0) (< y height)
-                               (not (contains? walls [x y])))
-                      (swap! tracer-map assoc [x y] dir)
-                      (when-not (get player-lookup [x y])
-                        (recur (+ x dx) (+ y dy) (inc dist)))))))))
+                  ;; First pass: find how far the bullet travels
+                  (let [max-dist (loop [x (+ (:x player) dx)
+                                        y (+ (:y player) dy)
+                                        d 1]
+                                   (if (or (> d range-)
+                                           (not (and (>= x 0) (< x width) (>= y 0) (< y height)))
+                                           (contains? walls [x y]))
+                                     (dec d)
+                                     (if (get player-lookup [x y])
+                                       d
+                                       (recur (+ x dx) (+ y dy) (inc d)))))]
+                    ;; Only render last 3 cells of the tracer (bullet head)
+                    (loop [x (+ (:x player) dx)
+                           y (+ (:y player) dy)
+                           d 1]
+                      (when (and (<= d range-)
+                                 (>= x 0) (< x width)
+                                 (>= y 0) (< y height)
+                                 (not (contains? walls [x y])))
+                        (when (> d (- max-dist 3))
+                          (swap! tracer-map assoc [x y]
+                                 {:dir dir :dist d :max-dist max-dist}))
+                        (when-not (get player-lookup [x y])
+                          (recur (+ x dx) (+ y dy) (inc d))))))))))
         tracers @tracer-map
         ;; Kill positions
         recent-kills (->> events
@@ -137,18 +152,23 @@
              pax (get pax-lookup [x y])
              is-kill (contains? recent-kills [x y])
              is-hit (and player (contains? damaged-players [x y]))
-             tracer-dir (when (and (not player) (not is-kill)) (get tracers [x y]))]
+             tracer (when (and (not player) (not is-kill)) (get tracers [x y]))]
          [:div.cell
           {:class (str cls
                        (when is-kill " nuke")
                        (when is-hit " hit")
-                       (when tracer-dir (str " tracer tracer-" (name tracer-dir))))
-           :style (when (and player (not is-kill))
-                    (str "background-color:" (:color player)))}
+                       (when tracer (str " tracer tracer-" (name (:dir tracer)))))
+           :style (str (when (and player (not is-kill))
+                         (str "background-color:" (:color player) ";"))
+                       (when tracer
+                         (str "--d:" (:dist tracer)
+                              ";--md:" (:max-dist tracer) ";")))}
           (cond
             is-kill [:div.nuke-fx
                      [:div.smoke]
                      [:div.sparks
+                      [:div.spark] [:div.spark] [:div.spark]
+                      [:div.spark] [:div.spark] [:div.spark]
                       [:div.spark] [:div.spark] [:div.spark]
                       [:div.spark] [:div.spark] [:div.spark]]]
             is-hit [:div.hit-fx
