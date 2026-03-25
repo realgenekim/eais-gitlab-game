@@ -1,0 +1,45 @@
+{:paths ["src" "resources"]
+
+ ;; NOTE: Do NOT add :mcp alias here!
+ ;; The :mcp alias lives in ~/.clojure/deps.edn (global config)
+ ;; and is used by clojure-mcp to connect to the nREPL server
+
+ :deps {org.clojure/clojure {:mvn/version "1.12.0"}
+        org.clojure/data.json {:mvn/version "2.5.1"}
+        com.taoensso/timbre {:mvn/version "6.3.1"}
+        genek/logging {:git/url "https://github.com/realgenekim/logging"
+                       :git/sha "69459ec7f9e252d41ef1e65c7ad55cfd944e34db"}
+
+        ;; Datastar SSE — server-push HTML fragments, reactive signals
+        dev.data-star.clojure/http-kit {:mvn/version "1.0.0-RC8"}
+
+        ;; Web server
+        http-kit/http-kit {:mvn/version "2.8.0"}
+        metosin/reitit-ring {:mvn/version "0.7.0"}
+        hiccup/hiccup {:mvn/version "2.0.0-RC4"}
+        ring/ring-core {:mvn/version "1.12.2"}}
+
+ :aliases
+ {:dev {:extra-paths ["dev"]
+        :extra-deps {;; Browser auto-reload functionality
+                     ring/ring-devel {:mvn/version "1.12.2"}
+                     hawk/hawk {:mvn/version "0.2.11"}
+                     browser-reload/browser-reload {:git/url "https://github.com/realgenekim/browser-reload"
+                                                    :git/sha "a794c2dd1dc505d2a400419b937d8df04c93d494"}
+                     ;; JNA upgrade for ARM64/Apple Silicon support (hawk uses old 3.2.2)
+                     net.java.dev.jna/jna {:mvn/version "5.14.0"}}}
+  :test {:extra-paths ["test"]
+         :jvm-opts ["-Dguardrails.enabled=true"]}
+  :run-tests {:extra-paths ["test"]
+              :extra-deps {lambdaisland/kaocha {:mvn/version "1.91.1392"}
+                           ring/ring-mock {:mvn/version "0.4.0"}
+                           browser-reload/browser-reload {:git/url "https://github.com/realgenekim/browser-reload"
+                                                          :git/sha "a794c2dd1dc505d2a400419b937d8df04c93d494"}}
+              :main-opts ["-m" "kaocha.runner"]
+              :jvm-opts ["-Dguardrails.enabled=true"]}
+  :nrepl {:extra-paths ["test"]
+          :extra-deps {nrepl/nrepl {:mvn/version "1.3.1"}}
+          :jvm-opts ["-Djdk.attach.allowAttachSelf"]
+          :main-opts ["-m" "nrepl.cmdline"]}
+  :build {:deps {io.github.clojure/tools.build {:git/tag "v0.10.5" :git/sha "2a21b7a"}}
+          :ns-default build}}}
