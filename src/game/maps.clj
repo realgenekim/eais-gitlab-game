@@ -7,9 +7,9 @@
    Legend: # = wall, . = open, S = spawn point, P = passenger spawn
    Returns {:width W :height H :walls #{[x y]...} :spawn-points [[x y]...]}"
   [ascii-str]
-  (let [lines  (str/split-lines (str/trim ascii-str))
+  (let [lines (str/split-lines (str/trim ascii-str))
         height (count lines)
-        width  (apply max (map count lines))]
+        width (apply max (map count lines))]
     (reduce
      (fn [m [y line]]
        (reduce
@@ -20,10 +20,10 @@
             \P (update m :passenger-spawns conj [x y])
             m))
         m (map-indexed vector line)))
-     {:width           width
-      :height          height
-      :walls           #{}
-      :spawn-points    []
+     {:width width
+      :height height
+      :walls #{}
+      :spawn-points []
       :passenger-spawns []}
      (map-indexed vector lines))))
 
@@ -42,23 +42,23 @@
 
 (def arena-ascii "
 ####################
-#S.....#....#.....S#
-#.####.#.##.#.####.#
-#.#..#.......#..#..#
-#.#..#.#####.#..#..#
-#......#P..#.......#
-#.####.#...#.####..#
-#.#....#...#....#..#
-#.#.##.......##.#..#
+#S.................S#
+#.##...#....#...##.#
+#......#....#......#
+#..#.........#..#..#
 #......P.....P.....#
-#.#.##.......##.#..#
-#.#....#...#....#..#
-#.####.#...#.####..#
-#......#P..#.......#
-#.#..#.#####.#..#..#
-#.#..#.......#..#..#
-#.####.#.##.#.####.#
-#S.....#....#.....S#
+#.##...............#
+#..................#
+#......P.....P.....#
+#..................#
+#......P.....P.....#
+#..................#
+#.##...............#
+#......P.....P.....#
+#..#.........#..#..#
+#......#....#......#
+#.##...#....#...##.#
+#S.................S#
 ####################
 ")
 
@@ -88,19 +88,19 @@
   "Render game state as ASCII art for terminal display / debugging."
   [game-state]
   (let [{:keys [width height walls]} (:map game-state)
-        players    (:players game-state)
+        players (:players game-state)
         passengers (filter #(nil? (:picked-up-by %)) (:passengers game-state))
         ;; Build lookup maps
         player-pos (into {} (map (fn [[id p]] [[(:x p) (:y p)] (subs id 7 8)])
                                  (filter (fn [[_ p]] (:alive? p)) players)))
-        pax-pos    (set (map (fn [p] [(:x p) (:y p)]) passengers))]
+        pax-pos (set (map (fn [p] [(:x p) (:y p)]) passengers))]
     (str/join
      \newline
      (for [y (range height)]
        (apply str
               (for [x (range width)]
                 (cond
-                  (contains? walls [x y])     \#
-                  (player-pos [x y])          (player-pos [x y])
-                  (pax-pos [x y])             \$
-                  :else                       \.)))))))
+                  (contains? walls [x y]) \#
+                  (player-pos [x y]) (player-pos [x y])
+                  (pax-pos [x y]) \$
+                  :else \.)))))))
