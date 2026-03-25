@@ -65,53 +65,108 @@
 (defn- cell-class [game-state x y player-lookup pax-lookup dest-lookup]
   (cond
     (contains? (get-in game-state [:map :walls]) [x y]) "wall"
-    (get player-lookup [x y])                            "player"
-    (get pax-lookup [x y])                               "passenger"
-    (get dest-lookup [x y])                              "destination"
-    :else                                                "open"))
+    (get player-lookup [x y]) "player"
+    (get pax-lookup [x y]) "passenger"
+    (get dest-lookup [x y]) "destination"
+    :else "open"))
 
 (defn game-map-fragment
-  "Render the full game map grid as a spectator god-mode view."
-  [game-state]
-  (let [{:keys [width height]} (:map game-state)
-        players    (:players game-state)
+  "Render the full game map grid as a spectator god-mode view.
+   Events from the current tick drive hit/kill/tracer animations."
+  [game-state events]
+  (let [{:keys [width height walls]} (:map game-state)
+        players (:players game-state)
         passengers (filter #(nil? (:picked-up-by %)) (:passengers game-state))
+        directions {:north [0 -1] :south [0 1] :east [1 0] :west [-1 0]}
         ;; Build lookups
         player-list (->> players
-                         (filter (fn [[_ p]] (:alive? p)))
                          (map-indexed (fn [idx [id p]]
                                         {:id id :x (:x p) :y (:y p)
                                          :name (:name p) :score (:score p)
+                                         :hp (:hp p) :alive (:alive? p)
                                          :color (player-color idx)
                                          :has-passenger (some? (:passenger p))})))
-        player-lookup (into {} (map (fn [p] [[(:x p) (:y p)] p]) player-list))
-        pax-lookup    (into {} (map (fn [p] [[(:x p) (:y p)] p]) passengers))
-        dest-lookup   (into {} (keep (fn [p]
-                                       (when-let [pax (:passenger p)]
-                                         [[(get-in pax [:dest :x])
-                                           (get-in pax [:dest :y])]
-                                          {:player-name (:name p)}]))
-                                     (map (fn [[_ p]] p) players)))]
+        alive-list (filter :alive player-list)
+        player-lookup (into {} (map (fn [p] [[(:x p) (:y p)] p]) alive-list))
+        pax-lookup (into {} (map (fn [p] [[(:x p) (:y p)] p]) passengers))
+        dest-lookup (into {} (keep (fn [p]
+                                     (when-let [pax (:passenger p)]
+                                       [[(get-in pax [:dest :x])
+                                         (get-in pax [:dest :y])]
+                                        {:player-name (:name p)}]))
+                                   (map (fn [[_ p]] p) players)))
+        ;; Compute bullet tracers with direction from shoot commands
+        tracer-map (atom {}) ;; [x y] -> direction keyword
+        _ (doseq [evt events]
+            (when (and (= :command (:type evt))
+                       (= :shoot (get-in evt [:action :type])))
+              (let [pid (:player-id evt)
+                    player (get-in game-state [:players pid])
+                    dir (keyword (get-in evt [:action :direction]))
+                    [dx dy] (get directions dir [0 0])]
+                (when (and player (not= [dx dy] [0 0]))
+                  (loop [x (+ (:x player) dx)
+                         y (+ (:y player) dy)
+                         dist 1]
+                    (when (and (<= dist 5)
+                               (>= x 0) (< x width)
+                               (>= y 0) (< y height)
+                               (not (contains? walls [x y])))
+                      (swap! tracer-map assoc [x y] dir)
+                      (when-not (get player-lookup [x y])
+                        (recur (+ x dx) (+ y dy) (inc dist)))))))))
+        tracers @tracer-map
+        ;; Kill positions
+        recent-kills (->> events
+                          (filter #(= :kill (:type %)))
+                          (keep (fn [evt]
+                                  (when-let [victim (get-in game-state [:players (:victim-id evt)])]
+                                    [(:x victim) (:y victim)])))
+                          set)
+        ;; Players with reduced HP = recently hit
+        damaged-players (->> players
+                             (filter (fn [[_ p]] (and (:alive? p) (< (:hp p) 100))))
+                             (map (fn [[_ p]] [(:x p) (:y p)]))
+                             set)]
     [:div.grid {:style (str "grid-template-columns: repeat(" width ", 1fr);"
                             "grid-template-rows: repeat(" height ", 1fr);")}
      (for [y (range height)
            x (range width)]
        (let [cls (cell-class game-state x y player-lookup pax-lookup dest-lookup)
              player (get player-lookup [x y])
-             pax (get pax-lookup [x y])]
+             pax (get pax-lookup [x y])
+             is-kill (contains? recent-kills [x y])
+             is-hit (and player (contains? damaged-players [x y]))
+             tracer-dir (when (and (not player) (not is-kill)) (get tracers [x y]))]
          [:div.cell
-          {:class cls
-           :style (when player (str "background-color:" (:color player)))}
+          {:class (str cls
+                       (when is-kill " nuke")
+                       (when is-hit " hit")
+                       (when tracer-dir (str " tracer tracer-" (name tracer-dir))))
+           :style (when (and player (not is-kill))
+                    (str "background-color:" (:color player)))}
           (cond
+            is-kill [:div.nuke-fx
+                     [:div.smoke]
+                     [:div.sparks
+                      [:div.spark] [:div.spark] [:div.spark]
+                      [:div.spark] [:div.spark] [:div.spark]]]
+            is-hit [:div.hit-fx
+                    [:span.player-icon
+                     {:title (str (:name player) " " (:hp player) "hp")}
+                     (if (:has-passenger player) "\uD83D\uDE95" "\uD83D\uDE96")]
+                    [:div.sparks.small
+                     [:div.spark] [:div.spark] [:div.spark] [:div.spark]]]
             player [:span.player-icon
                     {:title (str (:name player) " (" (:score player) "pts)"
+                                 " " (:hp player) "hp"
                                  (when (:has-passenger player) " [PAX]"))}
                     (if (:has-passenger player) "\uD83D\uDE95" "\uD83D\uDE96")]
-            pax    [:span.pax-icon {:title (str "Passenger → ("
-                                                (get-in pax [:dest :x]) ","
-                                                (get-in pax [:dest :y]) ")")}
-                    "$"]
-            :else  nil)]))]))
+            pax [:span.pax-icon {:title (str "Passenger \u2192 ("
+                                             (get-in pax [:dest :x]) ","
+                                             (get-in pax [:dest :y]) ")")}
+                 "$"]
+            :else nil)]))]))
 
 ;;; ---------------------------------------------------------------------------
 ;;; Scoreboard Fragment
@@ -152,12 +207,12 @@
        (for [evt display-events]
          [:div.event {:class (name (:type evt))}
           (case (:type evt)
-            :kill           (str "\u2620\uFE0F ELIMINATED — " (:victim-id evt))
-            :delivery       (str "\uD83D\uDCE6 DELIVERY +" (:points evt)
-                                 " — " (:player-id evt))
-            :player-joined  (str "\uD83D\uDE95 JOINED — " (:name evt))
-            :respawn        (str "\u2728 RESPAWN — " (:player-id evt))
-            :game-over      "\uD83C\uDFC1 GAME OVER!"
+            :kill (str "\u2620\uFE0F ELIMINATED — " (:victim-id evt))
+            :delivery (str "\uD83D\uDCE6 DELIVERY +" (:points evt)
+                           " — " (:player-id evt))
+            :player-joined (str "\uD83D\uDE95 JOINED — " (:name evt))
+            :respawn (str "\u2728 RESPAWN — " (:player-id evt))
+            :game-over "\uD83C\uDFC1 GAME OVER!"
             (str (:type evt)))])])))
 
 ;;; ---------------------------------------------------------------------------

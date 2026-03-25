@@ -43,27 +43,27 @@
 (defn player-view
   "Build the fog-of-war view for a specific player."
   [game-state player-id]
-  (let [visible   (visible-positions game-state player-id)
-        me        (get-in game-state [:players player-id])
-        others    (->> (:players game-state)
-                       (remove (fn [[id _]] (= id player-id)))
-                       (filter (fn [[_ p]] (and (:alive? p)
-                                                (visible [(:x p) (:y p)]))))
-                       (map (fn [[id p]]
-                              {:id id :x (:x p) :y (:y p)
-                               :has-passenger (some? (:passenger p))})))
+  (let [visible (visible-positions game-state player-id)
+        me (get-in game-state [:players player-id])
+        others (->> (:players game-state)
+                    (remove (fn [[id _]] (= id player-id)))
+                    (filter (fn [[_ p]] (and (:alive? p)
+                                             (visible [(:x p) (:y p)]))))
+                    (map (fn [[id p]]
+                           {:id id :x (:x p) :y (:y p)
+                            :has-passenger (some? (:passenger p))})))
         passengers (->> (:passengers game-state)
                         (filter (fn [p] (and (nil? (:picked-up-by p))
                                              (visible [(:x p) (:y p)]))))
                         (map #(select-keys % [:id :x :y :dest])))]
-    {:tick       (:tick game-state)
-     :you        (-> me
-                     (select-keys [:x :y :hp :score :passenger :ammo :grenades :alive?])
-                     (assoc :id player-id))
-     :visible    {:players    (vec others)
-                  :passengers (vec passengers)}
-     :map        {:width  (get-in game-state [:map :width])
-                  :height (get-in game-state [:map :height])}}))
+    {:tick (:tick game-state)
+     :you (-> me
+              (select-keys [:x :y :hp :score :passenger :ammo :grenades :alive?])
+              (assoc :id player-id))
+     :visible {:players (vec others)
+               :passengers (vec passengers)}
+     :map {:width (get-in game-state [:map :width])
+           :height (get-in game-state [:map :height])}}))
 
 ;;; ---------------------------------------------------------------------------
 ;;; Actions
@@ -108,7 +108,7 @@
 (defmethod apply-action :dropoff
   [state player-id _action]
   (let [player (get-in state [:players player-id])
-        pax    (:passenger player)]
+        pax (:passenger player)]
     (if (and (:alive? player) pax
              (= (:x player) (get-in pax [:dest :x]))
              (= (:y player) (get-in pax [:dest :y])))
@@ -124,8 +124,8 @@
   [state player-id {:keys [direction]}]
   (let [player (get-in state [:players player-id])
         [dx dy] (get directions (keyword direction) [0 0])
-        range-  (get-in state [:config :shoot-range] 5)
-        damage  (get-in state [:config :shoot-damage] 30)]
+        range- (get-in state [:config :shoot-range] 5)
+        damage (get-in state [:config :shoot-damage] 30)]
     (if (or (not (:alive? player))
             (< (:ammo player) 1)
             (= [dx dy] [0 0]))
@@ -212,24 +212,38 @@
 (defn maybe-spawn-passengers
   "Spawn new passengers if below the max count."
   [state]
-  (let [max-pax  (get-in state [:config :max-passengers] 6)
-        alive    (count (filter #(nil? (:picked-up-by %)) (:passengers state)))
-        needed   (- max-pax alive)]
+  (let [max-pax (get-in state [:config :max-passengers] 6)
+        alive (count (filter #(nil? (:picked-up-by %)) (:passengers state)))
+        needed (- max-pax alive)]
     (if (pos? needed)
       (let [{:keys [width height walls]} (:map state)
             open-cells (for [x (range width) y (range height)
                              :when (not (contains? walls [x y]))]
                          [x y])
-            open-vec   (vec open-cells)]
+            open-vec (vec open-cells)]
         (reduce (fn [s i]
-                  (let [pos  (nth open-vec (rand-int (count open-vec)))
+                  (let [pos (nth open-vec (rand-int (count open-vec)))
                         dest (nth open-vec (rand-int (count open-vec)))
-                        id   (str "pax-" (:tick state) "-" i)]
+                        id (str "pax-" (:tick state) "-" i)]
                     (update s :passengers conj
                             {:id id :x (first pos) :y (second pos)
                              :dest {:x (first dest) :y (second dest)}
                              :picked-up-by nil})))
                 state (range needed)))
+      state)))
+
+(defn regen-ammo
+  "Regenerate ammo for alive players every N ticks."
+  [state]
+  (let [regen-every (get-in state [:config :ammo-regen-ticks] 5)
+        max-ammo (get-in state [:config :max-ammo] 10)]
+    (if (zero? (mod (:tick state) regen-every))
+      (reduce-kv
+       (fn [s id player]
+         (if (and (:alive? player) (< (:ammo player) max-ammo))
+           (update-in s [:players id :ammo] inc)
+           s))
+       state (:players state))
       state)))
 
 (defn advance-tick
@@ -239,6 +253,7 @@
       (apply-commands commands)
       (respawn-dead-players)
       (maybe-spawn-passengers)
+      (regen-ammo)
       (update :tick inc)))
 
 ;;; ---------------------------------------------------------------------------
@@ -248,35 +263,37 @@
 (defn make-initial-state
   "Create a fresh game state with the given map."
   [game-map]
-  {:tick       0
-   :map        game-map
-   :players    {}
+  {:tick 0
+   :map game-map
+   :players {}
    :passengers []
-   :config     {:tick-ms            500
-                :visibility-radius  5
-                :shoot-range        5
-                :shoot-damage       30
-                :max-passengers     6
-                :max-players        8
-                :game-duration-ticks 300}})  ;; 300 ticks × 500ms = 2.5 min per round
+   :config {:tick-ms 500
+            :visibility-radius 5
+            :shoot-range 20
+            :shoot-damage 30
+            :max-passengers 6
+            :max-players 8
+            :ammo-regen-ticks 5 ;; regen 1 ammo every 5 ticks
+            :max-ammo 10
+            :game-duration-ticks 300}}) ;; 300 ticks × 500ms = 2.5 min per round
 
 (defn add-player
   "Add a player to the game. Returns [updated-state token]."
   [state player-name]
-  (let [id    (str "player-" (subs (str (random-uuid)) 0 8))
+  (let [id (str "player-" (subs (str (random-uuid)) 0 8))
         token (str (random-uuid))
         spawns (get-in state [:map :spawn-points] [[1 1] [18 1] [1 18] [18 18]])
-        spawn  (nth spawns (mod (count (:players state)) (count spawns)))]
+        spawn (nth spawns (mod (count (:players state)) (count spawns)))]
     [(-> state
          (assoc-in [:players id]
-                   {:name      player-name
-                    :x         (first spawn)
-                    :y         (second spawn)
-                    :hp        100
-                    :score     0
+                   {:name player-name
+                    :x (first spawn)
+                    :y (second spawn)
+                    :hp 100
+                    :score 0
                     :passenger nil
-                    :ammo      5
-                    :grenades  2
-                    :alive?    true
-                    :token     token}))
+                    :ammo 5
+                    :grenades 2
+                    :alive? true
+                    :token token}))
      {:id id :token token}]))

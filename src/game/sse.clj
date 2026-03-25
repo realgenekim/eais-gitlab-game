@@ -72,7 +72,7 @@
   [game-state events]
   (when (pos? (subscriber-count))
     (push-fragment! "#game-map"
-                    (views/game-map-fragment game-state))
+                    (views/game-map-fragment game-state events))
     (push-fragment! "#scoreboard"
                     (views/scoreboard-fragment game-state))
     (push-fragment! "#event-feed"
@@ -82,9 +82,22 @@
 
 (defn on-tick
   "Called by engine after each tick. Pushes state to all spectators.
-   Events are passed in to avoid circular dependency on game.engine."
+   Only passes events from the current tick for tracers/animations."
   [_sys game-state]
-  ;; We push the game state; events come from the engine's event log
-  ;; but we access them via the sys map directly (no require needed)
-  (let [events @(:event-log _sys)]
-    (push-game-state! game-state events)))
+  (let [all-events @(:event-log _sys)
+        current-tick (:tick game-state)
+        ;; Events for the current tick (for tracers/animations)
+        tick-events (filter #(or (= (:tick %) current-tick)
+                                 (= (:tick %) (dec current-tick))
+                                 (nil? (:tick %)))
+                            all-events)]
+    (push-game-state! game-state tick-events)))
+
+(defn reload-browsers!
+  "Push a browser reload to all connected spectators.
+   Call from REPL after changing CSS/views: (sse/reload-browsers!)"
+  []
+  (push-to-all!
+   (fn [sub]
+     (d*/execute-script! sub "location.reload()")))
+  (log/info :browser-reload :subscribers (subscriber-count)))

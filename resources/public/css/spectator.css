@@ -223,7 +223,149 @@ body {
   padding: 1rem 0;
 }
 
-/* Animations */
+/* ===== DIRECTIONAL BULLET TRACERS ===== */
+.cell.tracer {
+  animation: tracer-flash 0.4s ease-out;
+  overflow: hidden;
+  position: relative;
+}
+
+/* Directional gradients — bright head, fading tail */
+.cell.tracer-east {
+  background: linear-gradient(to right, rgba(255,200,50,0.1), rgba(255,200,50,0.7)) !important;
+  box-shadow: inset -4px 0 8px rgba(255,200,50,0.8);
+}
+.cell.tracer-west {
+  background: linear-gradient(to left, rgba(255,200,50,0.1), rgba(255,200,50,0.7)) !important;
+  box-shadow: inset 4px 0 8px rgba(255,200,50,0.8);
+}
+.cell.tracer-south {
+  background: linear-gradient(to bottom, rgba(255,200,50,0.1), rgba(255,200,50,0.7)) !important;
+  box-shadow: inset 0 -4px 8px rgba(255,200,50,0.8);
+}
+.cell.tracer-north {
+  background: linear-gradient(to top, rgba(255,200,50,0.1), rgba(255,200,50,0.7)) !important;
+  box-shadow: inset 0 4px 8px rgba(255,200,50,0.8);
+}
+
+@keyframes tracer-flash {
+  0% { filter: brightness(2.5); }
+  100% { filter: brightness(1); }
+}
+
+/* ===== HIT — sparks burst from car ===== */
+.cell.hit {
+  position: relative;
+  overflow: visible;
+  z-index: 5;
+  animation: hit-shake 0.3s ease-out;
+}
+
+.hit-fx {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.hit-fx .player-icon { z-index: 2; }
+
+.sparks.small {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.sparks.small .spark {
+  position: absolute;
+  width: 3px;
+  height: 3px;
+  border-radius: 50%;
+  background: #ffcc00;
+  box-shadow: 0 0 4px #ff8800;
+}
+
+.sparks.small .spark:nth-child(1) { top: 50%; left: 50%; animation: spark-fly 0.4s ease-out forwards; --sx: -12px; --sy: -10px; }
+.sparks.small .spark:nth-child(2) { top: 50%; left: 50%; animation: spark-fly 0.4s 0.05s ease-out forwards; --sx: 10px; --sy: -8px; }
+.sparks.small .spark:nth-child(3) { top: 50%; left: 50%; animation: spark-fly 0.4s 0.08s ease-out forwards; --sx: -8px; --sy: 12px; }
+.sparks.small .spark:nth-child(4) { top: 50%; left: 50%; animation: spark-fly 0.4s 0.03s ease-out forwards; --sx: 11px; --sy: 9px; }
+
+@keyframes spark-fly {
+  0% { transform: translate(0, 0) scale(1); opacity: 1; }
+  100% { transform: translate(var(--sx), var(--sy)) scale(0.3); opacity: 0; }
+}
+
+@keyframes hit-shake {
+  0%, 100% { transform: translate(0); }
+  20% { transform: translate(-2px, 1px); }
+  40% { transform: translate(2px, -1px); }
+  60% { transform: translate(-1px, -1px); }
+}
+
+/* ===== NUCLEAR KILL — smoke + sparks ===== */
+.cell.nuke {
+  position: relative;
+  overflow: visible;
+  z-index: 10;
+  background: rgba(255, 68, 0, 0.4) !important;
+  animation: nuke-cell 0.6s ease-out;
+}
+
+.nuke-fx {
+  position: relative;
+  width: 100%;
+  height: 100%;
+}
+
+/* Smoke cloud */
+.smoke {
+  position: absolute;
+  inset: -40%;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(80,80,80,0.8) 0%, rgba(40,40,40,0.4) 40%, transparent 70%);
+  animation: smoke-rise 0.8s ease-out forwards;
+  z-index: 1;
+}
+
+/* Sparks burst outward */
+.sparks {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  pointer-events: none;
+}
+
+.sparks .spark {
+  position: absolute;
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  top: 50%;
+  left: 50%;
+}
+
+.sparks .spark:nth-child(1) { background: #fff; box-shadow: 0 0 6px #ff8800; animation: spark-fly 0.5s ease-out forwards; --sx: -18px; --sy: -14px; }
+.sparks .spark:nth-child(2) { background: #ffcc00; box-shadow: 0 0 6px #ff4400; animation: spark-fly 0.5s 0.04s ease-out forwards; --sx: 16px; --sy: -12px; }
+.sparks .spark:nth-child(3) { background: #ff8800; box-shadow: 0 0 6px #ff0000; animation: spark-fly 0.5s 0.08s ease-out forwards; --sx: -14px; --sy: 16px; }
+.sparks .spark:nth-child(4) { background: #fff; box-shadow: 0 0 6px #ffcc00; animation: spark-fly 0.5s 0.02s ease-out forwards; --sx: 18px; --sy: 10px; }
+.sparks .spark:nth-child(5) { background: #ffcc00; box-shadow: 0 0 6px #ff8800; animation: spark-fly 0.5s 0.06s ease-out forwards; --sx: -6px; --sy: -18px; }
+.sparks .spark:nth-child(6) { background: #ff4400; box-shadow: 0 0 6px #ff0000; animation: spark-fly 0.5s 0.1s ease-out forwards; --sx: 8px; --sy: 18px; }
+
+@keyframes smoke-rise {
+  0% { transform: scale(0.3); opacity: 0; }
+  30% { transform: scale(1.2); opacity: 0.9; }
+  100% { transform: scale(1.8) translateY(-30%); opacity: 0; }
+}
+
+@keyframes nuke-cell {
+  0% { background: #ffffff !important; box-shadow: 0 0 40px rgba(255,255,255,1); }
+  20% { background: #ff8800 !important; box-shadow: 0 0 30px rgba(255,136,0,0.8); }
+  100% { background: rgba(255,68,0,0.2) !important; box-shadow: none; }
+}
+
+/* ===== BASE ANIMATIONS ===== */
 @keyframes player-pulse {
   from { box-shadow: 0 0 4px rgba(255,255,255,0.2); }
   to   { box-shadow: 0 0 12px rgba(255,255,255,0.5); }
@@ -232,18 +374,6 @@ body {
 @keyframes event-flash {
   from { opacity: 0; transform: translateX(-10px); }
   to   { opacity: 1; transform: translateX(0); }
-}
-
-/* Kill flash — applied to .arena via JS */
-@keyframes screen-shake {
-  0%, 100% { transform: translate(0); }
-  25% { transform: translate(-3px, 2px); }
-  50% { transform: translate(2px, -3px); }
-  75% { transform: translate(-2px, 1px); }
-}
-
-.arena.shake {
-  animation: screen-shake 0.15s ease-in-out;
 }
 
 /* Responsive — scale to projector */
