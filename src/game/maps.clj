@@ -78,11 +78,110 @@
 ############
 ")
 
-(def arena-map
-  (parse-ascii-map arena-ascii))
+;; ============================================================================
+;; "The Diamond" — open center, diagonal walls, sniper duels
+;; ============================================================================
 
-(def arena-small-map
-  (parse-ascii-map arena-small-ascii))
+(def diamond-ascii "
+####################
+#S.......P........S#
+#..##..........##..#
+#....##......##....#
+#......##..##......#
+#..P.....##....P...#
+#........##........#
+#..................#
+#.......P..P.......#
+#.....##....##.....#
+#.....##....##.....#
+#.......P..P.......#
+#..................#
+#........##........#
+#...P....##..P.....#
+#......##..##......#
+#....##......##....#
+#..##..........##..#
+#S........P.......S#
+####################
+")
+
+;; ============================================================================
+;; "Four Rooms" — walled quadrants, narrow doorways, choke points
+;; ============================================================================
+
+(def four-rooms-ascii "
+####################
+#S...P...#..P.....S#
+#........#.........#
+#........#.........#
+#...####.#.####....#
+#........#.........#
+#..P.....#.....P...#
+#........#.........#
+#........#.........#
+######.######.######
+#........#.........#
+#........#.........#
+#..P.....#.....P...#
+#........#.........#
+#...####.#.####....#
+#........#.........#
+#........#.........#
+#........#.........#
+#S...P...#..P.....S#
+####################
+")
+
+;; ============================================================================
+;; "The Gauntlet" — central corridor with flanking forts
+;; ============================================================================
+
+(def gauntlet-ascii "
+####################
+#S..#.....P.....#.S#
+#...#...........#..#
+#...#..########.#..#
+#...#..#......#.#..#
+#.P....#..PP..#....#
+#...#..#......#.#..#
+#...#..########.#..#
+#...#...........#..#
+#...............P..#
+#..P...............#
+#..#...........#...#
+#..#.########..#...#
+#..#.#......#..#...#
+#....#..PP..#....P.#
+#..#.#......#..#...#
+#..#.########..#...#
+#..#...........#...#
+#S..#.....P.....#.S#
+####################
+")
+
+;; ============================================================================
+;; Map Registry — all available maps with display names
+;; ============================================================================
+
+(def arena-map (parse-ascii-map arena-ascii))
+(def arena-small-map (parse-ascii-map arena-small-ascii))
+(def diamond-map (parse-ascii-map diamond-ascii))
+(def four-rooms-map (parse-ascii-map four-rooms-ascii))
+(def gauntlet-map (parse-ascii-map gauntlet-ascii))
+
+(def map-registry
+  "Ordered list of available maps: [{:id :name :map} ...]"
+  [{:id "arena"      :name "The Arena"      :map arena-map}
+   {:id "diamond"    :name "The Diamond"    :map diamond-map}
+   {:id "four-rooms" :name "Four Rooms"     :map four-rooms-map}
+   {:id "gauntlet"   :name "The Gauntlet"   :map gauntlet-map}
+   {:id "small"      :name "Small Arena"    :map arena-small-map}])
+
+(defn get-map-by-id
+  "Look up a map from the registry by string id. Falls back to arena."
+  [id]
+  (or (:map (first (filter #(= (:id %) id) map-registry)))
+      arena-map))
 
 (defn render-state-ascii
   "Render game state as ASCII art for terminal display / debugging."

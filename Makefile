@@ -62,6 +62,7 @@ runtests-once:
 
 # Default: start in dev mode
 server: server-dev
+run: server-dev
 
 # Dev mode: auto-reload, browser-reload
 server-dev:
@@ -120,4 +121,4 @@ help:
 	@echo ""
 	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 
-.PHONY: nrepl clj-kondo-config mcp-configure mcp-remove mcp-run runtests runtests-once server server-dev server-prod stop server-test-run repl clean help
+.PHONY: nrepl clj-kondo-config mcp-configure mcp-remove mcp-run runtests runtests-once run server server-dev server-prod stop server-test-run repl clean help

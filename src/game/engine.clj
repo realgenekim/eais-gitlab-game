@@ -86,10 +86,41 @@
                               :tick (:tick new-state)}])
         creds))))
 
+(defn trigger-lightning!
+  "Force a lightning strike at a random location. Called from spectator UI."
+  [sys]
+  (let [state @(:game-state sys)
+        {:keys [width height walls]} (:map state)
+        margin 3
+        cx (+ margin (rand-int (max 1 (- width (* 2 margin)))))
+        cy (+ margin (rand-int (max 1 (- height (* 2 margin)))))
+        radius (+ 2 (rand-int 3)) ;; 2-4
+        new-state (core/lightning-strike state cx cy radius)]
+    (reset! (:game-state sys) new-state)
+    ;; Emit events for the strike
+    (let [effect (first (:recent-effects new-state))]
+      (append-events! sys [{:type :lightning
+                            :tick (:tick new-state)
+                            :x cx :y cy
+                            :radius radius
+                            :cells-destroyed (count (:cells effect))}])
+      ;; Notify SSE subscribers immediately so the flash renders
+      (when-let [on-tick (:on-tick sys)]
+        (if (var? on-tick)
+          (@on-tick sys new-state)
+          (on-tick sys new-state))))
+    {:x cx :y cy :radius radius}))
+
 (defn authenticate
   "Look up player-id from a token."
   [sys token]
   (get @(:token->player sys) token))
+
+(defn swap-map!
+  "Swap the map mid-game. Players in walls get bumped to nearest open cell."
+  [sys new-game-map]
+  (swap! (:game-state sys) core/swap-map new-game-map)
+  (log/info :map-swapped :size (str (:width new-game-map) "x" (:height new-game-map))))
 
 (declare stop-game!)
 
@@ -122,6 +153,12 @@
       (when (and (:alive? player)
                  (not (get-in old-state [:players id :alive?])))
         (conj! events {:type :respawn :tick tick :player-id id})))
+    ;; Environmental effects (lightning strikes etc.)
+    (doseq [effect (:recent-effects new-state)]
+      (conj! events {:type :lightning :tick tick
+                     :x (:x effect) :y (:y effect)
+                     :radius (:radius effect)
+                     :cells-destroyed (count (:cells effect))}))
     (persistent! events)))
 
 (defn tick!

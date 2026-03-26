@@ -137,23 +137,42 @@
 (defn handle-spectate [request]
   (sse/handle-spectate request))
 
-(defn handle-restart [_request]
-  (engine/stop-game!)
-  (let [sys (engine/start-game! {:on-tick #'sse/on-tick})]
-    ;; Start 5 demo bots
-    (require 'game.bots)
-    (let [start-team! (resolve 'game.bots/start-team!)
-          hunter      (resolve 'game.bots/hunter-think)
-          courier     (resolve 'game.bots/courier-think)
-          random      (resolve 'game.bots/random-think)]
-      (start-team!
-       [{:name "Hunter-1"  :think-fn @hunter}
-        {:name "Hunter-2"  :think-fn @hunter}
-        {:name "Courier-1" :think-fn @courier}
-        {:name "Courier-2" :think-fn @courier}
-        {:name "RandomBot" :think-fn @random}]))
+(defn handle-map-swap [request]
+  (let [body (:body request)
+        map-id (get body "map" "arena")
+        game-map (maps/get-map-by-id map-id)]
+    (engine/swap-map! (sys) game-map)
     (sse/reload-browsers!)
-    (json-response 200 {:status "restarted" :tick 0})))
+    (json-response 200 {:status "map-swapped" :map map-id})))
+
+(defn handle-restart [request]
+  (let [body (:body request)
+        map-id (get body "map" "arena")
+        game-map (maps/get-map-by-id map-id)]
+    (engine/stop-game!)
+    (let [sys (engine/start-game! {:on-tick #'sse/on-tick
+                                   :game-map game-map})]
+      ;; Start 5 demo bots
+      (require 'game.bots)
+      (let [start-team! (resolve 'game.bots/start-team!)
+            hunter (resolve 'game.bots/hunter-think)
+            courier (resolve 'game.bots/courier-think)
+            random (resolve 'game.bots/random-think)]
+        (start-team!
+         [{:name "Hunter-1" :think-fn @hunter}
+          {:name "Hunter-2" :think-fn @hunter}
+          {:name "Courier-1" :think-fn @courier}
+          {:name "Courier-2" :think-fn @courier}
+          {:name "RandomBot" :think-fn @random}]))
+      (sse/reload-browsers!)
+      (json-response 200 {:status "restarted" :map map-id :tick 0}))))
+
+(defn handle-lightning [_request]
+  (let [result (engine/trigger-lightning! (sys))]
+    (json-response 200 {:status "lightning"
+                        :x (:x result)
+                        :y (:y result)
+                        :radius (:radius result)})))
 
 ;;; ---------------------------------------------------------------------------
 ;;; Router
@@ -173,7 +192,9 @@
          ;; Spectator
          ["/" {:get {:handler #'handle-spectator-page}}]
          ["/spectate" {:get {:handler #'handle-spectate}}]
-         ["/game/restart" {:post {:handler #'handle-restart}}]])
+         ["/game/restart" {:post {:handler #'handle-restart}}]
+         ["/game/map-swap" {:post {:handler #'handle-map-swap}}]
+         ["/game/lightning" {:post {:handler #'handle-lightning}}]])
        (reitit/create-default-handler)
        {:middleware [wrap-params wrap-json]})
       (wrap-resource "public")

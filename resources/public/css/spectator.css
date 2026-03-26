@@ -49,6 +49,21 @@ body {
   gap: 0.5rem;
 }
 
+.map-select {
+  background: var(--bg-panel);
+  color: var(--neon-cyan);
+  border: 1px solid var(--neon-cyan);
+  padding: 0.3rem 0.5rem;
+  font-family: inherit;
+  font-size: 0.8rem;
+  font-weight: bold;
+  border-radius: 3px;
+  cursor: pointer;
+}
+.map-select:hover {
+  box-shadow: 0 0 8px rgba(78,205,196,0.4);
+}
+
 .restart-btn {
   background: var(--neon-red);
   color: #fff;
@@ -65,6 +80,30 @@ body {
 .restart-btn:hover {
   background: #ff4444;
   box-shadow: 0 0 12px rgba(255,107,107,0.5);
+}
+
+.lightning-btn {
+  background: #2244aa;
+  color: #aaddff;
+  border: 1px solid #4488ff;
+  padding: 0.3rem 1rem;
+  font-family: inherit;
+  font-size: 0.8rem;
+  font-weight: bold;
+  letter-spacing: 0.1em;
+  cursor: pointer;
+  border-radius: 3px;
+  text-transform: uppercase;
+  text-shadow: 0 0 6px rgba(100,180,255,0.6);
+}
+.lightning-btn:hover {
+  background: #3366cc;
+  box-shadow: 0 0 12px rgba(100,180,255,0.6), 0 0 24px rgba(80,140,255,0.3);
+  color: #fff;
+}
+.lightning-btn:active {
+  background: #5588ee;
+  box-shadow: 0 0 20px rgba(150,200,255,0.8);
 }
 
 #game-info {
@@ -451,6 +490,211 @@ body {
 @keyframes event-flash {
   from { opacity: 0; transform: translateX(-10px); }
   to   { opacity: 1; transform: translateX(0); }
+}
+
+/* ===== BATTLE ROYALE SHRINK WARNING — ring of fire ===== */
+
+.cell.shrink-warning {
+  position: relative;
+  overflow: visible;
+  z-index: 10;
+  background: rgba(255, 80, 0, 0.4) !important;
+  animation: fire-pulse 0.4s ease-in-out infinite alternate;
+  box-shadow:
+    inset 0 0 8px rgba(255, 100, 0, 0.8),
+    0 0 12px rgba(255, 60, 0, 0.6),
+    0 0 24px rgba(255, 40, 0, 0.3);
+}
+
+.cell.shrink-warning::before {
+  content: '';
+  position: absolute;
+  inset: -20% -20%;
+  background: radial-gradient(circle,
+    rgba(255, 200, 50, 0.6) 0%,
+    rgba(255, 100, 0, 0.4) 40%,
+    rgba(255, 40, 0, 0.2) 70%,
+    transparent 100%);
+  animation: fire-flicker 0.25s ease-in-out infinite alternate;
+  z-index: -1;
+}
+
+@keyframes fire-pulse {
+  0%   { background: rgba(255, 80, 0, 0.3) !important;
+         box-shadow: inset 0 0 6px rgba(255,100,0,0.6), 0 0 8px rgba(255,60,0,0.4); }
+  100% { background: rgba(255, 120, 0, 0.6) !important;
+         box-shadow: inset 0 0 12px rgba(255,160,0,1), 0 0 20px rgba(255,80,0,0.8), 0 0 40px rgba(255,40,0,0.4); }
+}
+
+@keyframes fire-flicker {
+  0%   { opacity: 0.5; transform: scale(0.9); }
+  100% { opacity: 1; transform: scale(1.1); }
+}
+
+/* ===== CRATER FIRE — burning aftermath of lightning ===== */
+
+.cell.crater-fire {
+  position: relative;
+  overflow: visible;
+  background: rgba(180, 60, 0, 0.5) !important;
+  animation: crater-burn 0.5s ease-in-out infinite alternate;
+  box-shadow:
+    inset 0 0 6px rgba(255, 120, 0, 0.7),
+    0 0 8px rgba(255, 60, 0, 0.4);
+}
+
+.cell.crater-fire::before {
+  content: '';
+  position: absolute;
+  inset: -10%;
+  background: radial-gradient(circle,
+    rgba(255, 160, 40, 0.5) 0%,
+    rgba(255, 80, 0, 0.3) 50%,
+    transparent 100%);
+  animation: crater-fire-flicker 0.3s ease-in-out infinite alternate;
+  z-index: -1;
+}
+
+@keyframes crater-burn {
+  0%   { background: rgba(160, 50, 0, 0.4) !important;
+         box-shadow: inset 0 0 4px rgba(255,100,0,0.5), 0 0 6px rgba(255,50,0,0.3); }
+  100% { background: rgba(200, 80, 0, 0.6) !important;
+         box-shadow: inset 0 0 10px rgba(255,140,0,0.8), 0 0 14px rgba(255,60,0,0.5); }
+}
+
+@keyframes crater-fire-flicker {
+  0%   { opacity: 0.6; transform: scale(0.95); }
+  100% { opacity: 1; transform: scale(1.05); }
+}
+
+/* ===== LIGHTNING STRIKE — electric blue catastrophe ===== */
+
+/* Center cell — the strike point. Massive flash + bolt */
+.cell.lightning-center {
+  position: relative;
+  overflow: visible;
+  z-index: 20;
+  background: rgba(100, 180, 255, 0.9) !important;
+  animation: lightning-flash-cell 1s ease-out;
+  box-shadow: 0 0 80px rgba(100,180,255,1), 0 0 160px rgba(150,220,255,0.8), 0 0 240px rgba(80,140,255,0.4);
+}
+
+.lightning-fx {
+  position: relative;
+  width: 100%;
+  height: 100%;
+}
+
+/* The bolt — a bright vertical line */
+.lightning-bolt {
+  position: absolute;
+  left: 40%;
+  top: -400%;
+  width: 20%;
+  height: 500%;
+  background: linear-gradient(to bottom,
+    rgba(200,220,255,0) 0%,
+    rgba(200,220,255,0.6) 20%,
+    #fff 50%,
+    rgba(150,200,255,0.8) 80%,
+    rgba(100,180,255,0.3) 100%);
+  filter: blur(1px);
+  animation: bolt-strike 0.8s ease-out forwards;
+  z-index: 3;
+}
+
+/* Screen flash overlay on the center cell */
+.lightning-flash {
+  position: absolute;
+  inset: -300%;
+  border-radius: 50%;
+  background: radial-gradient(circle,
+    rgba(255,255,255,0.9) 0%,
+    rgba(150,200,255,0.7) 20%,
+    rgba(100,160,255,0.4) 40%,
+    rgba(60,120,255,0.2) 60%,
+    transparent 80%);
+  animation: lightning-flash-expand 1s ease-out forwards;
+  z-index: 1;
+}
+
+/* Sparks from lightning reuse the nuke spark styles but electric blue */
+.lightning-fx .sparks .spark {
+  background: #aaddff !important;
+  box-shadow: 0 0 10px #66bbff, 0 0 20px #4488ff !important;
+}
+
+/* Blast radius cells — scorched crater */
+.cell.lightning-blast {
+  position: relative;
+  overflow: visible;
+  z-index: 8;
+  background: rgba(60, 100, 160, 0.5) !important;
+  animation: crater-form 0.8s ease-out;
+  box-shadow: inset 0 0 8px rgba(100,180,255,0.4), 0 0 15px rgba(80,140,255,0.3);
+}
+
+.crater-fx {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(circle,
+    rgba(40,60,80,0.8) 0%,
+    rgba(30,40,60,0.6) 60%,
+    rgba(20,30,50,0.4) 100%);
+  border-radius: 2px;
+  animation: crater-glow 1.2s ease-out forwards;
+}
+
+@keyframes lightning-flash-cell {
+  0% { background: #ffffff !important; box-shadow: 0 0 120px rgba(255,255,255,1), 0 0 200px rgba(150,200,255,1); transform: scale(1.5); }
+  10% { background: #aaddff !important; box-shadow: 0 0 100px rgba(150,200,255,1); transform: scale(1.4); }
+  30% { background: #6699cc !important; box-shadow: 0 0 60px rgba(100,160,255,0.8); transform: scale(1.2); }
+  100% { background: rgba(60,100,160,0.4) !important; box-shadow: none; transform: scale(1); }
+}
+
+@keyframes bolt-strike {
+  0% { opacity: 0; transform: scaleY(0.3) scaleX(2); }
+  8% { opacity: 1; transform: scaleY(1) scaleX(1); }
+  15% { opacity: 0.4; transform: scaleY(1) scaleX(0.8); }
+  22% { opacity: 1; transform: scaleY(1) scaleX(1.5); }
+  35% { opacity: 0.8; }
+  100% { opacity: 0; transform: scaleY(1) scaleX(0.5); }
+}
+
+@keyframes lightning-flash-expand {
+  0% { transform: scale(0.3); opacity: 1; }
+  15% { transform: scale(1); opacity: 0.8; }
+  30% { transform: scale(1.5); opacity: 0.4; }
+  100% { transform: scale(2.5); opacity: 0; }
+}
+
+@keyframes crater-form {
+  0% { background: rgba(200,230,255,0.8) !important; box-shadow: 0 0 30px rgba(150,200,255,0.8); transform: scale(1.2); }
+  30% { background: rgba(100,150,200,0.6) !important; box-shadow: 0 0 15px rgba(100,160,255,0.5); transform: scale(1.05); }
+  100% { background: rgba(40,60,80,0.5) !important; box-shadow: inset 0 0 5px rgba(60,100,140,0.3); transform: scale(1); }
+}
+
+@keyframes crater-glow {
+  0% { box-shadow: inset 0 0 10px rgba(100,180,255,0.6); }
+  100% { box-shadow: inset 0 0 3px rgba(60,100,140,0.2); }
+}
+
+/* Event feed — lightning events are LOUD */
+.event.lightning {
+  color: #66ccff;
+  background: rgba(100,180,255,0.2);
+  font-size: 0.9rem;
+  font-weight: bold;
+  border-left: 3px solid #4488ff;
+  padding: 0.3rem 0.5rem;
+  text-shadow: 0 0 8px rgba(100,180,255,0.5);
+  animation: lightning-event-flash 0.5s ease-out;
+}
+
+@keyframes lightning-event-flash {
+  0% { background: rgba(200,230,255,0.6); color: #fff; }
+  30% { background: rgba(100,180,255,0.3); }
+  100% { background: rgba(100,180,255,0.2); }
 }
 
 /* Responsive — scale to projector */

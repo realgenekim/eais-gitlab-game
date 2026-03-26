@@ -84,30 +84,33 @@
 ;;; ---------------------------------------------------------------------------
 
 (defn push-game-state!
-  "Push full spectator view: map + scoreboard + event feed."
-  [game-state events]
+  "Push full spectator view: map + scoreboard + event feed.
+   tick-events: current tick only (for tracers/animations).
+   all-events: full history (for event feed display)."
+  [game-state tick-events all-events]
   (when (pos? (subscriber-count))
     (push-fragment! "#game-map"
-                    (views/game-map-fragment game-state events))
+                    (views/game-map-fragment game-state tick-events))
     (push-fragment! "#scoreboard"
                     (views/scoreboard-fragment game-state))
     (push-fragment! "#event-feed"
-                    (views/event-feed-fragment events))
+                    (views/event-feed-fragment all-events))
     (push-fragment! "#game-info"
                     (views/game-info-fragment game-state))))
 
 (defn on-tick
   "Called by engine after each tick. Pushes state to all spectators.
-   Only passes events from the current tick for tracers/animations."
+   Current-tick events go to the map (tracers/animations).
+   Full event history goes to the event feed (persistent kill feed)."
   [_sys game-state]
   (let [all-events @(:event-log _sys)
         current-tick (:tick game-state)
-        ;; Events for the current tick (for tracers/animations)
+        ;; Events for the current tick only (for tracers/animations)
         tick-events (filter #(or (= (:tick %) current-tick)
                                  (= (:tick %) (dec current-tick))
                                  (nil? (:tick %)))
                             all-events)]
-    (push-game-state! game-state tick-events)))
+    (push-game-state! game-state tick-events all-events)))
 
 (defn reload-browsers!
   "Push a browser reload to all connected spectators.

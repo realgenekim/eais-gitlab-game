@@ -1,0 +1,30 @@
+{;; ===== Tick & Timing =====
+ :tick-ms              250    ;; ms per tick (250 = 4 ticks/sec)
+ :game-duration-ticks  1000   ;; total ticks per round (~4 min at 250ms)
+
+ ;; ===== Players =====
+ :max-players          8
+ :visibility-radius    5      ;; fog-of-war manhattan radius
+ :respawn-ticks        10     ;; ticks dead before respawn
+
+ ;; ===== Combat =====
+ :shoot-range          20
+ :shoot-damage         30
+ :max-ammo             10
+ :ammo-regen-ticks     5      ;; ticks between ammo regen
+
+ ;; ===== Passengers =====
+ :max-passengers       6
+
+ ;; ===== Battle Royale Shrink =====
+ :shrink-start         200    ;; tick when first ring closes
+ :shrink-interval      50     ;; ticks between each ring
+ :shrink-warn-ticks    10     ;; fire warning before shrink
+
+ ;; ===== Lightning =====
+ :lightning-chance      0.008  ;; probability per tick (~0.8%)
+ :lightning-min-radius  2
+ :lightning-max-radius  4
+ :lightning-grace-ticks 20     ;; no strikes before this tick
+ :crater-fire-ticks    10     ;; how long craters burn after strike
+ }

@@ -35,7 +35,21 @@
       [:div.header
        [:h1 "CAB BATTLE"]
        [:div.header-controls
-        [:button.restart-btn {:data-star-on:click "@post('/game/restart')"} "NEW GAME"]]
+        [:select#map-select.map-select
+         (for [{:keys [id name]} maps/map-registry]
+           [:option {:value id} name])]
+        [:button.restart-btn
+         {:data-star-on:click
+          (str "fetch('/game/restart',{method:'POST',"
+               "headers:{'Content-Type':'application/json'},"
+               "body:JSON.stringify({map:document.getElementById('map-select').value})})"
+               ".catch(e=>console.error(e))")}
+         "NEW GAME"]
+        [:button.lightning-btn
+         {:data-star-on:click
+          (str "fetch('/game/lightning',{method:'POST'})"
+               ".catch(e=>console.error(e))")}
+         "\u26A1 LIGHTNING"]]
        [:div#game-info
         [:span.tick "Tick: 0"]
         [:span.players "Players: 0"]
@@ -98,16 +112,16 @@
                                         {:player-name (:name p)}]))
                                    (map (fn [[_ p]] p) players)))
         ;; Tracer config — adjust independently
-        tracer-length 5   ;; visual beam length (cells lit at once)
-        tracer-travel 10  ;; cells the beam sweeps through per tick
+        tracer-length 5 ;; visual beam length (cells lit at once)
+        tracer-travel 10 ;; cells the beam sweeps through per tick
         ;; Compute bullet tracers: all cells along path up to tracer-travel
         tracer-map (atom {}) ;; [x y] -> {:dir :east :d N :tt N}
         _ (doseq [evt events]
             (when (and (= :command (:type evt))
                        (= :shoot (get-in evt [:action :type])))
-              (let [pid    (:player-id evt)
+              (let [pid (:player-id evt)
                     player (get-in game-state [:players pid])
-                    dir    (keyword (get-in evt [:action :direction]))
+                    dir (keyword (get-in evt [:action :direction]))
                     [dx dy] (get directions dir [0 0])
                     range- 20]
                 (when (and player (not= [dx dy] [0 0]))
@@ -136,6 +150,15 @@
                         (when-not (get player-lookup [x y])
                           (recur (+ x dx) (+ y dy) (inc d))))))))))
         tracers @tracer-map
+        ;; Lightning strike cells from recent-effects
+        lightning-cells (->> (:recent-effects game-state)
+                             (filter #(= :lightning (:type %)))
+                             (mapcat :cells)
+                             set)
+        lightning-centers (->> (:recent-effects game-state)
+                               (filter #(= :lightning (:type %)))
+                               (map (fn [e] [(:x e) (:y e)]))
+                               set)
         ;; Kill positions
         recent-kills (->> events
                           (filter #(= :kill (:type %)))
@@ -147,7 +170,11 @@
         damaged-players (->> players
                              (filter (fn [[_ p]] (and (:alive? p) (< (:hp p) 100))))
                              (map (fn [[_ p]] [(:x p) (:y p)]))
-                             set)]
+                             set)
+        ;; Battle royale shrink warning — ring of fire
+        shrink-warning (or (:shrink-warning game-state) #{})
+        ;; Active crater fires
+        crater-fires (or (:crater-fires game-state) {})]
     [:div.grid {:style (str "grid-template-columns: repeat(" width ", 1fr);"
                             "grid-template-rows: repeat(" height ", 1fr);")}
      (for [y (range height)
@@ -157,11 +184,21 @@
              pax (get pax-lookup [x y])
              is-kill (contains? recent-kills [x y])
              is-hit (and player (contains? damaged-players [x y]))
-             tracer (when (and (not player) (not is-kill)) (get tracers [x y]))]
+             is-lightning-center (contains? lightning-centers [x y])
+             is-lightning (and (not is-lightning-center)
+                               (contains? lightning-cells [x y]))
+             is-shrink-warning (contains? shrink-warning [x y])
+             is-crater-fire (contains? crater-fires [x y])
+             tracer (when (and (not player) (not is-kill) (not is-lightning) (not is-lightning-center))
+                      (get tracers [x y]))]
          [:div.cell
           {:class (str cls
                        (when is-kill " nuke")
                        (when is-hit " hit")
+                       (when is-shrink-warning " shrink-warning")
+                       (when is-crater-fire " crater-fire")
+                       (when is-lightning-center " lightning-center")
+                       (when is-lightning " lightning-blast")
                        (when tracer (str " tracer tracer-" (name (:dir tracer)))))
            :style (str (when (and player (not is-kill))
                          (str "background-color:" (:color player) ";"))
@@ -170,6 +207,19 @@
                               ";--tt:" (:tt tracer)
                               ";--tl:" (:tl tracer) ";")))}
           (cond
+            is-lightning-center
+            [:div.lightning-fx
+             [:div.lightning-bolt]
+             [:div.lightning-flash]
+             [:div.sparks
+              [:div.spark] [:div.spark] [:div.spark]
+              [:div.spark] [:div.spark] [:div.spark]
+              [:div.spark] [:div.spark] [:div.spark]
+              [:div.spark] [:div.spark] [:div.spark]]]
+
+            is-lightning
+            [:div.crater-fx]
+
             is-kill [:div.nuke-fx
                      [:div.smoke]
                      [:div.sparks
@@ -223,7 +273,7 @@
 
 (defn event-feed-fragment [events]
   (let [display-events (->> events
-                            (filter #(#{:kill :delivery :player-joined :game-over :respawn}
+                            (filter #(#{:kill :delivery :player-joined :game-over :respawn :lightning}
                                       (:type %)))
                             (take-last 10)
                             reverse)]
@@ -238,6 +288,9 @@
                            " — " (:player-id evt))
             :player-joined (str "\uD83D\uDE95 JOINED — " (:name evt))
             :respawn (str "\u2728 RESPAWN — " (:player-id evt))
+            :lightning (str "\u26A1 LIGHTNING STRIKE at ("
+                            (:x evt) "," (:y evt)
+                            ") — " (:cells-destroyed evt) " cells destroyed!")
             :game-over "\uD83C\uDFC1 GAME OVER!"
             (str (:type evt)))])])))
 
