@@ -1,0 +1,1 @@
+{:name "rocket", :source "/Users/genekim/Downloads/car-framed.png", :n-frames 4, :frame-boxes [{:left 73, :right 382} {:left 407, :right 713} {:left 731, :right 1077} {:left 1079, :right 1413}], :inner-top 341, :inner-bottom 602, :gray-border-cols [65 72 390 406 714 730 1078 1414 1422], :gray-border-rows [333 340 603 610]}

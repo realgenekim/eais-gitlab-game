@@ -6,6 +6,7 @@
             [game.sse :as sse]
             [game.views :as views]
             [game.test-views :as test-views]
+            [game.sprite-viewer :as sprite-viewer]
             [org.httpkit.server :as http]
             [reitit.ring :as reitit]
             [ring.util.response :as resp]
@@ -187,6 +188,11 @@
   (engine/resume-game!)
   (json-response 200 {:status "resumed"}))
 
+(defn handle-sprite-viewer [_request]
+  {:status 200
+   :headers {"Content-Type" "text/html"}
+   :body (sprite-viewer/sprite-viewer-page)})
+
 (defn handle-test [request]
   (let [params (:query-params request)
         scenario (Integer/parseInt (or (get params "scenario") "0"))
@@ -218,8 +224,9 @@
          ["/game/lightning" {:post {:handler #'handle-lightning}}]
          ["/game/seek" {:post {:handler #'handle-seek}}]
          ["/game/resume" {:post {:handler #'handle-resume}}]
-         ;; Visual test
-         ["/test" {:get {:handler #'handle-test}}]])
+         ;; Visual test & tools
+         ["/test" {:get {:handler #'handle-test}}]
+         ["/sprite-viewer" {:get {:handler #'handle-sprite-viewer}}]])
        (reitit/create-default-handler)
        {:middleware [wrap-params wrap-json]})
       (wrap-resource "public")
