@@ -55,6 +55,18 @@
 (defn- medal-class [rank]
   (case (int rank) 1 "gold" 2 "silver" 3 "bronze" nil))
 
+(defn- rank-badge-html
+  "Render a rank badge — PNG sprite if available, text fallback."
+  [rank]
+  (let [suffix (ordinal rank)
+        png (str "/sprites/rank-" suffix ".png")
+        exists? (.exists (clojure.java.io/file (str "resources/public" png)))]
+    (if exists?
+      [:div.rank-badge
+       [:img.rank-img {:src png}]]
+      [:div.rank-badge
+       [:span.rank-num (str rank)]])))
+
 (defn sprite-frames-html
   "Render sprite frames. Supports both emoji (4 spans) and PNG sprite sheets.
    PNG sprites use pixel-exact sizing from :aspect ratio, same as sprite-viewer.
@@ -70,13 +82,13 @@
            img-url (if has-passenger
                      (get sprite :pax-image image)
                      image)]
-       [:span.sprite.sprite-composed {:style (str "width:" w "px;height:" height "px;")}
+       [:span.sprite.sprite-composed
+        {:style (str "--sprite-aspect:" aspect ";"
+                     "--sprite-bg-size:" (* 100 frame-count) "% 100%;")}
         (for [i (range frame-count)]
           [:span.sprite-frame
            {:class (str "pf" i)
-            :style (str "width:" w "px;height:" height "px;"
-                        "background-image:url(" img-url ");"
-                        "background-size:" (* 100 frame-count) "% 100%;"
+            :style (str "background-image:url(" img-url ");"
                         "background-position:" (if (= frame-count 1) "0"
                                                    (* i (/ 100.0 (dec frame-count)))) "% 0%;")}])])
      ;; Emoji fallback — 4 visibility-cycled spans
@@ -339,9 +351,7 @@
                        [:div.spark] [:div.spark] [:div.spark]]]
              is-hit [:div.hit-fx
                      [:div.sprite-cell
-                      [:div.rank-badge
-                       [:span.rank-num (str (:rank player))]
-                       [:span.color-dot {:style (str "background:" (:color player))}]]
+                      (rank-badge-html (:rank player))
                       (sprite-frames-html (:sprite player) (:has-passenger player) true sprite-h)]
                      [:div.sparks.small
                       [:div.spark] [:div.spark] [:div.spark] [:div.spark]]]
@@ -349,9 +359,7 @@
                      {:title (str (:name player) " (" (:score player) "pts)"
                                   " " (:hp player) "hp"
                                   (when (:has-passenger player) " [PAX]"))}
-                     [:div.rank-badge
-                      [:span.rank-num (str (:rank player))]
-                      [:span.color-dot {:style (str "background:" (:color player))}]]
+                     (rank-badge-html (:rank player))
                      (sprite-frames-html (:sprite player) (:has-passenger player) true sprite-h)]
              pax [:span.pax-icon {:title (str "Passenger \u2192 ("
                                               (get-in pax [:dest :x]) ","

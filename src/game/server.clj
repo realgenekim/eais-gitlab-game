@@ -238,10 +238,26 @@
 ;;; Main
 ;;; ---------------------------------------------------------------------------
 
+(defn- make-dev-app
+  "Wrap app with code-reload + browser-reload for dev mode."
+  []
+  (let [wrap-reload-script (requiring-resolve 'browser-reload.core/wrap-reload-script)
+        wrap-reload        (requiring-resolve 'ring.middleware.reload/wrap-reload)]
+    (-> #'app
+        wrap-reload-script
+        (wrap-reload {:dirs ["src" "resources"]
+                      :reload-compile-errors? true}))))
+
 (defn -main [& _args]
   (engine/start-game! {:on-tick #'sse/on-tick})
-  (let [port (Integer/parseInt (or (System/getenv "PORT") "33333"))]
-    (http/run-server #'app {:port port})
+  (let [port   (Integer/parseInt (or (System/getenv "PORT") "33333"))
+        is-dev (= "dev" (System/getenv "ENV"))
+        handler (if is-dev (make-dev-app) #'app)]
+    (when is-dev
+      (when-let [start-watcher (requiring-resolve 'browser-reload.core/start-file-watcher!)]
+        (start-watcher ["src" "resources"] #{"clj" "css" "js" "html" "edn"}))
+      (log/info :dev-mode :reload true :browser-reload true))
+    (http/run-server handler {:port port})
     (log/info :server-started :port port
               :endpoints ["/game/join" "/game/state" "/game/action"
                           "/game/scoreboard" "/game/map" "/game/ascii"
