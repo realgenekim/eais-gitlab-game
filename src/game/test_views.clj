@@ -85,7 +85,9 @@ var total = " total ";
 var autoTimer = null;
 
 function navigate(s, f) {
-  window.location.href = '/test?scenario=' + s + '&frame=' + f;
+  var url = '/test?scenario=' + s + '&frame=' + f;
+  history.replaceState(null, '', url);
+  location.reload();
 }
 
 function step(delta) {

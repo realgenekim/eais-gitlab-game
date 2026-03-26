@@ -228,7 +228,12 @@
          ["/game/resume" {:post {:handler #'handle-resume}}]
          ;; Visual test & tools
          ["/test" {:get {:handler #'handle-test}}]
-         ["/sprite-viewer" {:get {:handler #'handle-sprite-viewer}}]])
+         ["/sprite-viewer" {:get {:handler #'handle-sprite-viewer}}]
+         ;; Dev reload endpoint (browser-reload polls this)
+         ["/dev/reload-check" {:get {:handler (fn [_]
+                                                (if-let [handler (resolve 'browser-reload.core/reload-check-handler)]
+                                                  (handler _)
+                                                  {:status 200 :body "0"}))}}]])
        (reitit/create-default-handler)
        {:middleware [wrap-params wrap-json]})
       (wrap-resource "public")
