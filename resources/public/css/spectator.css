@@ -301,19 +301,29 @@ body {
   100% { opacity: 0; }
 }
 
-/* PNG sprite sheet animation — pixel dimensions set inline from aspect ratio.
-   Same approach as sprite-viewer: steps(N-1, jump-none) for N frames. */
-.sprite-img {
-  background-repeat: no-repeat;
-  background-position: 0% 0%;
-  image-rendering: pixelated;
-  overflow: hidden;
-  animation: sprite-sheet-cycle 1s steps(3, jump-none) infinite;
+/* PNG sprite sheet — composed visibility-cycling frames (same pattern as emoji .sf*) */
+.sprite-composed {
+  position: relative;
+  display: inline-block;
 }
+.sprite-frame {
+  position: absolute;
+  top: 0;
+  left: 0;
+  image-rendering: pixelated;
+  background-repeat: no-repeat;
+  overflow: hidden;
+  opacity: 0;
+}
+.pf0 { animation: pf-show 1s steps(1) infinite 0s; }
+.pf1 { animation: pf-show 1s steps(1) infinite -0.75s; }
+.pf2 { animation: pf-show 1s steps(1) infinite -0.5s; }
+.pf3 { animation: pf-show 1s steps(1) infinite -0.25s; }
 
-@keyframes sprite-sheet-cycle {
-  from { background-position: 0% 0%; }
-  to   { background-position: 100% 0%; }
+@keyframes pf-show {
+  0%   { opacity: 1; }
+  25%  { opacity: 0; }
+  100% { opacity: 0; }
 }
 
 .rank-badge {

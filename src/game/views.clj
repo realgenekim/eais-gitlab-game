@@ -63,17 +63,22 @@
    (sprite-frames-html sprite has-passenger alive 32))
   ([sprite has-passenger alive height]
    (if-let [image (and alive (:image sprite))]
-     ;; PNG sprite sheet — pixel-exact sizing from aspect ratio
+     ;; PNG sprite sheet — composed visibility-cycling frames (same as sprite-viewer)
      (let [frame-count (get sprite :frame-count 4)
            aspect (get sprite :aspect 1.333)
            w (int (* height aspect))
            img-url (if has-passenger
                      (get sprite :pax-image image)
                      image)]
-       [:span.sprite.sprite-img
-        {:style (str "width:" w "px;height:" height "px;"
-                     "background-image:url(" img-url ");"
-                     "background-size:" (* 100 frame-count) "% 100%;")}])
+       [:span.sprite.sprite-composed {:style (str "width:" w "px;height:" height "px;")}
+        (for [i (range frame-count)]
+          [:span.sprite-frame
+           {:class (str "pf" i)
+            :style (str "width:" w "px;height:" height "px;"
+                        "background-image:url(" img-url ");"
+                        "background-size:" (* 100 frame-count) "% 100%;"
+                        "background-position:" (if (= frame-count 1) "0"
+                                                   (* i (/ 100.0 (dec frame-count)))) "% 0%;")}])])
      ;; Emoji fallback — 4 visibility-cycled spans
      (let [frames (cond
                     (not alive) [(:dead sprite) (:dead sprite) (:dead sprite) (:dead sprite)]
