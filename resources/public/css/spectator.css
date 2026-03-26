@@ -262,7 +262,6 @@ body {
   width: 100%;
   height: 100%;
   gap: 0;
-  outline: 1px solid red; /* DEBUG */
 }
 
 .sprite {
@@ -308,15 +307,27 @@ body {
   display: inline-block;
   aspect-ratio: var(--sprite-aspect, 1.333);
 }
-/* In grid cells: fill the cell width */
-.cell .sprite-composed {
+/* Grid sprite (.gs) — fills cell width */
+.sprite-composed.gs {
   width: 100% !important;
   height: auto !important;
+  overflow: visible;
 }
-/* In scoreboard: stay small */
-.score-row .sprite-composed {
+/* Scoreboard sprite (.sbs) — compact inline */
+.sprite-composed.sbs {
   width: 1.6rem;
   height: auto;
+}
+/* Grid rank badge — small accent above sprite */
+.rank-badge.rank-grid {
+  width: 40%;
+  margin-bottom: -2px;
+}
+.rank-badge.rank-grid .rank-img {
+  width: 100%;
+  height: auto;
+  image-rendering: pixelated;
+  display: block;
 }
 .sprite-frame {
   position: absolute;
@@ -349,8 +360,6 @@ body {
 }
 
 .rank-badge .rank-img {
-  width: 100%;
-  height: auto;
   image-rendering: pixelated;
   display: block;
 }

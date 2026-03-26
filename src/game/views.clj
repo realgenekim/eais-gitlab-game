@@ -55,52 +55,78 @@
 (defn- medal-class [rank]
   (case (int rank) 1 "gold" 2 "silver" 3 "bronze" nil))
 
-(defn- rank-badge-html
-  "Render a rank badge — PNG sprite if available, text fallback."
-  [rank]
+;;; ---------------------------------------------------------------------------
+;;; Sprite Rendering Functions
+;;; ---------------------------------------------------------------------------
+;; Each function owns its layout + style. No context-dependent CSS overrides.
+
+(defn- sprite-frames
+  "Core: render animated PNG frames or emoji fallback. Returns hiccup.
+   `css-class` distinguishes grid vs scoreboard sizing."
+  [sprite has-passenger alive css-class]
+  (if-let [image (and alive (:image sprite))]
+    (let [frame-count (get sprite :frame-count 4)
+          aspect (get sprite :aspect 1.333)
+          img-url (if has-passenger
+                    (get sprite :pax-image image)
+                    image)]
+      [:span {:class (str "sprite sprite-composed " css-class)
+              :style (str "--sprite-aspect:" aspect ";"
+                          "--sprite-bg-size:" (* 100 frame-count) "% 100%;")}
+       (for [i (range frame-count)]
+         [:span.sprite-frame
+          {:class (str "pf" i)
+           :style (str "background-image:url(" img-url ");"
+                       "background-position:" (if (= frame-count 1) "0"
+                                                  (* i (/ 100.0 (dec frame-count)))) "% 0%;")}])])
+    ;; Emoji fallback
+    (let [frames (cond
+                   (not alive) [(:dead sprite) (:dead sprite) (:dead sprite) (:dead sprite)]
+                   has-passenger (:pax sprite)
+                   :else (:frames sprite))]
+      [:span {:class (str "sprite " css-class)}
+       [:span.sf.sf0 (nth frames 0)]
+       [:span.sf.sf1 (nth frames 1)]
+       [:span.sf.sf2 (nth frames 2)]
+       [:span.sf.sf3 (nth frames 3)]])))
+
+(defn- rank-badge
+  "Rank badge — PNG image if available, text number fallback.
+   `css-class` distinguishes grid vs scoreboard sizing."
+  [rank css-class]
   (let [suffix (ordinal rank)
         png (str "/sprites/rank-" suffix ".png")
         exists? (.exists (clojure.java.io/file (str "resources/public" png)))]
     (if exists?
-      [:div.rank-badge
+      [:div {:class (str "rank-badge " css-class)}
        [:img.rank-img {:src png}]]
-      [:div.rank-badge
+      [:div {:class (str "rank-badge " css-class)}
        [:span.rank-num (str rank)]])))
 
-(defn sprite-frames-html
-  "Render sprite frames. Supports both emoji (4 spans) and PNG sprite sheets.
-   PNG sprites use pixel-exact sizing from :aspect ratio, same as sprite-viewer.
-   Optional `height` param (px) controls rendered size (default 32)."
-  ([sprite has-passenger alive]
-   (sprite-frames-html sprite has-passenger alive 32))
-  ([sprite has-passenger alive height]
-   (if-let [image (and alive (:image sprite))]
-     ;; PNG sprite sheet — composed visibility-cycling frames (same as sprite-viewer)
-     (let [frame-count (get sprite :frame-count 4)
-           aspect (get sprite :aspect 1.333)
-           w (int (* height aspect))
-           img-url (if has-passenger
-                     (get sprite :pax-image image)
-                     image)]
-       [:span.sprite.sprite-composed
-        {:style (str "--sprite-aspect:" aspect ";"
-                     "--sprite-bg-size:" (* 100 frame-count) "% 100%;")}
-        (for [i (range frame-count)]
-          [:span.sprite-frame
-           {:class (str "pf" i)
-            :style (str "background-image:url(" img-url ");"
-                        "background-position:" (if (= frame-count 1) "0"
-                                                   (* i (/ 100.0 (dec frame-count)))) "% 0%;")}])])
-     ;; Emoji fallback — 4 visibility-cycled spans
-     (let [frames (cond
-                    (not alive) [(:dead sprite) (:dead sprite) (:dead sprite) (:dead sprite)]
-                    has-passenger (:pax sprite)
-                    :else (:frames sprite))]
-       [:span.sprite
-        [:span.sf.sf0 (nth frames 0)]
-        [:span.sf.sf1 (nth frames 1)]
-        [:span.sf.sf2 (nth frames 2)]
-        [:span.sf.sf3 (nth frames 3)]]))))
+(defn grid-sprite
+  "Sprite for a game grid cell — fills cell width, rank badge above."
+  [sprite player]
+  [:div.sprite-cell
+   {:title (str (:name player) " (" (:score player) "pts)"
+                " " (:hp player) "hp"
+                (when (:has-passenger player) " [PAX]"))}
+   (rank-badge (:rank player) "rank-grid")
+   (sprite-frames (:sprite player) (:has-passenger player) true "gs")])
+
+(defn grid-sprite-hit
+  "Sprite for a hit player in a grid cell — with spark effects."
+  [sprite player]
+  [:div.hit-fx
+   [:div.sprite-cell
+    (rank-badge (:rank player) "rank-grid")
+    (sprite-frames (:sprite player) (:has-passenger player) true "gs")]
+   [:div.sparks.small
+    [:div.spark] [:div.spark] [:div.spark] [:div.spark]]])
+
+(defn scoreboard-sprite
+  "Compact inline sprite for the scoreboard sidebar."
+  [sprite has-passenger alive]
+  (sprite-frames sprite has-passenger alive "sbs"))
 
 ;;; ---------------------------------------------------------------------------
 ;;; Shared Nav Bar
@@ -349,18 +375,8 @@
                        [:div.spark] [:div.spark] [:div.spark]
                        [:div.spark] [:div.spark] [:div.spark]
                        [:div.spark] [:div.spark] [:div.spark]]]
-             is-hit [:div.hit-fx
-                     [:div.sprite-cell
-                      (rank-badge-html (:rank player))
-                      (sprite-frames-html (:sprite player) (:has-passenger player) true sprite-h)]
-                     [:div.sparks.small
-                      [:div.spark] [:div.spark] [:div.spark] [:div.spark]]]
-             player [:div.sprite-cell
-                     {:title (str (:name player) " (" (:score player) "pts)"
-                                  " " (:hp player) "hp"
-                                  (when (:has-passenger player) " [PAX]"))}
-                     (rank-badge-html (:rank player))
-                     (sprite-frames-html (:sprite player) (:has-passenger player) true sprite-h)]
+             is-hit (grid-sprite-hit (:sprite player) player)
+             player (grid-sprite (:sprite player) player)
              pax [:span.pax-icon {:title (str "Passenger \u2192 ("
                                               (get-in pax [:dest :x]) ","
                                               (get-in pax [:dest :y]) ")")}
@@ -391,7 +407,7 @@
                                         (str " " m)))
                           :style (str "border-left: 4px solid " color ";")}
           [:span.rank-num (ordinal rank)]
-          (sprite-frames-html sprite has-passenger alive)
+          (scoreboard-sprite sprite has-passenger alive)
           [:span.name name]
           (when has-passenger [:span.pax-badge "PAX"])
           [:div.hp-bar
