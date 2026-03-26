@@ -174,6 +174,18 @@
                         :y (:y result)
                         :radius (:radius result)})))
 
+(defn handle-seek [request]
+  (let [body (:body request)
+        tick (get body "tick" 0)]
+    (let [result (engine/seek-to-tick! (sys) tick)]
+      (json-response 200 {:status "seeked"
+                          :tick (:tick result)
+                          :max-tick (:max-tick result)}))))
+
+(defn handle-resume [_request]
+  (engine/resume-game!)
+  (json-response 200 {:status "resumed"}))
+
 ;;; ---------------------------------------------------------------------------
 ;;; Router
 ;;; ---------------------------------------------------------------------------
@@ -194,7 +206,9 @@
          ["/spectate" {:get {:handler #'handle-spectate}}]
          ["/game/restart" {:post {:handler #'handle-restart}}]
          ["/game/map-swap" {:post {:handler #'handle-map-swap}}]
-         ["/game/lightning" {:post {:handler #'handle-lightning}}]])
+         ["/game/lightning" {:post {:handler #'handle-lightning}}]
+         ["/game/seek" {:post {:handler #'handle-seek}}]
+         ["/game/resume" {:post {:handler #'handle-resume}}]])
        (reitit/create-default-handler)
        {:middleware [wrap-params wrap-json]})
       (wrap-resource "public")

@@ -6,7 +6,7 @@
             [clojure.string :as str]))
 
 ;;; ---------------------------------------------------------------------------
-;;; Player Colors — Vampire Survivors palette
+;;; Player Colors & Sprites — Mario Kart whimsy
 ;;; ---------------------------------------------------------------------------
 
 (def player-colors
@@ -15,6 +15,56 @@
 
 (defn player-color [idx]
   (nth player-colors (mod idx (count player-colors))))
+
+;; Each player gets a unique animated sprite — 4 frames that cycle
+;; :frames = normal driving, :pax = carrying passenger, :dead = eliminated
+(def player-sprites
+  [{:name "Rocket"   :frames ["\uD83D\uDE97" "\uD83D\uDE99" "\uD83C\uDFCE\uFE0F" "\uD83D\uDE97"]
+    :pax ["\uD83D\uDE95" "\uD83E\uDD11" "\uD83D\uDE95" "\uD83D\uDCB0"] :dead "\uD83D\uDC80"}
+   {:name "Ghost"    :frames ["\uD83D\uDC7E" "\uD83D\uDC7B" "\uD83D\uDC7E" "\uD83D\uDEF8"]
+    :pax ["\uD83D\uDE95" "\uD83E\uDD11" "\uD83D\uDE95" "\uD83D\uDCB0"] :dead "\uD83D\uDC80"}
+   {:name "Fox"      :frames ["\uD83E\uDD8A" "\uD83D\uDC3A" "\uD83E\uDD8A" "\uD83D\uDC3E"]
+    :pax ["\uD83D\uDE95" "\uD83E\uDD11" "\uD83D\uDE95" "\uD83D\uDCB0"] :dead "\uD83D\uDC80"}
+   {:name "Robot"    :frames ["\uD83E\uDD16" "\uD83D\uDD27" "\uD83E\uDD16" "\u26A1"]
+    :pax ["\uD83D\uDE95" "\uD83E\uDD11" "\uD83D\uDE95" "\uD83D\uDCB0"] :dead "\uD83D\uDC80"}
+   {:name "Octopus"  :frames ["\uD83D\uDC19" "\uD83E\uDD91" "\uD83D\uDC19" "\uD83C\uDF0A"]
+    :pax ["\uD83D\uDE95" "\uD83E\uDD11" "\uD83D\uDE95" "\uD83D\uDCB0"] :dead "\uD83D\uDC80"}
+   {:name "Unicorn"  :frames ["\uD83E\uDD84" "\uD83C\uDF08" "\uD83E\uDD84" "\u2728"]
+    :pax ["\uD83D\uDE95" "\uD83E\uDD11" "\uD83D\uDE95" "\uD83D\uDCB0"] :dead "\uD83D\uDC80"}
+   {:name "Dragon"   :frames ["\uD83D\uDC32" "\uD83D\uDD25" "\uD83D\uDC32" "\uD83D\uDCA8"]
+    :pax ["\uD83D\uDE95" "\uD83E\uDD11" "\uD83D\uDE95" "\uD83D\uDCB0"] :dead "\uD83D\uDC80"}
+   {:name "Alien"    :frames ["\uD83D\uDC7D" "\uD83D\uDEF8" "\uD83D\uDC7D" "\uD83D\uDCAB"]
+    :pax ["\uD83D\uDE95" "\uD83E\uDD11" "\uD83D\uDE95" "\uD83D\uDCB0"] :dead "\uD83D\uDC80"}])
+
+(defn player-sprite [idx]
+  (nth player-sprites (mod idx (count player-sprites))))
+
+(defn- compute-ranks
+  "Returns {player-id rank} where rank is 1-based, sorted by score desc."
+  [players]
+  (->> players
+       (map (fn [[id p]] {:id id :score (:score p)}))
+       (sort-by :score >)
+       (map-indexed (fn [i {:keys [id]}] [id (inc i)]))
+       (into {})))
+
+(defn- ordinal [n]
+  (str n (case (int n) 1 "st" 2 "nd" 3 "rd" "th")))
+
+(defn- medal-class [rank]
+  (case (int rank) 1 "gold" 2 "silver" 3 "bronze" nil))
+
+(defn- sprite-style
+  "CSS custom properties for sprite frame animation."
+  [sprite has-passenger alive]
+  (let [frames (cond
+                 (not alive) [(:dead sprite) (:dead sprite) (:dead sprite) (:dead sprite)]
+                 has-passenger (:pax sprite)
+                 :else (:frames sprite))]
+    (str "--f0:'" (nth frames 0) "';"
+         "--f1:'" (nth frames 1) "';"
+         "--f2:'" (nth frames 2) "';"
+         "--f3:'" (nth frames 3) "';")))
 
 ;;; ---------------------------------------------------------------------------
 ;;; Spectator Page (full HTML)
@@ -50,6 +100,19 @@
           (str "fetch('/game/lightning',{method:'POST'})"
                ".catch(e=>console.error(e))")}
          "\u26A1 LIGHTNING"]]
+
+       ;; Tick scrubber controls
+       [:div.scrubber
+        [:button#scrub-prev.scrub-btn {:title "Previous tick (Left arrow)"}
+         "\u25C0"]
+        [:input#tick-input.tick-input
+         {:type "number" :min "0" :placeholder "tick"
+          :title "Enter tick number and press Enter"}]
+        [:button#scrub-next.scrub-btn {:title "Next tick (Right arrow)"}
+         "\u25B6"]
+        [:button#scrub-resume.scrub-btn.resume-btn {:title "Resume live (Esc)"}
+         "\u25B6\u25B6"]]
+
        [:div#game-info
         [:span.tick "Tick: 0"]
         [:span.players "Players: 0"]
@@ -72,7 +135,69 @@
         [:div.panel
          [:h2 "EVENTS"]
          [:div#event-feed
-          [:div.empty "Waiting for action..."]]]]]]])))
+          [:div.empty "Waiting for action..."]]]]]
+
+      ;; Scrubber JavaScript
+      [:script
+       (h/raw
+        "
+(function() {
+  var input = document.getElementById('tick-input');
+  var prevBtn = document.getElementById('scrub-prev');
+  var nextBtn = document.getElementById('scrub-next');
+  var resumeBtn = document.getElementById('scrub-resume');
+
+  function seekTo(tick) {
+    fetch('/game/seek', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({tick: tick})
+    })
+    .then(function(r) { return r.json(); })
+    .then(function(d) { input.value = d.tick; input.max = d['max-tick']; })
+    .catch(function(e) { console.error(e); });
+  }
+
+  function step(delta) {
+    var current = parseInt(input.value) || 0;
+    seekTo(current + delta);
+  }
+
+  // Input: enter to seek
+  input.addEventListener('keydown', function(e) {
+    if (e.key === 'Enter') {
+      seekTo(parseInt(input.value) || 0);
+    }
+  });
+
+  // Buttons
+  prevBtn.addEventListener('click', function() { step(-1); });
+  nextBtn.addEventListener('click', function() { step(1); });
+  resumeBtn.addEventListener('click', function() {
+    input.value = '';
+    fetch('/game/resume', {method: 'POST'}).catch(function(e) { console.error(e); });
+  });
+
+  // Keyboard: left/right arrows + Esc to resume
+  document.addEventListener('keydown', function(e) {
+    // Don't hijack if user is typing in a different input
+    if (e.target.tagName === 'SELECT') return;
+    if (e.target === input && e.key !== 'ArrowLeft' && e.key !== 'ArrowRight' && e.key !== 'Escape') return;
+
+    if (e.key === 'ArrowLeft') {
+      e.preventDefault();
+      step(-1);
+    } else if (e.key === 'ArrowRight') {
+      e.preventDefault();
+      step(1);
+    } else if (e.key === 'Escape') {
+      e.preventDefault();
+      input.value = '';
+      fetch('/game/resume', {method: 'POST'}).catch(function(e2) { console.error(e2); });
+    }
+  });
+})();
+")]]])))
 
 ;;; ---------------------------------------------------------------------------
 ;;; Map Fragment — the grid (god mode view)
@@ -95,12 +220,15 @@
         passengers (filter #(nil? (:picked-up-by %)) (:passengers game-state))
         directions {:north [0 -1] :south [0 1] :east [1 0] :west [-1 0]}
         ;; Build lookups
+        rank-map (compute-ranks players)
         player-list (->> players
                          (map-indexed (fn [idx [id p]]
                                         {:id id :x (:x p) :y (:y p)
                                          :name (:name p) :score (:score p)
                                          :hp (:hp p) :alive (:alive? p)
                                          :color (player-color idx)
+                                         :sprite (player-sprite idx)
+                                         :rank (get rank-map id 0)
                                          :has-passenger (some? (:passenger p))})))
         alive-list (filter :alive player-list)
         player-lookup (into {} (map (fn [p] [[(:x p) (:y p)] p]) alive-list))
@@ -201,7 +329,7 @@
                        (when is-lightning " lightning-blast")
                        (when tracer (str " tracer tracer-" (name (:dir tracer)))))
            :style (str (when (and player (not is-kill))
-                         (str "background-color:" (:color player) ";"))
+                         (sprite-style (:sprite player) (:has-passenger player) true))
                        (when tracer
                          (str "--d:" (:d tracer)
                               ";--tt:" (:tt tracer)
@@ -228,16 +356,21 @@
                       [:div.spark] [:div.spark] [:div.spark]
                       [:div.spark] [:div.spark] [:div.spark]]]
             is-hit [:div.hit-fx
-                    [:span.player-icon
-                     {:title (str (:name player) " " (:hp player) "hp")}
-                     (if (:has-passenger player) "\uD83D\uDE95" "\uD83D\uDE96")]
+                    [:div.sprite-cell
+                     [:span.sprite {:title (str (:name player) " " (:hp player) "hp")}]
+                     [:div.rank-badge
+                      [:span.color-dot {:style (str "background:" (:color player))}]
+                      [:span.rank-num (str (:rank player))]]]
                     [:div.sparks.small
                      [:div.spark] [:div.spark] [:div.spark] [:div.spark]]]
-            player [:span.player-icon
+            player [:div.sprite-cell
                     {:title (str (:name player) " (" (:score player) "pts)"
                                  " " (:hp player) "hp"
                                  (when (:has-passenger player) " [PAX]"))}
-                    (if (:has-passenger player) "\uD83D\uDE95" "\uD83D\uDE96")]
+                    [:span.sprite]
+                    [:div.rank-badge
+                     [:span.color-dot {:style (str "background:" (:color player))}]
+                     [:span.rank-num (str (:rank player))]]]
             pax [:span.pax-icon {:title (str "Passenger \u2192 ("
                                              (get-in pax [:dest :x]) ","
                                              (get-in pax [:dest :y]) ")")}
@@ -254,17 +387,26 @@
                                     {:id id :name (:name p) :score (:score p)
                                      :alive (:alive? p) :hp (:hp p)
                                      :color (player-color idx)
+                                     :sprite (player-sprite idx)
                                      :has-passenger (some? (:passenger p))}))
-                     (sort-by :score >))]
+                     (sort-by :score >)
+                     (map-indexed (fn [rank-idx p]
+                                    (assoc p :rank (inc rank-idx)))))]
     (if (empty? players)
       [:div.empty "No players yet"]
       [:div.scores
-       (for [{:keys [name score alive hp color has-passenger]} players]
-         [:div.score-row {:class (when-not alive "dead")}
-          [:span.color-dot {:style (str "background:" color)}]
+       (for [{:keys [name score alive hp color sprite has-passenger rank]} players]
+         [:div.score-row {:class (str (when-not alive "dead")
+                                      (when-let [m (medal-class rank)]
+                                        (str " " m)))
+                          :style (str "border-left: 4px solid " color ";"
+                                      (sprite-style sprite has-passenger alive))}
+          [:span.rank-num (ordinal rank)]
+          [:span.sprite.sb-sprite]
           [:span.name name]
           (when has-passenger [:span.pax-badge "PAX"])
-          [:span.hp (when alive (str hp "hp"))]
+          [:div.hp-bar
+           [:div.hp-fill {:style (str "width:" (if alive hp 0) "%")}]]
           [:span.score (str score "pts")]])])))
 
 ;;; ---------------------------------------------------------------------------

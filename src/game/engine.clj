@@ -86,6 +86,8 @@
                               :tick (:tick new-state)}])
         creds))))
 
+(declare stop-game! pause-game!)
+
 (defn trigger-lightning!
   "Force a lightning strike at a random location. Called from spectator UI."
   [sys]
@@ -111,6 +113,24 @@
           (on-tick sys new-state))))
     {:x cx :y cy :radius radius}))
 
+(defn seek-to-tick!
+  "Pause game and replay to a specific tick. Returns the state at that tick."
+  [sys target-tick]
+  ;; Pause if running
+  (when @(:game-timer sys)
+    (pause-game! sys))
+  (let [recorder (:recorder sys)
+        max-tick (:tick @(:game-state sys))
+        target (max 0 (min target-tick max-tick))
+        state (replay/replay-to-tick recorder target)]
+    (reset! (:game-state sys) state)
+    ;; Push to spectators
+    (when-let [on-tick (:on-tick sys)]
+      (if (var? on-tick)
+        (@on-tick sys state)
+        (on-tick sys state)))
+    {:tick target :max-tick max-tick}))
+
 (defn authenticate
   "Look up player-id from a token."
   [sys token]
@@ -121,8 +141,6 @@
   [sys new-game-map]
   (swap! (:game-state sys) core/swap-map new-game-map)
   (log/info :map-swapped :size (str (:width new-game-map) "x" (:height new-game-map))))
-
-(declare stop-game!)
 
 ;;; ---------------------------------------------------------------------------
 ;;; Tick — the heartbeat
