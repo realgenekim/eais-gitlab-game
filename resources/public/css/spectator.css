@@ -19,6 +19,33 @@
 
 * { margin: 0; padding: 0; box-sizing: border-box; }
 
+/* Nav bar */
+.nav-bar {
+  display: flex;
+  gap: 0;
+  background: #0d0d14;
+  border-bottom: 1px solid var(--border, #2a2a3a);
+  font-size: 0.75rem;
+  letter-spacing: 0.1em;
+}
+.nav-link {
+  color: #888;
+  text-decoration: none;
+  padding: 0.3rem 1rem;
+  text-transform: uppercase;
+  font-weight: bold;
+  font-family: 'Helvetica Neue', Arial, sans-serif;
+  transition: color 0.15s, background 0.15s;
+}
+.nav-link:hover {
+  color: #4ecdc4;
+  background: rgba(78,205,196,0.08);
+}
+.nav-link.active {
+  color: #ffe66d;
+  border-bottom: 2px solid #ffe66d;
+}
+
 body {
   background: var(--bg);
   color: var(--text);
@@ -183,7 +210,7 @@ body {
 /* Arena layout */
 .arena {
   display: flex;
-  height: calc(100vh - 3.5rem);
+  height: calc(100vh - 5rem);
   gap: 1rem;
   padding: 1rem;
 }
@@ -276,13 +303,13 @@ body {
 
 /* PNG sprite sheet animation — steps through horizontal strip */
 .sprite-img {
-  width: 1.8rem;
+  width: 2.4rem;
   height: 1.8rem;
   background-repeat: no-repeat;
   background-position: 0% 0%;
   background-size: 400% 100%;
   image-rendering: pixelated;
-  animation: sprite-sheet-cycle 1s steps(var(--frames, 4)) infinite;
+  animation: sprite-sheet-cycle 1s steps(var(--frames, 3), jump-none) infinite;
 }
 
 @keyframes sprite-sheet-cycle {

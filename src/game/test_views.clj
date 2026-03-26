@@ -21,6 +21,7 @@
         [:link {:rel "stylesheet" :href "/css/spectator.css"}]
         [:link {:rel "stylesheet" :href "/css/test.css"}]]
        [:body.test-body
+        (views/nav-bar :test)
 
         ;; Header
         [:div.test-header

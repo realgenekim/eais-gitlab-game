@@ -68,7 +68,7 @@
       [:span.sprite.sprite-img
        {:style (str "background-image:url(" img-url ");"
                     "background-size:" (* 100 frame-count) "% 100%;"
-                    "--frames:" frame-count ";")}])
+                    "--frames:" (dec frame-count) ";")}])
     ;; Emoji fallback — 4 visibility-cycled spans
     (let [frames (cond
                    (not alive) [(:dead sprite) (:dead sprite) (:dead sprite) (:dead sprite)]
@@ -79,6 +79,18 @@
        [:span.sf.sf1 (nth frames 1)]
        [:span.sf.sf2 (nth frames 2)]
        [:span.sf.sf3 (nth frames 3)]])))
+
+;;; ---------------------------------------------------------------------------
+;;; Shared Nav Bar
+;;; ---------------------------------------------------------------------------
+
+(defn nav-bar
+  "Top navigation bar linking all pages. `active` is :spectator, :test, or :sprites."
+  [active]
+  [:nav.nav-bar
+   [:a.nav-link {:href "/" :class (when (= active :spectator) "active")} "Spectator"]
+   [:a.nav-link {:href "/test" :class (when (= active :test) "active")} "Visual Test"]
+   [:a.nav-link {:href "/sprite-viewer" :class (when (= active :sprites) "active")} "Sprites"]])
 
 ;;; ---------------------------------------------------------------------------
 ;;; Spectator Page (full HTML)
@@ -95,6 +107,7 @@
       [:link {:rel "stylesheet" :href "/css/spectator.css"}]
       [:script {:type "module" :src "/vendor/datastar-aliased.js"}]]
      [:body {:data-star-init "@get('/spectate')"}
+      (nav-bar :spectator)
 
       [:div.header
        [:h1 "CAB BATTLE"]

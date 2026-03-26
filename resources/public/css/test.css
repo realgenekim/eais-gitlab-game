@@ -47,7 +47,7 @@
 /* Arena layout — zoomed */
 .test-arena {
   display: flex;
-  height: calc(100vh - 3.5rem);
+  height: calc(100vh - 5rem);
   gap: 1rem;
   padding: 1rem;
 }
