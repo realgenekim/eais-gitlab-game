@@ -238,28 +238,70 @@ body {
 }
 
 .sprite {
-  font-size: 1.1rem;
-  line-height: 1;
+  position: relative;
+  display: inline-block;
+  width: 1.4rem;
+  height: 1.4rem;
   filter: drop-shadow(0 0 4px rgba(255,255,255,0.3));
   cursor: default;
+  flex-shrink: 0;
+  overflow: hidden;
 }
 
-.sprite::before {
-  content: var(--f0);
-  animation: sprite-cycle 1s steps(1) infinite;
+/* 4 frame spans stacked on top of each other — CSS cycles visibility.
+   All hidden by default. Each frame becomes visible for its 25% window. */
+.sf {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.1rem;
+  line-height: 1;
+  opacity: 0;
+}
+.sf0 { animation: sf-show 1s steps(1) infinite 0s; }
+.sf1 { animation: sf-show 1s steps(1) infinite -0.75s; }
+.sf2 { animation: sf-show 1s steps(1) infinite -0.5s; }
+.sf3 { animation: sf-show 1s steps(1) infinite -0.25s; }
+
+@keyframes sf-show {
+  0%   { opacity: 1; }
+  25%  { opacity: 0; }
+  100% { opacity: 0; }
 }
 
-@keyframes sprite-cycle {
-  0%   { content: var(--f0); }
-  25%  { content: var(--f1); }
-  50%  { content: var(--f2); }
-  75%  { content: var(--f3); }
+/* PNG sprite sheet animation — steps through horizontal strip */
+.sprite-img {
+  width: 1.8rem;
+  height: 1.8rem;
+  background-repeat: no-repeat;
+  background-position: 0% 0%;
+  background-size: 400% 100%;
+  image-rendering: pixelated;
+  animation: sprite-sheet-cycle 1s steps(var(--frames, 4)) infinite;
+}
+
+@keyframes sprite-sheet-cycle {
+  from { background-position: 0% 0%; }
+  to   { background-position: 100% 0%; }
+}
+
+/* Scoreboard: smaller PNG sprites */
+.sb-sprite.sprite-img {
+  width: 1.6rem;
+  height: 1.1rem;
+  image-rendering: pixelated;
 }
 
 .rank-badge {
   display: flex;
   align-items: center;
-  gap: 2px;
+  justify-content: center;
+  gap: 3px;
   line-height: 1;
 }
 
@@ -272,10 +314,11 @@ body {
 }
 
 .rank-badge .rank-num {
-  color: var(--text);
-  font-weight: bold;
-  font-size: 0.55rem;
-  text-shadow: 0 0 4px rgba(0,0,0,0.8);
+  color: var(--neon-yellow);
+  font-family: 'Helvetica Neue', Arial, sans-serif;
+  font-weight: 900;
+  font-size: 0.65rem;
+  text-shadow: 0 0 6px rgba(255,230,109,0.5), 0 1px 2px rgba(0,0,0,0.8);
 }
 
 .pax-icon {
@@ -354,12 +397,11 @@ body {
   text-shadow: 0 0 6px rgba(205,127,50,0.4);
 }
 
-.sb-sprite {
+.score-row .sprite {
   font-size: 1rem;
-}
-.sb-sprite::before {
-  content: var(--f0);
-  animation: sprite-cycle 1s steps(1) infinite;
+  width: 1.2em;
+  height: 1.2em;
+  flex-shrink: 0;
 }
 
 .score-row .name {
@@ -852,6 +894,6 @@ body {
   .rank-badge .rank-num { font-size: 0.7rem; }
   .rank-badge .color-dot { width: 8px; height: 8px; }
   .score-row .rank-num { font-size: 1.6rem; }
-  .sb-sprite { font-size: 1.3rem; }
+  .score-row .sprite { font-size: 1.3rem; }
   .sidebar { width: 350px; }
 }

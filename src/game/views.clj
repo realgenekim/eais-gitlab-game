@@ -19,21 +19,22 @@
 ;; Each player gets a unique animated sprite — 4 frames that cycle
 ;; :frames = normal driving, :pax = carrying passenger, :dead = eliminated
 (def player-sprites
-  [{:name "Rocket"   :frames ["\uD83D\uDE97" "\uD83D\uDE99" "\uD83C\uDFCE\uFE0F" "\uD83D\uDE97"]
+  [{:name "Rocket" :image "/sprites/rocket.png" :frame-count 4
+    :frames ["\uD83D\uDE97" "\uD83D\uDE99" "\uD83C\uDFCE\uFE0F" "\uD83D\uDE97"]
     :pax ["\uD83D\uDE95" "\uD83E\uDD11" "\uD83D\uDE95" "\uD83D\uDCB0"] :dead "\uD83D\uDC80"}
-   {:name "Ghost"    :frames ["\uD83D\uDC7E" "\uD83D\uDC7B" "\uD83D\uDC7E" "\uD83D\uDEF8"]
+   {:name "Ghost" :frames ["\uD83D\uDC7E" "\uD83D\uDC7B" "\uD83D\uDC7E" "\uD83D\uDEF8"]
     :pax ["\uD83D\uDE95" "\uD83E\uDD11" "\uD83D\uDE95" "\uD83D\uDCB0"] :dead "\uD83D\uDC80"}
-   {:name "Fox"      :frames ["\uD83E\uDD8A" "\uD83D\uDC3A" "\uD83E\uDD8A" "\uD83D\uDC3E"]
+   {:name "Fox" :frames ["\uD83E\uDD8A" "\uD83D\uDC3A" "\uD83E\uDD8A" "\uD83D\uDC3E"]
     :pax ["\uD83D\uDE95" "\uD83E\uDD11" "\uD83D\uDE95" "\uD83D\uDCB0"] :dead "\uD83D\uDC80"}
-   {:name "Robot"    :frames ["\uD83E\uDD16" "\uD83D\uDD27" "\uD83E\uDD16" "\u26A1"]
+   {:name "Robot" :frames ["\uD83E\uDD16" "\uD83D\uDD27" "\uD83E\uDD16" "\u26A1"]
     :pax ["\uD83D\uDE95" "\uD83E\uDD11" "\uD83D\uDE95" "\uD83D\uDCB0"] :dead "\uD83D\uDC80"}
-   {:name "Octopus"  :frames ["\uD83D\uDC19" "\uD83E\uDD91" "\uD83D\uDC19" "\uD83C\uDF0A"]
+   {:name "Octopus" :frames ["\uD83D\uDC19" "\uD83E\uDD91" "\uD83D\uDC19" "\uD83C\uDF0A"]
     :pax ["\uD83D\uDE95" "\uD83E\uDD11" "\uD83D\uDE95" "\uD83D\uDCB0"] :dead "\uD83D\uDC80"}
-   {:name "Unicorn"  :frames ["\uD83E\uDD84" "\uD83C\uDF08" "\uD83E\uDD84" "\u2728"]
+   {:name "Unicorn" :frames ["\uD83E\uDD84" "\uD83C\uDF08" "\uD83E\uDD84" "\u2728"]
     :pax ["\uD83D\uDE95" "\uD83E\uDD11" "\uD83D\uDE95" "\uD83D\uDCB0"] :dead "\uD83D\uDC80"}
-   {:name "Dragon"   :frames ["\uD83D\uDC32" "\uD83D\uDD25" "\uD83D\uDC32" "\uD83D\uDCA8"]
+   {:name "Dragon" :frames ["\uD83D\uDC32" "\uD83D\uDD25" "\uD83D\uDC32" "\uD83D\uDCA8"]
     :pax ["\uD83D\uDE95" "\uD83E\uDD11" "\uD83D\uDE95" "\uD83D\uDCB0"] :dead "\uD83D\uDC80"}
-   {:name "Alien"    :frames ["\uD83D\uDC7D" "\uD83D\uDEF8" "\uD83D\uDC7D" "\uD83D\uDCAB"]
+   {:name "Alien" :frames ["\uD83D\uDC7D" "\uD83D\uDEF8" "\uD83D\uDC7D" "\uD83D\uDCAB"]
     :pax ["\uD83D\uDE95" "\uD83E\uDD11" "\uD83D\uDE95" "\uD83D\uDCB0"] :dead "\uD83D\uDC80"}])
 
 (defn player-sprite [idx]
@@ -54,17 +55,30 @@
 (defn- medal-class [rank]
   (case (int rank) 1 "gold" 2 "silver" 3 "bronze" nil))
 
-(defn- sprite-style
-  "CSS custom properties for sprite frame animation."
+(defn- sprite-frames-html
+  "Render sprite frames. Supports both emoji (4 spans) and PNG sprite sheets.
+   PNG sprites use background-image with CSS stepping animation."
   [sprite has-passenger alive]
-  (let [frames (cond
-                 (not alive) [(:dead sprite) (:dead sprite) (:dead sprite) (:dead sprite)]
-                 has-passenger (:pax sprite)
-                 :else (:frames sprite))]
-    (str "--f0:'" (nth frames 0) "';"
-         "--f1:'" (nth frames 1) "';"
-         "--f2:'" (nth frames 2) "';"
-         "--f3:'" (nth frames 3) "';")))
+  (if-let [image (and alive (:image sprite))]
+    ;; PNG sprite sheet — single span with background-image animation
+    (let [frame-count (get sprite :frame-count 4)
+          img-url (if has-passenger
+                    (get sprite :pax-image image)
+                    image)]
+      [:span.sprite.sprite-img
+       {:style (str "background-image:url(" img-url ");"
+                    "background-size:" (* 100 frame-count) "% 100%;"
+                    "--frames:" frame-count ";")}])
+    ;; Emoji fallback — 4 visibility-cycled spans
+    (let [frames (cond
+                   (not alive) [(:dead sprite) (:dead sprite) (:dead sprite) (:dead sprite)]
+                   has-passenger (:pax sprite)
+                   :else (:frames sprite))]
+      [:span.sprite
+       [:span.sf.sf0 (nth frames 0)]
+       [:span.sf.sf1 (nth frames 1)]
+       [:span.sf.sf2 (nth frames 2)]
+       [:span.sf.sf3 (nth frames 3)]])))
 
 ;;; ---------------------------------------------------------------------------
 ;;; Spectator Page (full HTML)
@@ -328,9 +342,7 @@
                        (when is-lightning-center " lightning-center")
                        (when is-lightning " lightning-blast")
                        (when tracer (str " tracer tracer-" (name (:dir tracer)))))
-           :style (str (when (and player (not is-kill))
-                         (sprite-style (:sprite player) (:has-passenger player) true))
-                       (when tracer
+           :style (str (when tracer
                          (str "--d:" (:d tracer)
                               ";--tt:" (:tt tracer)
                               ";--tl:" (:tl tracer) ";")))}
@@ -357,20 +369,20 @@
                       [:div.spark] [:div.spark] [:div.spark]]]
             is-hit [:div.hit-fx
                     [:div.sprite-cell
-                     [:span.sprite {:title (str (:name player) " " (:hp player) "hp")}]
                      [:div.rank-badge
-                      [:span.color-dot {:style (str "background:" (:color player))}]
-                      [:span.rank-num (str (:rank player))]]]
+                      [:span.rank-num (str (:rank player))]
+                      [:span.color-dot {:style (str "background:" (:color player))}]]
+                     (sprite-frames-html (:sprite player) (:has-passenger player) true)]
                     [:div.sparks.small
                      [:div.spark] [:div.spark] [:div.spark] [:div.spark]]]
             player [:div.sprite-cell
                     {:title (str (:name player) " (" (:score player) "pts)"
                                  " " (:hp player) "hp"
                                  (when (:has-passenger player) " [PAX]"))}
-                    [:span.sprite]
                     [:div.rank-badge
-                     [:span.color-dot {:style (str "background:" (:color player))}]
-                     [:span.rank-num (str (:rank player))]]]
+                     [:span.rank-num (str (:rank player))]
+                     [:span.color-dot {:style (str "background:" (:color player))}]]
+                    (sprite-frames-html (:sprite player) (:has-passenger player) true)]
             pax [:span.pax-icon {:title (str "Passenger \u2192 ("
                                              (get-in pax [:dest :x]) ","
                                              (get-in pax [:dest :y]) ")")}
@@ -399,10 +411,9 @@
          [:div.score-row {:class (str (when-not alive "dead")
                                       (when-let [m (medal-class rank)]
                                         (str " " m)))
-                          :style (str "border-left: 4px solid " color ";"
-                                      (sprite-style sprite has-passenger alive))}
+                          :style (str "border-left: 4px solid " color ";")}
           [:span.rank-num (ordinal rank)]
-          [:span.sprite.sb-sprite]
+          (sprite-frames-html sprite has-passenger alive)
           [:span.name name]
           (when has-passenger [:span.pax-badge "PAX"])
           [:div.hp-bar

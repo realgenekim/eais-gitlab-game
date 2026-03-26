@@ -5,6 +5,7 @@
             [game.engine :as engine]
             [game.sse :as sse]
             [game.views :as views]
+            [game.test-views :as test-views]
             [org.httpkit.server :as http]
             [reitit.ring :as reitit]
             [ring.util.response :as resp]
@@ -186,6 +187,14 @@
   (engine/resume-game!)
   (json-response 200 {:status "resumed"}))
 
+(defn handle-test [request]
+  (let [params (:query-params request)
+        scenario (Integer/parseInt (or (get params "scenario") "0"))
+        frame (Integer/parseInt (or (get params "frame") "0"))]
+    {:status 200
+     :headers {"Content-Type" "text/html"}
+     :body (test-views/test-page scenario frame)}))
+
 ;;; ---------------------------------------------------------------------------
 ;;; Router
 ;;; ---------------------------------------------------------------------------
@@ -208,7 +217,9 @@
          ["/game/map-swap" {:post {:handler #'handle-map-swap}}]
          ["/game/lightning" {:post {:handler #'handle-lightning}}]
          ["/game/seek" {:post {:handler #'handle-seek}}]
-         ["/game/resume" {:post {:handler #'handle-resume}}]])
+         ["/game/resume" {:post {:handler #'handle-resume}}]
+         ;; Visual test
+         ["/test" {:get {:handler #'handle-test}}]])
        (reitit/create-default-handler)
        {:middleware [wrap-params wrap-json]})
       (wrap-resource "public")
