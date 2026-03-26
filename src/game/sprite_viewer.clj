@@ -50,10 +50,15 @@ h2 { color: var(--neon-cyan); font-size: 1rem; letter-spacing: 0.15em; margin-bo
   padding-top: 1rem; border-top: 1px solid var(--border); }
 .anim-box { text-align: center; }
 .anim-label { color: var(--text-dim); font-size: 0.7rem; margin-bottom: 0.3rem; }
-.anim-sprite { image-rendering: pixelated; background-repeat: no-repeat;
-  background-position: 0% 0%; display: inline-block; }
-.anim-sprite.a4 { animation: sheet4 1s steps(3, jump-none) infinite; }
-@keyframes sheet4 { from { background-position: 0% 0%; } to { background-position: 100% 0%; } }
+/* Composed animation — 4 stacked frames cycling visibility (same as emoji sprites) */
+.anim-composed { position: relative; display: inline-block; }
+.anim-composed .anim-frame { position: absolute; top: 0; left: 0;
+  image-rendering: pixelated; background-repeat: no-repeat; opacity: 0; }
+.anim-composed .af0 { animation: af-show 1s steps(1) infinite 0s; }
+.anim-composed .af1 { animation: af-show 1s steps(1) infinite -0.75s; }
+.anim-composed .af2 { animation: af-show 1s steps(1) infinite -0.5s; }
+.anim-composed .af3 { animation: af-show 1s steps(1) infinite -0.25s; }
+@keyframes af-show { 0% { opacity: 1; } 25% { opacity: 0; } 100% { opacity: 0; } }
 .full-sheet { margin-top: 1rem; padding-top: 1rem; border-top: 1px solid var(--border); }
 .full-sheet img { image-rendering: pixelated; border: 1px solid var(--border);
   background: var(--bg); max-width: 100%; }
@@ -190,13 +195,18 @@ h2 { color: var(--neon-cyan); font-size: 1rem; letter-spacing: 0.15em; margin-bo
                        "image-rendering:pixelated;"
                        "border:1px solid var(--border);"))}]]
 
-      ;; Animated at various sizes
+      ;; Animated at various sizes — composed from same frames as inspector
       [:h2 {:style "margin-top:1rem;"} "ANIMATED"]
       [:div.anim-row
        (for [h [32 48 64 96 128 192]]
-         [:div.anim-box
-          [:div.anim-label (str h "px")]
-          [:div.anim-sprite.a4.checkerboard {:style (anim-style url n-frames aspect h)}]])]
+         (let [w (int (* h aspect))]
+           [:div.anim-box
+            [:div.anim-label (str h "px")]
+            [:div.anim-composed.checkerboard {:style (str "width:" w "px;height:" h "px;")}
+             (for [i (range n-frames)]
+               [:div.anim-frame
+                {:class (str "af" i)
+                 :style (frame-style url n-frames aspect i h)}])]]))]
 
       ;; Full sheet
       [:div.full-sheet
