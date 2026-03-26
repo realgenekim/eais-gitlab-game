@@ -120,6 +120,12 @@
   font-size: 1.8rem;
 }
 
+/* Freeze tracer animations — show beam statically for visual debugging */
+.test-grid-container .cell.tracer {
+  animation: none !important;
+  opacity: 1 !important;
+}
+
 /* Sidebar */
 .test-sidebar {
   width: 320px;
