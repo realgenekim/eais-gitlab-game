@@ -54,7 +54,7 @@
          [:div.test-map
           [:div.test-grid-label "ZOOMED GRID"]
           [:div#test-grid.test-grid-container
-           (views/game-map-fragment state events)]]
+           (views/game-map-fragment state events {:sprite-height 64})]]
 
          ;; Sidebar
          [:div.test-sidebar

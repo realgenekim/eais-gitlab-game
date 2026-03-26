@@ -82,6 +82,9 @@ bot:
 stop:
 	lsof -ti :$(PORT) | xargs kill -9 || true
 
+# Restart dev server
+restart: stop server-dev
+
 # Test that application compiles without errors
 server-test-run:
 	@echo "Testing application compilation..."

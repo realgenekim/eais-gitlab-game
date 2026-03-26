@@ -188,10 +188,12 @@
   (engine/resume-game!)
   (json-response 200 {:status "resumed"}))
 
-(defn handle-sprite-viewer [_request]
-  {:status 200
-   :headers {"Content-Type" "text/html"}
-   :body (sprite-viewer/sprite-viewer-page)})
+(defn handle-sprite-viewer [request]
+  (let [selected (get-in request [:query-params "sprite"])
+        frame-str (get-in request [:query-params "frame"])]
+    {:status 200
+     :headers {"Content-Type" "text/html"}
+     :body (sprite-viewer/sprite-viewer-page selected frame-str)}))
 
 (defn handle-test [request]
   (let [params (:query-params request)

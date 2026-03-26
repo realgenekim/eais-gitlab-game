@@ -19,7 +19,7 @@
 ;; Each player gets a unique animated sprite — 4 frames that cycle
 ;; :frames = normal driving, :pax = carrying passenger, :dead = eliminated
 (def player-sprites
-  [{:name "Rocket" :image "/sprites/rocket.png" :frame-count 4
+  [{:name "Rocket" :image "/sprites/rocket.png" :frame-count 4 :aspect 1.333
     :frames ["\uD83D\uDE97" "\uD83D\uDE99" "\uD83C\uDFCE\uFE0F" "\uD83D\uDE97"]
     :pax ["\uD83D\uDE95" "\uD83E\uDD11" "\uD83D\uDE95" "\uD83D\uDCB0"] :dead "\uD83D\uDC80"}
    {:name "Ghost" :frames ["\uD83D\uDC7E" "\uD83D\uDC7B" "\uD83D\uDC7E" "\uD83D\uDEF8"]
@@ -55,30 +55,35 @@
 (defn- medal-class [rank]
   (case (int rank) 1 "gold" 2 "silver" 3 "bronze" nil))
 
-(defn- sprite-frames-html
+(defn sprite-frames-html
   "Render sprite frames. Supports both emoji (4 spans) and PNG sprite sheets.
-   PNG sprites use background-image with CSS stepping animation."
-  [sprite has-passenger alive]
-  (if-let [image (and alive (:image sprite))]
-    ;; PNG sprite sheet — single span with background-image animation
-    (let [frame-count (get sprite :frame-count 4)
-          img-url (if has-passenger
-                    (get sprite :pax-image image)
-                    image)]
-      [:span.sprite.sprite-img
-       {:style (str "background-image:url(" img-url ");"
-                    "background-size:" (* 100 frame-count) "% 100%;"
-                    "--frames:" (dec frame-count) ";")}])
-    ;; Emoji fallback — 4 visibility-cycled spans
-    (let [frames (cond
-                   (not alive) [(:dead sprite) (:dead sprite) (:dead sprite) (:dead sprite)]
-                   has-passenger (:pax sprite)
-                   :else (:frames sprite))]
-      [:span.sprite
-       [:span.sf.sf0 (nth frames 0)]
-       [:span.sf.sf1 (nth frames 1)]
-       [:span.sf.sf2 (nth frames 2)]
-       [:span.sf.sf3 (nth frames 3)]])))
+   PNG sprites use pixel-exact sizing from :aspect ratio, same as sprite-viewer.
+   Optional `height` param (px) controls rendered size (default 32)."
+  ([sprite has-passenger alive]
+   (sprite-frames-html sprite has-passenger alive 32))
+  ([sprite has-passenger alive height]
+   (if-let [image (and alive (:image sprite))]
+     ;; PNG sprite sheet — pixel-exact sizing from aspect ratio
+     (let [frame-count (get sprite :frame-count 4)
+           aspect (get sprite :aspect 1.333)
+           w (int (* height aspect))
+           img-url (if has-passenger
+                     (get sprite :pax-image image)
+                     image)]
+       [:span.sprite.sprite-img
+        {:style (str "width:" w "px;height:" height "px;"
+                     "background-image:url(" img-url ");"
+                     "background-size:" (* 100 frame-count) "% 100%;")}])
+     ;; Emoji fallback — 4 visibility-cycled spans
+     (let [frames (cond
+                    (not alive) [(:dead sprite) (:dead sprite) (:dead sprite) (:dead sprite)]
+                    has-passenger (:pax sprite)
+                    :else (:frames sprite))]
+       [:span.sprite
+        [:span.sf.sf0 (nth frames 0)]
+        [:span.sf.sf1 (nth frames 1)]
+        [:span.sf.sf2 (nth frames 2)]
+        [:span.sf.sf3 (nth frames 3)]]))))
 
 ;;; ---------------------------------------------------------------------------
 ;;; Shared Nav Bar
@@ -238,169 +243,116 @@
     (get dest-lookup [x y]) "destination"
     :else "open"))
 
+(defn- build-player-list [players rank-map]
+  (->> players
+       (map-indexed (fn [idx [id p]]
+                      {:id id :x (:x p) :y (:y p)
+                       :name (:name p) :score (:score p)
+                       :hp (:hp p) :alive (:alive? p)
+                       :color (player-color idx)
+                       :sprite (player-sprite idx)
+                       :rank (get rank-map id 0)
+                       :has-passenger (some? (:passenger p))}))))
+
 (defn game-map-fragment
   "Render the full game map grid as a spectator god-mode view.
-   Events from the current tick drive hit/kill/tracer animations."
-  [game-state events]
-  (let [{:keys [width height walls]} (:map game-state)
-        players (:players game-state)
-        passengers (filter #(nil? (:picked-up-by %)) (:passengers game-state))
-        directions {:north [0 -1] :south [0 1] :east [1 0] :west [-1 0]}
-        ;; Build lookups
-        rank-map (compute-ranks players)
-        player-list (->> players
-                         (map-indexed (fn [idx [id p]]
-                                        {:id id :x (:x p) :y (:y p)
-                                         :name (:name p) :score (:score p)
-                                         :hp (:hp p) :alive (:alive? p)
-                                         :color (player-color idx)
-                                         :sprite (player-sprite idx)
-                                         :rank (get rank-map id 0)
-                                         :has-passenger (some? (:passenger p))})))
-        alive-list (filter :alive player-list)
-        player-lookup (into {} (map (fn [p] [[(:x p) (:y p)] p]) alive-list))
-        pax-lookup (into {} (map (fn [p] [[(:x p) (:y p)] p]) passengers))
-        dest-lookup (into {} (keep (fn [p]
-                                     (when-let [pax (:passenger p)]
-                                       [[(get-in pax [:dest :x])
-                                         (get-in pax [:dest :y])]
-                                        {:player-name (:name p)}]))
-                                   (map (fn [[_ p]] p) players)))
-        ;; Tracer config — adjust independently
-        tracer-length 5 ;; visual beam length (cells lit at once)
-        tracer-travel 10 ;; cells the beam sweeps through per tick
-        ;; Compute bullet tracers: all cells along path up to tracer-travel
-        tracer-map (atom {}) ;; [x y] -> {:dir :east :d N :tt N}
-        _ (doseq [evt events]
-            (when (and (= :command (:type evt))
-                       (= :shoot (get-in evt [:action :type])))
-              (let [pid (:player-id evt)
-                    player (get-in game-state [:players pid])
-                    dir (keyword (get-in evt [:action :direction]))
-                    [dx dy] (get directions dir [0 0])
-                    range- 20]
-                (when (and player (not= [dx dy] [0 0]))
-                  ;; Find how far bullet actually travels (hit or wall)
-                  (let [max-dist (loop [x (+ (:x player) dx)
-                                        y (+ (:y player) dy)
-                                        d 1]
-                                   (if (or (> d range-)
-                                           (not (and (>= x 0) (< x width) (>= y 0) (< y height)))
-                                           (contains? walls [x y]))
-                                     (dec d)
-                                     (if (get player-lookup [x y])
-                                       d
-                                       (recur (+ x dx) (+ y dy) (inc d)))))
-                        ;; Render up to tracer-travel cells (or max-dist, whichever is less)
-                        render-dist (min max-dist tracer-travel)]
-                    (loop [x (+ (:x player) dx)
-                           y (+ (:y player) dy)
-                           d 1]
-                      (when (and (<= d render-dist)
-                                 (>= x 0) (< x width)
-                                 (>= y 0) (< y height)
-                                 (not (contains? walls [x y])))
-                        (swap! tracer-map assoc [x y]
-                               {:dir dir :d d :tt render-dist :tl tracer-length})
-                        (when-not (get player-lookup [x y])
-                          (recur (+ x dx) (+ y dy) (inc d))))))))))
-        tracers @tracer-map
-        ;; Lightning strike cells from recent-effects
-        lightning-cells (->> (:recent-effects game-state)
-                             (filter #(= :lightning (:type %)))
-                             (mapcat :cells)
-                             set)
-        lightning-centers (->> (:recent-effects game-state)
-                               (filter #(= :lightning (:type %)))
-                               (map (fn [e] [(:x e) (:y e)]))
-                               set)
-        ;; Kill positions
-        recent-kills (->> events
-                          (filter #(= :kill (:type %)))
-                          (keep (fn [evt]
-                                  (when-let [victim (get-in game-state [:players (:victim-id evt)])]
-                                    [(:x victim) (:y victim)])))
-                          set)
-        ;; Players with reduced HP = recently hit
-        damaged-players (->> players
-                             (filter (fn [[_ p]] (and (:alive? p) (< (:hp p) 100))))
-                             (map (fn [[_ p]] [(:x p) (:y p)]))
-                             set)
-        ;; Battle royale shrink warning — ring of fire
-        shrink-warning (or (:shrink-warning game-state) #{})
-        ;; Active crater fires
-        crater-fires (or (:crater-fires game-state) {})]
-    [:div.grid {:style (str "grid-template-columns: repeat(" width ", 1fr);"
-                            "grid-template-rows: repeat(" height ", 1fr);")}
-     (for [y (range height)
-           x (range width)]
-       (let [cls (cell-class game-state x y player-lookup pax-lookup dest-lookup)
-             player (get player-lookup [x y])
-             pax (get pax-lookup [x y])
-             is-kill (contains? recent-kills [x y])
-             is-hit (and player (contains? damaged-players [x y]))
-             is-lightning-center (contains? lightning-centers [x y])
-             is-lightning (and (not is-lightning-center)
-                               (contains? lightning-cells [x y]))
-             is-shrink-warning (contains? shrink-warning [x y])
-             is-crater-fire (contains? crater-fires [x y])
-             tracer (when (and (not player) (not is-kill) (not is-lightning) (not is-lightning-center))
-                      (get tracers [x y]))]
-         [:div.cell
-          {:class (str cls
-                       (when is-kill " nuke")
-                       (when is-hit " hit")
-                       (when is-shrink-warning " shrink-warning")
-                       (when is-crater-fire " crater-fire")
-                       (when is-lightning-center " lightning-center")
-                       (when is-lightning " lightning-blast")
-                       (when tracer (str " tracer tracer-" (name (:dir tracer)))))
-           :style (str (when tracer
-                         (str "--d:" (:d tracer)
-                              ";--tt:" (:tt tracer)
-                              ";--tl:" (:tl tracer) ";")))}
-          (cond
-            is-lightning-center
-            [:div.lightning-fx
-             [:div.lightning-bolt]
-             [:div.lightning-flash]
-             [:div.sparks
-              [:div.spark] [:div.spark] [:div.spark]
-              [:div.spark] [:div.spark] [:div.spark]
-              [:div.spark] [:div.spark] [:div.spark]
-              [:div.spark] [:div.spark] [:div.spark]]]
+   Events from the current tick drive hit/kill/tracer animations.
+   Optional `opts` map: {:sprite-height px} for zoomed views."
+  ([game-state events] (game-map-fragment game-state events {}))
+  ([game-state events opts]
+   (let [{:keys [width height walls]} (:map game-state)
+         players (:players game-state)
+         passengers (filter #(nil? (:picked-up-by %)) (:passengers game-state))
+         directions {:north [0 -1] :south [0 1] :east [1 0] :west [-1 0]}
+         sprite-h (get opts :sprite-height 32)
+         rank-map (compute-ranks players)
+         player-list (build-player-list players rank-map)
+         alive-list (filter :alive player-list)
+         player-lookup (into {} (map (fn [p] [[(:x p) (:y p)] p]) alive-list))
+         pax-lookup (into {} (map (fn [p] [[(:x p) (:y p)] p]) passengers))
+         dest-lookup (into {} (keep (fn [p] (when-let [pax (:passenger p)] [[(get-in pax [:dest :x]) (get-in pax [:dest :y])] {:player-name (:name p)}])) (map (fn [[_ p]] p) players)))
+         tracer-length 5
+         tracer-travel 10
+         tracer-map (atom {})
+         _ (doseq [evt events] (when (and (= :command (:type evt)) (= :shoot (get-in evt [:action :type]))) (let [pid (:player-id evt) player (get-in game-state [:players pid]) dir (keyword (get-in evt [:action :direction])) [dx dy] (get directions dir [0 0]) range- 20] (when (and player (not= [dx dy] [0 0])) (let [max-dist (loop [x (+ (:x player) dx) y (+ (:y player) dy) d 1] (if (or (> d range-) (not (and (>= x 0) (< x width) (>= y 0) (< y height))) (contains? walls [x y])) (dec d) (if (get player-lookup [x y]) d (recur (+ x dx) (+ y dy) (inc d))))) render-dist (min max-dist tracer-travel)] (loop [x (+ (:x player) dx) y (+ (:y player) dy) d 1] (when (and (<= d render-dist) (>= x 0) (< x width) (>= y 0) (< y height) (not (contains? walls [x y]))) (swap! tracer-map assoc [x y] {:dir dir :d d :tt render-dist :tl tracer-length}) (when-not (get player-lookup [x y]) (recur (+ x dx) (+ y dy) (inc d))))))))))
+         tracers @tracer-map
+         lightning-cells (->> (:recent-effects game-state) (filter #(= :lightning (:type %))) (mapcat :cells) set)
+         lightning-centers (->> (:recent-effects game-state) (filter #(= :lightning (:type %))) (map (fn [e] [(:x e) (:y e)])) set)
+         recent-kills (->> events (filter #(= :kill (:type %))) (keep (fn [evt] (when-let [victim (get-in game-state [:players (:victim-id evt)])] [(:x victim) (:y victim)]))) set)
+         damaged-players (->> players (filter (fn [[_ p]] (and (:alive? p) (< (:hp p) 100)))) (map (fn [[_ p]] [(:x p) (:y p)])) set)
+         shrink-warning (or (:shrink-warning game-state) #{})
+         crater-fires (or (:crater-fires game-state) {})]
+     [:div.grid {:style (str "grid-template-columns: repeat(" width ", 1fr);"
+                             "grid-template-rows: repeat(" height ", 1fr);")}
+      (for [y (range height)
+            x (range width)]
+        (let [cls (cell-class game-state x y player-lookup pax-lookup dest-lookup)
+              player (get player-lookup [x y])
+              pax (get pax-lookup [x y])
+              is-kill (contains? recent-kills [x y])
+              is-hit (and player (contains? damaged-players [x y]))
+              is-lightning-center (contains? lightning-centers [x y])
+              is-lightning (and (not is-lightning-center)
+                                (contains? lightning-cells [x y]))
+              is-shrink-warning (contains? shrink-warning [x y])
+              is-crater-fire (contains? crater-fires [x y])
+              tracer (when (and (not player) (not is-kill) (not is-lightning) (not is-lightning-center))
+                       (get tracers [x y]))]
+          [:div.cell
+           {:class (str cls
+                        (when is-kill " nuke")
+                        (when is-hit " hit")
+                        (when is-shrink-warning " shrink-warning")
+                        (when is-crater-fire " crater-fire")
+                        (when is-lightning-center " lightning-center")
+                        (when is-lightning " lightning-blast")
+                        (when tracer (str " tracer tracer-" (name (:dir tracer)))))
+            :style (str (when tracer
+                          (str "--d:" (:d tracer)
+                               ";--tt:" (:tt tracer)
+                               ";--tl:" (:tl tracer) ";")))}
+           (cond
+             is-lightning-center
+             [:div.lightning-fx
+              [:div.lightning-bolt]
+              [:div.lightning-flash]
+              [:div.sparks
+               [:div.spark] [:div.spark] [:div.spark]
+               [:div.spark] [:div.spark] [:div.spark]
+               [:div.spark] [:div.spark] [:div.spark]
+               [:div.spark] [:div.spark] [:div.spark]]]
 
-            is-lightning
-            [:div.crater-fx]
+             is-lightning
+             [:div.crater-fx]
 
-            is-kill [:div.nuke-fx
-                     [:div.smoke]
-                     [:div.sparks
-                      [:div.spark] [:div.spark] [:div.spark]
-                      [:div.spark] [:div.spark] [:div.spark]
-                      [:div.spark] [:div.spark] [:div.spark]
-                      [:div.spark] [:div.spark] [:div.spark]]]
-            is-hit [:div.hit-fx
-                    [:div.sprite-cell
+             is-kill [:div.nuke-fx
+                      [:div.smoke]
+                      [:div.sparks
+                       [:div.spark] [:div.spark] [:div.spark]
+                       [:div.spark] [:div.spark] [:div.spark]
+                       [:div.spark] [:div.spark] [:div.spark]
+                       [:div.spark] [:div.spark] [:div.spark]]]
+             is-hit [:div.hit-fx
+                     [:div.sprite-cell
+                      [:div.rank-badge
+                       [:span.rank-num (str (:rank player))]
+                       [:span.color-dot {:style (str "background:" (:color player))}]]
+                      (sprite-frames-html (:sprite player) (:has-passenger player) true sprite-h)]
+                     [:div.sparks.small
+                      [:div.spark] [:div.spark] [:div.spark] [:div.spark]]]
+             player [:div.sprite-cell
+                     {:title (str (:name player) " (" (:score player) "pts)"
+                                  " " (:hp player) "hp"
+                                  (when (:has-passenger player) " [PAX]"))}
                      [:div.rank-badge
                       [:span.rank-num (str (:rank player))]
                       [:span.color-dot {:style (str "background:" (:color player))}]]
-                     (sprite-frames-html (:sprite player) (:has-passenger player) true)]
-                    [:div.sparks.small
-                     [:div.spark] [:div.spark] [:div.spark] [:div.spark]]]
-            player [:div.sprite-cell
-                    {:title (str (:name player) " (" (:score player) "pts)"
-                                 " " (:hp player) "hp"
-                                 (when (:has-passenger player) " [PAX]"))}
-                    [:div.rank-badge
-                     [:span.rank-num (str (:rank player))]
-                     [:span.color-dot {:style (str "background:" (:color player))}]]
-                    (sprite-frames-html (:sprite player) (:has-passenger player) true)]
-            pax [:span.pax-icon {:title (str "Passenger \u2192 ("
-                                             (get-in pax [:dest :x]) ","
-                                             (get-in pax [:dest :y]) ")")}
-                 "$"]
-            :else nil)]))]))
+                     (sprite-frames-html (:sprite player) (:has-passenger player) true sprite-h)]
+             pax [:span.pax-icon {:title (str "Passenger \u2192 ("
+                                              (get-in pax [:dest :x]) ","
+                                              (get-in pax [:dest :y]) ")")}
+                  "$"]
+             :else nil)]))])))
 
 ;;; ---------------------------------------------------------------------------
 ;;; Scoreboard Fragment

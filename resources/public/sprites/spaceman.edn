@@ -1,0 +1,1 @@
+{:name "spaceman", :source "/Users/genekim/Downloads/spaceman-framed.png", :n-frames 4, :frame-boxes [{:left 171, :right 445} {:left 457, :right 746} {:left 759, :right 1044} {:left 1059, :right 1359}], :inner-top 347, :inner-bottom 632, :gray-border-cols [180 445 741 763 768 1063], :gray-border-rows [623]}

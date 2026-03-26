@@ -30,6 +30,7 @@ game.commentator — AI color commentator (Claude → ElevenLabs TTS)
 make nrepl           # Terminal 1: Start nREPL
 make runtests        # Terminal 2: Watch tests
 make server-dev      # Terminal 3: Dev server (ENV=dev, port 8080)
+make restart         # Stop + restart dev server (needed for new routes/arities)
 make mcp-configure   # One-time: Configure Clojure MCP for Claude Code
 ```
 

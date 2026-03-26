@@ -90,10 +90,13 @@
   min-height: 80px;
 }
 
+/* Emoji sprites — zoomed square container */
 .test-grid-container .sprite {
   width: 3rem;
   height: 3rem;
 }
+
+/* PNG sprite sheets — sizing is inline (pixel-exact from aspect ratio) */
 
 .test-grid-container .sf {
   font-size: 2.5rem;

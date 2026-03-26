@@ -301,27 +301,19 @@ body {
   100% { opacity: 0; }
 }
 
-/* PNG sprite sheet animation — steps through horizontal strip */
+/* PNG sprite sheet animation — pixel dimensions set inline from aspect ratio.
+   Same approach as sprite-viewer: steps(N-1, jump-none) for N frames. */
 .sprite-img {
-  width: 2.4rem;
-  height: 1.8rem;
   background-repeat: no-repeat;
   background-position: 0% 0%;
-  background-size: 400% 100%;
   image-rendering: pixelated;
-  animation: sprite-sheet-cycle 1s steps(var(--frames, 3), jump-none) infinite;
+  overflow: hidden;
+  animation: sprite-sheet-cycle 1s steps(3, jump-none) infinite;
 }
 
 @keyframes sprite-sheet-cycle {
   from { background-position: 0% 0%; }
   to   { background-position: 100% 0%; }
-}
-
-/* Scoreboard: smaller PNG sprites */
-.sb-sprite.sprite-img {
-  width: 1.6rem;
-  height: 1.1rem;
-  image-rendering: pixelated;
 }
 
 .rank-badge {
