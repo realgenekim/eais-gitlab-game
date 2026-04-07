@@ -192,6 +192,7 @@
         [dx dy] (get directions (keyword direction) [0 0])
         range- (get-in state [:config :shoot-range] 5)
         damage (get-in state [:config :shoot-damage] 30)
+        kill-bonus (get-in state [:config :kill-bonus] 150)
         enemies (or (:enemies state) {})]
     (if (or (not (:alive? player))
             (< (:ammo player) 1)
@@ -266,7 +267,7 @@
                                        %)
                                     ps))))
                   (assoc-in [:players hit-id :passenger] nil)
-                  (update-in [:players player-id :score] + 50))
+                  (update-in [:players player-id :score] + kill-bonus))
               (assoc-in state [:players hit-id :hp] new-hp)))
 
           ;; Hit an enemy
@@ -539,30 +540,31 @@
    :scary {:hp 80 :speed 2 :damage 30 :score 50}})
 
 (defn spawn-enemies
-  "Spawn a wave of enemies at random edge cells.
-   Enemies spawn outside the border walls (row/col 0 or max)."
+  "Spawn a wave of enemies at random edge cells."
   [state enemy-type count-to-spawn]
   (let [{:keys [width height walls]} (:map state)
         edge-cells (concat
-                    (for [x (range 1 (dec width))] [x 1]) ;; top edge
-                    (for [x (range 1 (dec width))] [x (- height 2)]) ;; bottom edge
-                    (for [y (range 1 (dec height))] [1 y]) ;; left edge
-                    (for [y (range 1 (dec height))] [(- width 2) y])) ;; right edge
+                    (for [x (range 1 (dec width))] [x 1])
+                    (for [x (range 1 (dec width))] [x (- height 2)])
+                    (for [y (range 1 (dec height))] [1 y])
+                    (for [y (range 1 (dec height))] [(- width 2) y]))
         open-edges (vec (remove #(contains? walls %) edge-cells))
         type-info (get enemy-types enemy-type {:hp 20 :speed 1 :damage 10 :score 10})]
-    (reduce (fn [s i]
-              (let [pos (nth open-edges (rand-int (count open-edges)))
-                    id (str "enemy-" (:tick state) "-" i)]
-                (assoc-in s [:enemies id]
-                          {:x (first pos)
-                           :y (second pos)
-                           :hp (:hp type-info)
-                           :max-hp (:hp type-info)
-                           :speed (:speed type-info)
-                           :damage (:damage type-info)
-                           :score (:score type-info)
-                           :type enemy-type})))
-            state (range count-to-spawn))))
+    (if (empty? open-edges)
+      state
+      (reduce (fn [s i]
+                (let [pos (nth open-edges (rand-int (count open-edges)))
+                      id (str "enemy-" (:tick state) "-" i)]
+                  (assoc-in s [:enemies id]
+                            {:x (first pos)
+                             :y (second pos)
+                             :hp (:hp type-info)
+                             :max-hp (:hp type-info)
+                             :speed (:speed type-info)
+                             :damage (:damage type-info)
+                             :score (:score type-info)
+                             :type enemy-type})))
+              state (range count-to-spawn)))))
 
 (defn move-enemies
   "Move each enemy one cell toward the nearest alive player."

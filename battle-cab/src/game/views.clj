@@ -133,10 +133,11 @@
 ;;; ---------------------------------------------------------------------------
 
 (defn nav-bar
-  "Top navigation bar linking all pages. `active` is :spectator, :test, or :sprites."
+  "Top navigation bar linking all pages. `active` is :spectator, :test, :sprites, or :stats."
   [active]
   [:nav.nav-bar
    [:a.nav-link {:href "/" :class (when (= active :spectator) "active")} "Spectator"]
+   [:a.nav-link {:href "/server-stats" :class (when (= active :stats) "active")} "Stats"]
    [:a.nav-link {:href "/test" :class (when (= active :test) "active")} "Visual Test"]
    [:a.nav-link {:href "/sprite-viewer" :class (when (= active :sprites) "active")} "Sprites"]])
 
@@ -453,3 +454,241 @@
    [:span.passengers (str "Passengers: "
                           (count (filter #(nil? (:picked-up-by %))
                                          (:passengers game-state))))]])
+
+;;; ---------------------------------------------------------------------------
+;;; Server Stats Page
+;;; ---------------------------------------------------------------------------
+
+(defn- format-rps [n]
+  (if (zero? n) "0" (format "%.1f" (double n))))
+
+(defn- stat-card [label value & {:keys [sub class] :or {class ""}}]
+  [:div.stat-card {:class class}
+   [:div.stat-value value]
+   [:div.stat-label label]
+   (when sub [:div.stat-sub sub])])
+
+(defn server-stats-page
+  "Full HTML page showing server statistics, request rates, player info."
+  [game-state rates sse-count ws-count]
+  (let [players (:players game-state)
+        alive-count (count (filter (fn [[_ p]] (:alive? p)) players))
+        total-players (count players)
+        passengers (:passengers game-state)
+        free-pax (count (filter #(nil? (:picked-up-by %)) passengers))
+        carried-pax (count (filter #(some? (:picked-up-by %)) passengers))
+        tick (:tick game-state)
+        running? (some? (some-> @game.engine/system :game-timer deref))
+        tick-ms (get-in game-state [:config :tick-ms] 500)
+        by-endpoint (:by-endpoint rates)]
+    (str
+     (h/html
+      [:html {:lang "en"}
+       [:head
+        [:meta {:charset "utf-8"}]
+        [:meta {:name "viewport" :content "width=device-width, initial-scale=1"}]
+        [:title "Cab Battle — Server Stats"]
+        [:link {:rel "stylesheet" :href "/css/spectator.css"}]
+        [:style
+         (h/raw "
+.stats-container {
+  padding: 1.5rem;
+  max-width: 1200px;
+  margin: 0 auto;
+  overflow-y: auto;
+  height: calc(100vh - 2rem);
+}
+.stats-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1.5rem;
+}
+.stats-header h1 {
+  font-size: 1.6rem;
+  color: var(--neon-yellow);
+  text-shadow: 0 0 20px rgba(255,230,109,0.5);
+  letter-spacing: 0.2em;
+}
+.status-badge {
+  padding: 0.3rem 0.8rem;
+  border-radius: 4px;
+  font-size: 0.8rem;
+  font-weight: bold;
+  letter-spacing: 0.1em;
+}
+.status-running { background: #00b89433; color: #00b894; border: 1px solid #00b894; }
+.status-stopped { background: #ff6b6b33; color: #ff6b6b; border: 1px solid #ff6b6b; }
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 1rem;
+  margin-bottom: 2rem;
+}
+.stat-card {
+  background: var(--bg-panel);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 1rem;
+  text-align: center;
+}
+.stat-value {
+  font-size: 2rem;
+  font-weight: bold;
+  color: var(--neon-cyan);
+  line-height: 1.2;
+}
+.stat-label {
+  font-size: 0.7rem;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.15em;
+  margin-top: 0.3rem;
+}
+.stat-sub {
+  font-size: 0.65rem;
+  color: var(--text-dim);
+  margin-top: 0.2rem;
+}
+.stat-card.highlight .stat-value { color: var(--neon-yellow); }
+.stat-card.alert .stat-value { color: var(--neon-red); }
+.section-title {
+  font-size: 0.9rem;
+  color: var(--neon-yellow);
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  margin-bottom: 0.8rem;
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 0.4rem;
+}
+.rate-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-bottom: 2rem;
+  font-size: 0.85rem;
+}
+.rate-table th {
+  text-align: left;
+  color: var(--text-dim);
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  padding: 0.4rem 0.8rem;
+  border-bottom: 1px solid var(--border);
+}
+.rate-table td {
+  padding: 0.4rem 0.8rem;
+  border-bottom: 1px solid #1a1a2a;
+}
+.rate-table .ep { color: var(--neon-cyan); }
+.rate-table .rps { color: var(--neon-yellow); font-weight: bold; text-align: right; }
+.rate-bar {
+  display: inline-block;
+  height: 8px;
+  background: var(--neon-cyan);
+  border-radius: 4px;
+  opacity: 0.6;
+  margin-left: 0.5rem;
+  vertical-align: middle;
+}
+.player-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-bottom: 2rem;
+  font-size: 0.85rem;
+}
+.player-table th {
+  text-align: left;
+  color: var(--text-dim);
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  padding: 0.4rem 0.8rem;
+  border-bottom: 1px solid var(--border);
+}
+.player-table td {
+  padding: 0.4rem 0.8rem;
+  border-bottom: 1px solid #1a1a2a;
+}
+.player-table .alive { color: #00b894; }
+.player-table .dead { color: #ff6b6b; }
+.auto-refresh {
+  font-size: 0.7rem;
+  color: var(--text-dim);
+  text-align: right;
+}
+")]]
+       [:body
+        (nav-bar :stats)
+        [:div.stats-container
+         ;; Header
+         [:div.stats-header
+          [:h1 "SERVER STATS"]
+          [:div
+           [:span.status-badge
+            {:class (if running? "status-running" "status-stopped")}
+            (if running? "RUNNING" "STOPPED")]]]
+
+         ;; Top-line metrics
+         [:div.stats-grid
+          (stat-card "Bots" (str total-players)
+                     :sub (str alive-count " alive / " (- total-players alive-count) " dead")
+                     :class "highlight")
+          (stat-card "Requests/sec" (format-rps (:total-rps rates))
+                     :sub (str (:sample-count rates) " in last "
+                               (int (:window-secs rates)) "s")
+                     :class "highlight")
+          (stat-card "SSE Spectators" (str sse-count))
+          (stat-card "WS Spectators" (str ws-count))
+          (stat-card "Current Tick" (str tick)
+                     :sub (str (format "%.0f" (double (/ tick (/ 1000.0 tick-ms)))) "s elapsed"))
+          (stat-card "Tick Rate" (str tick-ms "ms")
+                     :sub (str (format "%.0f" (/ 1000.0 tick-ms)) " ticks/sec"))
+          (stat-card "Passengers" (str free-pax " free")
+                     :sub (str carried-pax " carried"))
+          (stat-card "Map" (get-in game-state [:map :name] "unknown")
+                     :sub (str (get-in game-state [:map :width]) "x"
+                               (get-in game-state [:map :height])))]
+
+         ;; Endpoint rates
+         [:div.section-title "Request Rates by Endpoint"]
+         (if (seq by-endpoint)
+           (let [max-rps (apply max (vals by-endpoint))]
+             [:table.rate-table
+              [:thead [:tr [:th "Endpoint"] [:th {:style "text-align:right"} "Req/s"] [:th ""]]]
+              [:tbody
+               (for [[ep rps] (sort-by val > by-endpoint)]
+                 [:tr
+                  [:td.ep ep]
+                  [:td.rps (format-rps rps)]
+                  [:td [:span.rate-bar
+                        {:style (str "width:" (if (pos? max-rps)
+                                                (int (* 120 (/ rps max-rps)))
+                                                0) "px")}]]])]])
+           [:div {:style "color:var(--text-dim);margin-bottom:2rem"} "No requests recorded yet."])
+
+         ;; Player details
+         (when (seq players)
+           [:div
+            [:div.section-title "Player Details"]
+            [:table.player-table
+             [:thead [:tr [:th "Name"] [:th "ID"] [:th "Score"] [:th "HP"]
+                      [:th "Pos"] [:th "Ammo"] [:th "Passenger"] [:th "Status"]]]
+             [:tbody
+              (for [[id p] (sort-by (fn [[_ p]] (:score p)) > players)]
+                [:tr
+                 [:td {:style (str "color:" (player-color (.indexOf (vec (keys players)) id)))}
+                  (:name p)]
+                 [:td {:style "color:var(--text-dim);font-size:0.7rem"} (subs (str id) 0 (min 12 (count (str id))))]
+                 [:td {:style "font-weight:bold"} (:score p)]
+                 [:td {:class (if (:alive? p) "alive" "dead")} (:hp p)]
+                 [:td (str "(" (:x p) "," (:y p) ")")]
+                 [:td (:ammo p)]
+                 [:td (if (:passenger p) "Yes" "-")]
+                 [:td {:class (if (:alive? p) "alive" "dead")}
+                  (if (:alive? p) "ALIVE" "DEAD")]])]]])
+
+         ;; Auto-refresh script
+         [:div.auto-refresh "Auto-refreshes every 2s"]]]
+
+       [:script (h/raw "setTimeout(function refresh(){ location.reload(); }, 2000);")]]))))

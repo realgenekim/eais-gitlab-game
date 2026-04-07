@@ -10,6 +10,7 @@
  ;; ===== Combat =====
  :shoot-range          20
  :shoot-damage         30
+ :kill-bonus           150    ;; points for killing another player
  :max-ammo             10
  :ammo-regen-ticks     5      ;; ticks between ammo regen
 

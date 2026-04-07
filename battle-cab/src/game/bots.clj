@@ -222,24 +222,53 @@
 ;;; ---------------------------------------------------------------------------
 
 (defn vs-hunter-think
-  "VS bot: align with nearest enemy, shoot it, dodge when hurt."
+  "VS bot: shoot enemies AND other players, dodge when in danger, deliver passengers."
   [state me-id]
   (let [me (get-in state [:players me-id])
         my-pos [(:x me) (:y me)]
-        enemies (->> (or (:enemies state) {})
-                     (map (fn [[id e]] {:id id :pos [(:x e) (:y e)] :hp (:hp e)}))
-                     (sort-by #(distance my-pos (:pos %))))]
+        shots (:recent-shots state)
+        ;; Other players as targets
+        rival-players (->> (:players state)
+                           (remove (fn [[id _]] (= id me-id)))
+                           (filter (fn [[_ p]] (:alive? p)))
+                           (map (fn [[id p]] {:id id :pos [(:x p) (:y p)]})))
+        ;; NPC enemies
+        npc-enemies (->> (or (:enemies state) {})
+                         (map (fn [[id e]] {:id id :pos [(:x e) (:y e)] :hp (:hp e)})))
+        ;; All shootable targets (players + NPCs)
+        all-targets (concat rival-players npc-enemies)
+        passengers (->> (:passengers state)
+                        (filter #(nil? (:picked-up-by %)))
+                        (map (fn [p] {:pos [(:x p) (:y p)] :dest (:dest p)})))]
     (when (:alive? me)
       (cond
-        ;; 1. SHOOT — if enemy is on same row/col and we have ammo
-        (and (pos? (:ammo me)) (seq enemies))
-        (if-let [shot-dir (some #(line-of-sight-dir my-pos (:pos %)) enemies)]
-          [{:type :shoot :direction shot-dir}]
-          ;; 2. MOVE to align with nearest enemy
-          (let [nearest (first enemies)]
-            [{:type :move :direction (toward state my-pos (:pos nearest))}]))
+        ;; 1. DODGE — if we're in a bullet path
+        (and (seq shots) (in-danger? shots (:x me) (:y me)))
+        (let [threat (first (filter #(some (fn [[sx sy]] (and (= sx (:x me)) (= sy (:y me)))) (:path %)) shots))]
+          [{:type :move :direction (dodge-dir (:direction threat))}])
 
-        ;; 3. No enemies visible — move toward center
+        ;; 2. SHOOT — if any target is on same row/col and we have ammo
+        (and (pos? (:ammo me)) (seq all-targets))
+        (if-let [shot-dir (some #(line-of-sight-dir my-pos (:pos %)) all-targets)]
+          [{:type :shoot :direction shot-dir}]
+          ;; Move to align with nearest target
+          (let [nearest (apply min-key #(distance my-pos (:pos %)) all-targets)]
+            [{:type :move :direction (toward state my-pos (:pos nearest))}
+             {:type :pickup}]))
+
+        ;; 3. DELIVER — if carrying passenger, go to destination
+        (:passenger me)
+        [{:type :move :direction (toward state my-pos [(get-in me [:passenger :dest :x])
+                                                       (get-in me [:passenger :dest :y])])}
+         {:type :dropoff}]
+
+        ;; 4. PICKUP — go to nearest passenger
+        (seq passengers)
+        (let [nearest-pax (apply min-key #(distance my-pos (:pos %)) passengers)]
+          [{:type :move :direction (toward state my-pos (:pos nearest-pax))}
+           {:type :pickup}])
+
+        ;; 5. ROAM toward center
         :else
         [{:type :move :direction (toward state my-pos [10 9])}]))))
 

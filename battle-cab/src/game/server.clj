@@ -222,6 +222,24 @@
                           :player-id (:id creds)})
       (json-response 400 {:error "Game is full"}))))
 
+(defn handle-frame [request]
+  (let [tick-str (get-in request [:query-params "tick"])
+        tick (when tick-str (Integer/parseInt tick-str))]
+    (if tick
+      (if-let [frame (ws/get-frame tick)]
+        {:status 200
+         :headers {"Content-Type" "application/json"
+                   "Access-Control-Allow-Origin" "*"}
+         :body frame}
+        (json-response 404 {:error "Frame not found" :tick tick
+                            :available (count @ws/frame-buffer)}))
+      ;; No tick specified — return latest + frame count
+      (let [buf @ws/frame-buffer
+            latest-tick (when (seq buf) (apply max (keys buf)))]
+        (json-response 200 {:latest-tick latest-tick
+                            :frame-count (count buf)
+                            :oldest-tick (when (seq buf) (apply min (keys buf)))})))))
+
 (defn handle-lightning [_request]
   (let [result (engine/trigger-lightning! (sys))]
     (json-response 200 {:status "lightning"
@@ -300,6 +318,7 @@
          ["/spectate-ws" {:get {:handler #'ws/handle-ws-spectate}}]
          ["/game/restart" {:post {:handler #'handle-restart}}]
          ["/game/add-bot" {:post {:handler #'handle-add-bot}}]
+         ["/game/frame" {:get {:handler #'handle-frame}}]
          ["/game/map-swap" {:post {:handler #'handle-map-swap}}]
          ["/game/lightning" {:post {:handler #'handle-lightning}}]
          ["/game/seek" {:post {:handler #'handle-seek}}]

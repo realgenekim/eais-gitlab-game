@@ -29,9 +29,23 @@ game.commentator — AI color commentator (Claude → ElevenLabs TTS)
 ```bash
 make nrepl           # Terminal 1: Start nREPL
 make runtests        # Terminal 2: Watch tests
-make server-dev      # Terminal 3: Dev server (ENV=dev, port 8080)
+make server-dev      # Terminal 3: Dev server (ENV=dev, port 33333)
 make restart         # Stop + restart dev server (needed for new routes/arities)
 make mcp-configure   # One-time: Configure Clojure MCP for Claude Code
+```
+
+**IMPORTANT: Run server in background** so Claude can do other work while it runs:
+```bash
+lsof -ti:33333 | xargs kill -9 2>/dev/null; sleep 2
+ENV=dev clojure -M:dev -m game.server 2>&1 &
+```
+Use top-level Makefile targets to manage: `make reset-game`, `make add-bots`, `make status`
+
+**Checking game status from outside the JVM** (when nREPL is in a different process):
+```bash
+curl -s http://localhost:33333/game/status   # tick, players, running?
+curl -s http://localhost:33333/game/ascii    # ASCII map render
+curl -X POST http://localhost:33333/game/restart -H 'Content-Type: application/json' -d '{"map":"arena"}'
 ```
 
 ## Key Conventions
