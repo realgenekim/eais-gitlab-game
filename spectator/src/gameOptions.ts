@@ -16,7 +16,7 @@ export const GameOptions : any = {
     enemyRate               : 800,      // enemy rate, in milliseconds per enemy
     magnetRadius            : 100,      // radius of the circle within which the coins are being attracted
 
-    // Server connection
-    serverUrl               : 'ws://localhost:8080/spectate-ws',
-    tickMs                  : 500       // server tick interval for interpolation
+    // Server connection (MVP 2+)
+    serverWsUrl             : 'ws://localhost:33333/spectate-ws',
+    tickMs                  : 250       // server tick interval for interpolation
 }

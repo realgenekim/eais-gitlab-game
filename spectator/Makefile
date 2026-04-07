@@ -19,6 +19,15 @@ run-mvp1: install
 	@echo ""
 	npx vite --port 5173
 
+# MVP 2: Server-connected mode (requires battle-cab server running)
+# Start server first: cd ../battle-cab && make server-dev
+run-mvp2: install
+	@echo "=== MVP 2: Server-Connected Spectator ==="
+	@echo "Requires battle-cab server on port 33333"
+	@echo "Open http://localhost:5173/?server"
+	@echo ""
+	npx vite --port 5173
+
 # Production build
 build: install
 	npx vite build
