@@ -31,6 +31,43 @@
         #controls button.danger { border-color: #ff6b6b; color: #ff6b6b; }
         #controls button.danger:hover { background: rgba(255,107,107,0.2); }
         #controls .status { color: #4ecdc4; font-family: monospace; font-size: 12px; padding: 8px; }
+        #controls .status.error { color: #ff6b6b; }
+
+        /* Scoreboard sidebar */
+        #scoreboard {
+            position: fixed;
+            top: 50px;
+            right: 10px;
+            z-index: 1000;
+            background: rgba(15,15,25,0.9);
+            border: 2px solid #333;
+            border-radius: 8px;
+            padding: 12px 16px;
+            min-width: 220px;
+            font-family: monospace;
+            display: none;
+        }
+        #scoreboard h2 {
+            color: #ff6b6b;
+            font-size: 16px;
+            margin: 0 0 10px 0;
+            letter-spacing: 0.15em;
+            text-transform: uppercase;
+        }
+        .sb-player {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 6px 0;
+            border-bottom: 1px solid #222;
+        }
+        .sb-player:last-child { border-bottom: none; }
+        .sb-name { color: #fff; font-size: 15px; font-weight: bold; }
+        .sb-stats { color: #aaa; font-size: 12px; text-align: right; }
+        .sb-hp { color: #4ecdc4; font-size: 14px; }
+        .sb-score { color: #ffe66d; font-size: 14px; font-weight: bold; }
+        .sb-dead { opacity: 0.4; }
+        .sb-dead .sb-name { text-decoration: line-through; }
     </style>
 </head>
 <body>
@@ -43,15 +80,49 @@
         <span class="status" id="ctrl-status"></span>
     </div>
 
+    <!-- Scoreboard sidebar -->
+    <div id="scoreboard">
+        <h2>Scoreboard</h2>
+        <div id="sb-players"></div>
+    </div>
+
     <script>
         const SERVER = 'http://localhost:33333';
         let botNum = 0;
         const names = ['Rick-Alpha','Rick-Beta','Rick-Gamma','Rick-Delta',
                         'Rick-Echo','Rick-Foxtrot','Rick-Golf','Rick-Hotel'];
 
-        // Show controls only in server mode
+        // Show controls + scoreboard only in server mode
         if (window.location.search.includes('server')) {
             document.getElementById('controls').style.display = 'flex';
+            document.getElementById('scoreboard').style.display = 'block';
+
+            // Listen for game state from Phaser scene via custom event
+            window.addEventListener('gameState', (e) => {
+                const state = e.detail;
+                updateScoreboard(state.players);
+            });
+        }
+
+        function updateScoreboard(players) {
+            const el = document.getElementById('sb-players');
+            if (!el || !players) return;
+            // Sort by score descending
+            const sorted = [...players].sort((a,b) => b.score - a.score);
+            el.innerHTML = sorted.map(p => `
+                <div class="sb-player ${p.alive ? '' : 'sb-dead'}">
+                    <div>
+                        <div class="sb-name">${p.name}</div>
+                        <div class="sb-stats">
+                            Ammo: ${p.ammo || '?'}
+                        </div>
+                    </div>
+                    <div>
+                        <div class="sb-score">${p.score} pts</div>
+                        <div class="sb-hp">${p.alive ? p.hp + ' HP' : 'DEAD'}</div>
+                    </div>
+                </div>
+            `).join('');
         }
 
         async function addBot() {
@@ -72,7 +143,9 @@
                     moveBot(data.token, name);
                 }
             } catch(e) {
-                document.getElementById('ctrl-status').textContent = 'Server error';
+                const el = document.getElementById('ctrl-status');
+                el.textContent = 'Server error: ' + e.message;
+                el.className = 'status error';
             }
         }
 
@@ -86,7 +159,9 @@
                 botNum = 0;
                 document.getElementById('ctrl-status').textContent = 'Game reset!';
             } catch(e) {
-                document.getElementById('ctrl-status').textContent = 'Server error';
+                const el = document.getElementById('ctrl-status');
+                el.textContent = 'Server error: ' + e.message;
+                el.className = 'status error';
             }
         }
 

@@ -118,6 +118,9 @@ export class ServerGame extends Phaser.Scene {
         this.statusText.setText(
             `Tick ${state.tick} | ${state.players.length} players | WS connected`);
 
+        // Dispatch to HTML scoreboard overlay
+        window.dispatchEvent(new CustomEvent('gameState', { detail: state }));
+
         const seenIds = new Set<string>();
 
         for (const p of state.players) {
@@ -179,7 +182,7 @@ export class ServerGame extends Phaser.Scene {
                 // New player — create sprite (use add.sprite, NOT physics)
                 const sprite = this.add.sprite(targetX, targetY,
                     'RickDefault', 'RickDefault_front');
-                sprite.setScale(0.25);
+                sprite.setScale(0.5);
                 sprite.setDepth(10);
                 this.playerSprites.set(p.id, sprite);
 

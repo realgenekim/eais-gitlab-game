@@ -148,27 +148,16 @@
     (sse/reload-browsers!)
     (json-response 200 {:status "map-swapped" :map map-id})))
 
+(declare on-tick-all)
+
 (defn handle-restart [request]
   (let [body (:body request)
         map-id (get body "map" "arena")
         game-map (maps/get-map-by-id map-id)]
     (engine/stop-game!)
-    (let [sys (engine/start-game! {:on-tick #'sse/on-tick
-                                   :game-map game-map})]
-      ;; Start 5 demo bots
-      (require 'game.bots)
-      (let [start-team! (resolve 'game.bots/start-team!)
-            hunter (resolve 'game.bots/hunter-think)
-            courier (resolve 'game.bots/courier-think)
-            random (resolve 'game.bots/random-think)]
-        (start-team!
-         [{:name "Hunter-1" :think-fn @hunter}
-          {:name "Hunter-2" :think-fn @hunter}
-          {:name "Courier-1" :think-fn @courier}
-          {:name "Courier-2" :think-fn @courier}
-          {:name "RandomBot" :think-fn @random}]))
-      (sse/reload-browsers!)
-      (json-response 200 {:status "restarted" :map map-id :tick 0}))))
+    (engine/start-game! {:on-tick #'on-tick-all
+                         :game-map game-map})
+    (json-response 200 {:status "restarted" :map map-id :tick 0})))
 
 (defn handle-lightning [_request]
   (let [result (engine/trigger-lightning! (sys))]
@@ -205,8 +194,22 @@
      :body (test-views/test-page scenario frame)}))
 
 ;;; ---------------------------------------------------------------------------
-;;; Router
+;;; CORS + Router
 ;;; ---------------------------------------------------------------------------
+
+(defn wrap-cors
+  "Allow cross-origin requests from Phaser spectator client."
+  [handler]
+  (fn [request]
+    (if (= :options (:request-method request))
+      {:status 200
+       :headers {"Access-Control-Allow-Origin" "*"
+                 "Access-Control-Allow-Methods" "GET, POST, OPTIONS"
+                 "Access-Control-Allow-Headers" "Content-Type, Authorization"}}
+      (let [response (handler request)]
+        (update response :headers merge
+                {"Access-Control-Allow-Origin" "*"
+                 "Access-Control-Allow-Headers" "Content-Type, Authorization"})))))
 
 (def app
   (-> (reitit/ring-handler
@@ -239,7 +242,8 @@
        (reitit/create-default-handler)
        {:middleware [wrap-params wrap-json]})
       (wrap-resource "public")
-      wrap-content-type))
+      wrap-content-type
+      wrap-cors))
 
 ;;; ---------------------------------------------------------------------------
 ;;; Main
@@ -255,7 +259,7 @@
         (wrap-reload {:dirs ["src" "resources"]
                       :reload-compile-errors? true}))))
 
-(defn- on-tick-all
+(defn on-tick-all
   "Composed on-tick: pushes to both SSE (HTML) and WebSocket (JSON) spectators."
   [sys game-state]
   (sse/on-tick sys game-state)
