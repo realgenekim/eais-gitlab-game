@@ -652,8 +652,8 @@
   (-> state
       ;; Keep shots for 3 ticks so spectator client always sees them
       (update :recent-shots (fn [shots]
-                              (vec (filter #(> (+ (:tick state) 3)
-                                               (or (:fired-tick %) 0))
+                              (vec (filter #(>= (+ (or (:fired-tick %) 0) 3)
+                                                (:tick state))
                                            shots))))
       (assoc :recent-effects [])
       (apply-commands commands)
