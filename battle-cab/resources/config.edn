@@ -19,7 +19,7 @@
 
  ;; ===== Battle Royale Shrink =====
  :shrink-start         200    ;; tick when first ring closes
- :shrink-interval      50     ;; ticks between each ring
+ :shrink-interval      150    ;; ticks between each ring (~5 min total game)
  :shrink-warn-ticks    10     ;; fire warning before shrink
 
  ;; ===== Lightning =====

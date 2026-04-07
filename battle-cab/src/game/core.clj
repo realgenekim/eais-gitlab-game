@@ -469,7 +469,11 @@
                 ;; Remove passengers on new walls
                 state (update state :passengers
                               (fn [ps] (vec (remove #(contains? added-walls [(:x %) (:y %)])
-                                                    ps))))]
+                                                    ps))))
+                ;; End game when final ring is placed
+                state (if (>= rings-added max-ring)
+                        (assoc-in state [:config :game-duration-ticks] (+ tick 1))
+                        state)]
             state)))
       state)))
 
@@ -479,16 +483,16 @@
 
 (defn lightning-strike
   "Execute a lightning strike at [cx cy] with given radius.
-   Destroys open cells (turns to walls), kills/damages players, removes passengers.
-   Returns updated state with :recent-effects populated."
+   Destroys walls in the blast zone (opens up terrain), kills/damages players,
+   removes passengers. Returns updated state with :recent-effects populated."
   [state cx cy radius]
   (let [{:keys [width height walls]} (:map state)
         ;; All cells in blast radius (manhattan distance)
         blast-cells (set (positions-in-radius [cx cy] radius (:map state)))
-        ;; Only convert non-wall cells to crater walls
-        new-crater (clojure.set/difference blast-cells walls)
-        ;; Add crater walls
-        state (update-in state [:map :walls] into new-crater)
+        ;; Walls that get destroyed (opened up)
+        destroyed-walls (clojure.set/intersection blast-cells walls)
+        ;; Remove destroyed walls from map
+        state (update-in state [:map :walls] #(clojure.set/difference % destroyed-walls))
         ;; Kill or damage players in blast zone
         state (reduce-kv
                (fn [s id player]
@@ -514,20 +518,13 @@
                state (:players state))
         ;; Remove passengers in blast zone
         state (update state :passengers
-                      (fn [ps] (vec (remove #(contains? new-crater [(:x %) (:y %)]) ps))))
-        ;; Record crater fires — burn for N ticks
-        fire-duration (get-in state [:config :crater-fire-ticks] 10)
-        fire-expires (+ (:tick state) fire-duration)
-        state (update state :crater-fires
-                      (fn [fires]
-                        (reduce #(assoc %1 %2 fire-expires)
-                                (or fires {})
-                                blast-cells)))
+                      (fn [ps] (vec (remove #(contains? blast-cells [(:x %) (:y %)]) ps))))
         ;; Record the effect for rendering
         effect {:type :lightning
                 :x cx :y cy
                 :radius radius
-                :cells blast-cells}]
+                :cells blast-cells
+                :destroyed-walls (count destroyed-walls)}]
     (update state :recent-effects (fnil conj []) effect)))
 
 (defn maybe-lightning-strike
