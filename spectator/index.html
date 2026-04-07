@@ -7,10 +7,109 @@
     <style>
         body { margin: 0; background: #111; overflow: hidden; }
         #thegame { width: 100vw; height: 100vh; }
+
+        /* Control panel — top-right overlay */
+        #controls {
+            position: fixed;
+            top: 10px;
+            right: 10px;
+            z-index: 1000;
+            display: flex;
+            gap: 8px;
+        }
+        #controls button {
+            font-family: monospace;
+            font-size: 13px;
+            padding: 6px 14px;
+            border: 1px solid #555;
+            border-radius: 4px;
+            cursor: pointer;
+            color: #fff;
+            background: rgba(30,30,40,0.85);
+        }
+        #controls button:hover { background: rgba(60,60,80,0.9); }
+        #controls button.danger { border-color: #ff6b6b; color: #ff6b6b; }
+        #controls button.danger:hover { background: rgba(255,107,107,0.2); }
+        #controls .status { color: #4ecdc4; font-family: monospace; font-size: 12px; padding: 8px; }
     </style>
 </head>
 <body>
     <div id="thegame"></div>
+
+    <!-- Control panel (only shown in server mode) -->
+    <div id="controls" style="display:none;">
+        <button onclick="addBot()">+ Add Bot</button>
+        <button onclick="resetGame()" class="danger">Reset Game</button>
+        <span class="status" id="ctrl-status"></span>
+    </div>
+
+    <script>
+        const SERVER = 'http://localhost:33333';
+        let botNum = 0;
+        const names = ['Rick-Alpha','Rick-Beta','Rick-Gamma','Rick-Delta',
+                        'Rick-Echo','Rick-Foxtrot','Rick-Golf','Rick-Hotel'];
+
+        // Show controls only in server mode
+        if (window.location.search.includes('server')) {
+            document.getElementById('controls').style.display = 'flex';
+        }
+
+        async function addBot() {
+            const name = names[botNum % names.length];
+            botNum++;
+            try {
+                const resp = await fetch(SERVER + '/game/join', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({name})
+                });
+                const data = await resp.json();
+                const msg = data.message || data.error;
+                document.getElementById('ctrl-status').textContent = msg;
+                if (data.token) {
+                    console.log(`Bot ${name}: token=${data.token}`);
+                    // Auto-move the bot randomly
+                    moveBot(data.token, name);
+                }
+            } catch(e) {
+                document.getElementById('ctrl-status').textContent = 'Server error';
+            }
+        }
+
+        async function resetGame() {
+            try {
+                await fetch(SERVER + '/game/restart', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({})
+                });
+                botNum = 0;
+                document.getElementById('ctrl-status').textContent = 'Game reset!';
+            } catch(e) {
+                document.getElementById('ctrl-status').textContent = 'Server error';
+            }
+        }
+
+        function moveBot(token, name) {
+            const dirs = ['north','south','east','west'];
+            const iv = setInterval(async () => {
+                const dir = dirs[Math.floor(Math.random() * 4)];
+                try {
+                    await fetch(SERVER + '/game/action', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Authorization': token
+                        },
+                        body: JSON.stringify({action: 'move', direction: dir})
+                    });
+                } catch(e) {
+                    clearInterval(iv);
+                }
+            }, 300);
+        }
+    </script>
+
     <script type="module" src="/src/main.ts"></script>
 </body>
 </html>
