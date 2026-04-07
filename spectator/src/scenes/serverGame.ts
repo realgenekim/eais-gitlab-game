@@ -49,6 +49,7 @@ export class ServerGame extends Phaser.Scene {
     connected       : boolean = false;
     playerSprites   : Map<string, Phaser.GameObjects.Sprite> = new Map();
     playerLabels    : Map<string, Phaser.GameObjects.Text> = new Map();
+    playerHpBars    : Map<string, Phaser.GameObjects.Graphics> = new Map();
     enemySprites    : Map<string, Phaser.GameObjects.Sprite> = new Map();
     renderedShots   : Set<string> = new Set();  // track rendered shots by fired-tick+shooter
     shrinkGraphics  : Phaser.GameObjects.Graphics | null = null;
@@ -265,6 +266,28 @@ export class ServerGame extends Phaser.Scene {
         }
     }
 
+    drawHpBar(playerId: string, x: number, y: number, hp: number, maxHp: number): void {
+        let bar = this.playerHpBars.get(playerId);
+        if (!bar) {
+            bar = this.add.graphics().setDepth(60);
+            this.playerHpBars.set(playerId, bar);
+        }
+        bar.clear();
+        bar.setVisible(true);
+        const w = 40;
+        const h = 4;
+        const bx = x - w / 2;
+        const by = y;
+        const pct = Math.max(0, hp / maxHp);
+        // Background
+        bar.fillStyle(0x333333, 0.8);
+        bar.fillRect(bx, by, w, h);
+        // HP fill — green > yellow > red
+        const color = pct > 0.5 ? 0x4ecdc4 : pct > 0.25 ? 0xffe66d : 0xff6b6b;
+        bar.fillStyle(color, 1);
+        bar.fillRect(bx, by, w * pct, h);
+    }
+
     detectWave(state: ServerState): void {
         const currentCount = (state.enemies || []).length;
         // If enemy count jumped by 3+ in one tick, it's a new wave
@@ -338,10 +361,16 @@ export class ServerGame extends Phaser.Scene {
                     } else {
                         sprite.play(`${avatar.prefix}-idle`, true);
                     }
-                    label.setText(`${p.name} [${p.hp}hp]`);
+                    label.setText(p.name);
+
+                    // HP bar
+                    this.drawHpBar(p.id, sprite.x, sprite.y - 50, p.hp, 500);
                 } else {
                     sprite.setVisible(false);
                     label.setVisible(false);
+                    if (this.playerHpBars.has(p.id)) {
+                        this.playerHpBars.get(p.id)!.setVisible(false);
+                    }
                 }
             } else {
                 // New player — use assigned avatar, down_1 frame (consistent size)
@@ -352,10 +381,12 @@ export class ServerGame extends Phaser.Scene {
                 this.playerSprites.set(p.id, sprite);
 
                 const label = this.add.text(targetX, targetY - 40, p.name, {
-                    fontSize: '12px', color: '#fff', fontFamily: 'monospace',
+                    fontSize: '11px', color: '#fff', fontFamily: 'monospace',
                     stroke: '#000', strokeThickness: 3
                 }).setOrigin(0.5).setDepth(50);
                 this.playerLabels.set(p.id, label);
+
+                this.drawHpBar(p.id, targetX, targetY - 50, p.hp, 500);
 
                 if (!p.alive) { sprite.setVisible(false); label.setVisible(false); }
             }
