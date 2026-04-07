@@ -109,6 +109,38 @@ export class PreloadAssets extends Phaser.Scene {
             repeat: -1
         });
 
+        // Squanchy walk animations
+        this.anims.create({
+            key: 'squanchy-walk-down',
+            frames: [
+                { key: 'Squanchy', frame: 'Squanchy_down_1' },
+                { key: 'Squanchy', frame: 'Squanchy_down_2' },
+                { key: 'Squanchy', frame: 'Squanchy_down_3' },
+                { key: 'Squanchy', frame: 'Squanchy_down_4' },
+            ],
+            frameRate: 8, repeat: -1
+        });
+        this.anims.create({
+            key: 'squanchy-walk-up',
+            frames: [
+                { key: 'Squanchy', frame: 'Squanchy_up_1' },
+                { key: 'Squanchy', frame: 'Squanchy_up_2' },
+                { key: 'Squanchy', frame: 'Squanchy_up_3' },
+                { key: 'Squanchy', frame: 'Squanchy_up_4' },
+            ],
+            frameRate: 8, repeat: -1
+        });
+        this.anims.create({
+            key: 'squanchy-walk-side',
+            frames: [
+                { key: 'Squanchy', frame: 'Squanchy_side_1' },
+                { key: 'Squanchy', frame: 'Squanchy_side_2' },
+                { key: 'Squanchy', frame: 'Squanchy_side_3' },
+                { key: 'Squanchy', frame: 'Squanchy_side_4' },
+            ],
+            frameRate: 8, repeat: -1
+        });
+
         // Route to correct scene based on URL
         const useServer = window.location.search.includes('server');
         this.scene.start(useServer ? 'ServerGame' : 'PlayGame');

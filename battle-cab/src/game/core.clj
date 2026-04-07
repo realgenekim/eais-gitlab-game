@@ -187,58 +187,70 @@
   (let [player (get-in state [:players player-id])
         [dx dy] (get directions (keyword direction) [0 0])
         range- (get-in state [:config :shoot-range] 5)
-        damage (get-in state [:config :shoot-damage] 30)]
+        damage (get-in state [:config :shoot-damage] 30)
+        enemies (or (:enemies state) {})]
     (if (or (not (:alive? player))
             (< (:ammo player) 1)
             (= [dx dy] [0 0]))
       state
-      (let [;; Trace the shot — collect path cells AND find hit target
-            {:keys [path hit-id]}
+      (let [;; Build lookup of enemy positions
+            enemy-at (into {} (for [[eid e] enemies] [[(:x e) (:y e)] eid]))
+            ;; Trace the shot — check players AND enemies
+            {:keys [path hit-id hit-enemy-id]}
             (loop [x (+ (:x player) dx)
                    y (+ (:y player) dy)
                    dist 1
                    cells []]
               (cond
                 (> dist range-)
-                {:path cells :hit-id nil}
+                {:path cells :hit-id nil :hit-enemy-id nil}
 
                 (not (in-bounds? (:map state) [x y]))
-                {:path cells :hit-id nil}
+                {:path cells :hit-id nil :hit-enemy-id nil}
 
                 (wall? state [x y])
-                {:path cells :hit-id nil}
+                {:path cells :hit-id nil :hit-enemy-id nil}
 
                 :else
-                (let [target (first (keep (fn [[id p]]
-                                            (when (and (not= id player-id)
-                                                       (:alive? p)
-                                                       (= (:x p) x)
-                                                       (= (:y p) y))
-                                              id))
-                                          (:players state)))]
-                  (if target
-                    {:path (conj cells [x y]) :hit-id target}
+                (let [;; Check for player hit
+                      target-player (first (keep (fn [[id p]]
+                                                   (when (and (not= id player-id)
+                                                              (:alive? p)
+                                                              (= (:x p) x)
+                                                              (= (:y p) y))
+                                                     id))
+                                                 (:players state)))
+                      ;; Check for enemy hit
+                      target-enemy (get enemy-at [x y])]
+                  (cond
+                    target-player
+                    {:path (conj cells [x y]) :hit-id target-player :hit-enemy-id nil}
+
+                    target-enemy
+                    {:path (conj cells [x y]) :hit-id nil :hit-enemy-id target-enemy}
+
+                    :else
                     (recur (+ x dx) (+ y dy) (inc dist)
                            (conj cells [x y]))))))
-            ;; Record shot for API visibility
+            ;; Record shot
             shot {:shooter-id player-id
                   :origin [(:x player) (:y player)]
                   :direction (keyword direction)
                   :path path
-                  :hit-id hit-id}
+                  :hit-id (or hit-id hit-enemy-id)}
             state (-> state
                       (update-in [:players player-id :ammo] dec)
                       (update :recent-shots conj shot))]
-        (if hit-id
+        (cond
+          ;; Hit a player
+          hit-id
           (let [new-hp (- (get-in state [:players hit-id :hp]) damage)]
             (if (<= new-hp 0)
-              ;; Kill!
               (-> state
                   (assoc-in [:players hit-id :hp] 0)
                   (assoc-in [:players hit-id :alive?] false)
                   (assoc-in [:players hit-id :respawn-at]
                             (+ (:tick state) (get-in state [:config :respawn-ticks] 10)))
-                  ;; Drop passenger if carrying
                   (cond-> (get-in state [:players hit-id :passenger])
                     (update :passengers
                             (fn [ps]
@@ -250,9 +262,21 @@
                                     ps))))
                   (assoc-in [:players hit-id :passenger] nil)
                   (update-in [:players player-id :score] + 50))
-              ;; Damage only
               (assoc-in state [:players hit-id :hp] new-hp)))
-          state)))))
+
+          ;; Hit an enemy
+          hit-enemy-id
+          (let [enemy (get-in state [:enemies hit-enemy-id])
+                new-hp (- (:hp enemy) damage)]
+            (if (<= new-hp 0)
+              ;; Kill enemy — remove it, award score
+              (-> state
+                  (update :enemies dissoc hit-enemy-id)
+                  (update-in [:players player-id :score] + (:score enemy 10)))
+              ;; Damage enemy
+              (assoc-in state [:enemies hit-enemy-id :hp] new-hp)))
+
+          :else state)))))
 
 (defmethod apply-action :default
   [state _player-id _action]
@@ -499,16 +523,137 @@
                           (transient (or fires {}))
                           (or fires {})))))))
 
+;;; ---------------------------------------------------------------------------
+;;; Enemies — server-side mobs for VS mode
+;;; ---------------------------------------------------------------------------
+
+(def enemy-types
+  "Enemy type definitions: {type {:hp :speed :damage :score}}"
+  {:floopy {:hp 20 :speed 1 :damage 10 :score 10}
+   :squanchy {:hp 50 :speed 1 :damage 20 :score 25}
+   :scary {:hp 80 :speed 2 :damage 30 :score 50}})
+
+(defn spawn-enemies
+  "Spawn a wave of enemies at random edge cells.
+   Enemies spawn outside the border walls (row/col 0 or max)."
+  [state enemy-type count-to-spawn]
+  (let [{:keys [width height walls]} (:map state)
+        edge-cells (concat
+                    (for [x (range 1 (dec width))] [x 1]) ;; top edge
+                    (for [x (range 1 (dec width))] [x (- height 2)]) ;; bottom edge
+                    (for [y (range 1 (dec height))] [1 y]) ;; left edge
+                    (for [y (range 1 (dec height))] [(- width 2) y])) ;; right edge
+        open-edges (vec (remove #(contains? walls %) edge-cells))
+        type-info (get enemy-types enemy-type {:hp 20 :speed 1 :damage 10 :score 10})]
+    (reduce (fn [s i]
+              (let [pos (nth open-edges (rand-int (count open-edges)))
+                    id (str "enemy-" (:tick state) "-" i)]
+                (assoc-in s [:enemies id]
+                          {:x (first pos)
+                           :y (second pos)
+                           :hp (:hp type-info)
+                           :max-hp (:hp type-info)
+                           :speed (:speed type-info)
+                           :damage (:damage type-info)
+                           :score (:score type-info)
+                           :type enemy-type})))
+            state (range count-to-spawn))))
+
+(defn move-enemies
+  "Move each enemy one cell toward the nearest alive player."
+  [state]
+  (let [alive-players (->> (:players state)
+                           (filter (fn [[_ p]] (:alive? p)))
+                           (map (fn [[_ p]] [(:x p) (:y p)])))
+        walls (get-in state [:map :walls])]
+    (if (empty? alive-players)
+      state
+      (reduce-kv
+       (fn [s id enemy]
+         (let [ex (:x enemy) ey (:y enemy)
+               ;; Find nearest player
+               nearest (apply min-key
+                              (fn [[px py]] (manhattan-distance [ex ey] [px py]))
+                              alive-players)
+               [px py] nearest
+               dx (compare px ex) ;; -1, 0, or 1
+               dy (compare py ey)
+               ;; Try to move toward player (prefer axis with larger distance)
+               mx (Math/abs (- px ex))
+               my (Math/abs (- py ey))
+               [nx ny] (if (>= mx my)
+                         [(+ ex dx) ey]
+                         [ex (+ ey dy)])
+               ;; Fall back if blocked by wall
+               [nx ny] (if (contains? walls [nx ny])
+                         (if (>= mx my)
+                           [ex (+ ey dy)]
+                           [(+ ex dx) ey])
+                         [nx ny])
+               ;; Final check — don't walk into walls
+               [nx ny] (if (contains? walls [nx ny])
+                         [ex ey]
+                         [nx ny])]
+           (-> s
+               (assoc-in [:enemies id :x] nx)
+               (assoc-in [:enemies id :y] ny))))
+       state (or (:enemies state) {})))))
+
+(defn enemy-player-collisions
+  "Enemies on the same cell as a player deal damage."
+  [state]
+  (let [player-positions (into {}
+                               (for [[id p] (:players state)
+                                     :when (:alive? p)]
+                                 [[(:x p) (:y p)] id]))]
+    (reduce-kv
+     (fn [s eid enemy]
+       (if-let [pid (get player-positions [(:x enemy) (:y enemy)])]
+         (let [damage (:damage enemy 10)
+               new-hp (max 0 (- (get-in s [:players pid :hp]) damage))]
+           (-> s
+               (assoc-in [:players pid :hp] new-hp)
+               (cond-> (zero? new-hp)
+                 (-> (assoc-in [:players pid :alive?] false)
+                     (assoc-in [:players pid :respawn-at]
+                               (+ (:tick state) (get-in state [:config :respawn-ticks] 10)))))))
+         s))
+     state (or (:enemies state) {}))))
+
+(defn maybe-spawn-wave
+  "Spawn enemy waves on a schedule. Escalating difficulty."
+  [state]
+  (let [tick (:tick state)
+        wave-interval (get-in state [:config :wave-interval] 40) ;; every 10 seconds at 250ms/tick
+        grace (get-in state [:config :enemy-grace-ticks] 20)]
+    (if (or (< tick grace)
+            (not (zero? (mod tick wave-interval))))
+      state
+      ;; Determine wave composition based on tick
+      (let [wave-num (quot tick wave-interval)
+            floopy-count (min 8 (+ 3 wave-num))
+            squanchy-count (if (>= wave-num 3) (min 4 (- wave-num 1)) 0)
+            scary-count (if (>= wave-num 6) (min 3 (- wave-num 4)) 0)]
+        (-> state
+            (spawn-enemies :floopy floopy-count)
+            (cond-> (pos? squanchy-count) (spawn-enemies :squanchy squanchy-count))
+            (cond-> (pos? scary-count) (spawn-enemies :scary scary-count)))))))
+
 (defn advance-tick
   "Pure function: old state + commands → new state."
   [state commands]
   (-> state
-      (assoc :recent-shots []) ;; clear previous tick's shots
-      (assoc :recent-effects []) ;; clear previous tick's effects
+      (assoc :recent-shots [])
+      (assoc :recent-effects [])
       (apply-commands commands)
       (respawn-dead-players)
       (maybe-spawn-passengers)
       (regen-ammo)
+      ;; Enemy system
+      (maybe-spawn-wave)
+      (move-enemies)
+      (enemy-player-collisions)
+      ;; Environment
       (battle-royale-shrink)
       (maybe-lightning-strike)
       (expire-crater-fires)
@@ -524,10 +669,11 @@
   {:tick 0
    :map game-map
    :players {}
+   :enemies {}
    :passengers []
    :recent-shots []
    :recent-effects []
-   :crater-fires {}  ;; {[x y] expires-at-tick} — burning crater cells
+   :crater-fires {}
    :config (config/load-config)})
 
 (defn add-player

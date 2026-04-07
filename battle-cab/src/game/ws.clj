@@ -38,7 +38,7 @@
 
 (defn- state->json
   "Convert game state to JSON for Phaser spectator.
-   Sends full state including players, map, config."
+   Sends full state including players, enemies, map."
   [game-state]
   (let [players (->> (:players game-state)
                      (map (fn [[id p]]
@@ -52,6 +52,15 @@
                              :has-passenger (some? (:passenger p))
                              :ammo (:ammo p)}))
                      vec)
+        enemies (->> (or (:enemies game-state) {})
+                     (map (fn [[id e]]
+                            {:id id
+                             :x (:x e)
+                             :y (:y e)
+                             :hp (:hp e)
+                             :max-hp (:max-hp e)
+                             :type (name (:type e))}))
+                     vec)
         passengers (->> (:passengers game-state)
                         (filter #(nil? (:picked-up-by %)))
                         (map #(select-keys % [:id :x :y :dest]))
@@ -60,6 +69,7 @@
      {:type "state"
       :tick (:tick game-state)
       :players players
+      :enemies enemies
       :passengers passengers
       :map {:width (get-in game-state [:map :width])
             :height (get-in game-state [:map :height])}
