@@ -57,6 +57,8 @@ export class ServerGame extends Phaser.Scene {
     lastWallCount   : number = -1;
     playerAvatars   : Map<string, string> = new Map();  // player-id → rick variant
     nextAvatarIndex : number = 0;
+    lastEnemyCount  : number = 0;
+    waveNumber      : number = 0;
     statusText      : Phaser.GameObjects.Text;
     tileSize        : number = 48;
     mapWidth        : number = 21;
@@ -197,6 +199,7 @@ export class ServerGame extends Phaser.Scene {
 
         this.renderWalls(state);
         this.updatePlayers(state);
+        this.detectWave(state);
         this.updateEnemies(state);
         this.renderShots(state);
         this.renderShrinkWarning(state);
@@ -260,6 +263,43 @@ export class ServerGame extends Phaser.Scene {
                 this.renderedShots.clear();
             }
         }
+    }
+
+    detectWave(state: ServerState): void {
+        const currentCount = (state.enemies || []).length;
+        // If enemy count jumped by 3+ in one tick, it's a new wave
+        if (currentCount >= this.lastEnemyCount + 3 && this.lastEnemyCount >= 0) {
+            this.waveNumber++;
+            const enemyTypes = [...new Set((state.enemies || []).map(e => e.type))];
+            const typeLabel = enemyTypes.length > 1
+                ? enemyTypes.join(' + ').toUpperCase()
+                : (enemyTypes[0] || 'ENEMIES').toUpperCase();
+
+            const waveText = this.add.text(
+                this.cameras.main.centerX, this.cameras.main.centerY - 50,
+                `WAVE ${this.waveNumber}`, {
+                    fontSize: '48px', color: '#ff6b6b', fontFamily: 'monospace',
+                    stroke: '#000', strokeThickness: 6
+                }).setOrigin(0.5).setDepth(200).setAlpha(0);
+
+            const subText = this.add.text(
+                this.cameras.main.centerX, this.cameras.main.centerY + 10,
+                typeLabel + ' INCOMING!', {
+                    fontSize: '20px', color: '#ffe66d', fontFamily: 'monospace',
+                    stroke: '#000', strokeThickness: 4
+                }).setOrigin(0.5).setDepth(200).setAlpha(0);
+
+            // Animate in, hold, fade out
+            this.tweens.add({
+                targets: [waveText, subText],
+                alpha: 1,
+                duration: 300,
+                hold: 1500,
+                yoyo: true,
+                onComplete: () => { waveText.destroy(); subText.destroy(); }
+            });
+        }
+        this.lastEnemyCount = currentCount;
     }
 
     updatePlayers(state: ServerState): void {
