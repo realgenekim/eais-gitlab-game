@@ -97,3 +97,12 @@
       (is (= (:id c1) (get-in view [:you :id])))
       (is (map? (:visible view)))
       (is (vector? (get-in view [:visible :players]))))))
+
+(deftest spawn-enemies-empty-edges-test
+  (testing "spawn-enemies handles fully-walled edges without crashing"
+    (let [tiny-map {:width 4 :height 4
+                    :walls (set (for [x (range 4) y (range 4)] [x y]))
+                    :spawn-points [[1 1]]
+                    :passenger-spawns []}
+          state (assoc (core/make-initial-state tiny-map) :tick 100)]
+      (is (= state (core/spawn-enemies state :floopy 5))))))

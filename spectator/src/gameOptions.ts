@@ -17,6 +17,7 @@ export const GameOptions : any = {
     magnetRadius            : 100,      // radius of the circle within which the coins are being attracted
 
     // Server connection (MVP 2+)
+    serverUrl               : 'http://localhost:33333',
     serverWsUrl             : 'ws://localhost:33333/spectate-ws',
     tickMs                  : 250       // server tick interval for interpolation
 }

@@ -3,44 +3,63 @@
 Based on [Emanuele Feronato's Phaser VS prototype](https://emanueleferonato.com/2024/11/29/quick-html5-prototype-of-vampire-survivors-built-with-phaser-like-the-original-game/),
 skinned with [rick-survival](https://github.com/yudinikita/rick-survival) sprite assets.
 
-## Quick Start (MVP 1)
+## URL Modes
+
+| URL | Mode |
+|-----|------|
+| `http://localhost:5173` | MVP 1: standalone local game (WASD, auto-fire) |
+| `http://localhost:5173/?server` | Live: connected to Clojure server via WebSocket |
+| `http://localhost:5173/?server&frame=50` | Frame replay: view saved tick 50 (J/K to step) |
+
+## Quick Start
 
 ```bash
-cd spectator
-make install   # npm install (one time)
-make dev       # Vite dev server on http://localhost:5173
+# Terminal 1: Server
+cd battle-cab && make server-dev
+
+# Terminal 2: Spectator
+cd spectator && make dev
+
+# Terminal 3: Add bots
+make reset-game && make add-bots
+# Or: open http://localhost:5173/?server and click "+ Add Bot"
 ```
 
-Open http://localhost:5173 — WASD to move Rick, auto-fire kills FloopyDoops, collect XP gems.
+## Frame-by-Frame Replay
 
-## What's Working (MVP 1)
+Add `&frame=N` to the URL to inspect a specific server tick:
+```
+http://localhost:5173/?server&frame=50
+```
 
-- RickDefault player with directional walk animations (up/down/left/right)
-- FloopyDoops enemies swarming toward player
-- Blaster bullet sprites from rick-survival atlas
-- ExpGem drops on enemy kill with magnet pickup
-- Kill counter HUD
-- All sprites from rick-survival (TexturePacker → Phaser atlas format)
+Keyboard controls in frame mode:
+- **J / Left Arrow**: Previous frame
+- **K / Right Arrow**: Next frame
+- **H**: Back 10 frames
+- **L**: Forward 10 frames
 
-## MVP Progression
+Server saves last 2000 frames. Check available frames:
+```bash
+curl http://localhost:33333/game/frame
+# {"latest-tick":200, "frame-count":200, "oldest-tick":1}
+```
 
-| MVP | Status | What it proves |
-|-----|--------|----------------|
-| 1   | DONE   | Rick-survival sprites work in Phaser VS prototype |
-| 2   | next   | Clojure server → WebSocket → Phaser pipeline |
-| 3   |        | Server-side enemies + wave spawning |
-| 4   |        | Manual targeting (bots must aim, no auto-fire) |
-| 5   |        | Full game: teams, waves, shrink, 10-min round |
+## MVP Status
+
+| MVP | Status | What |
+|-----|--------|------|
+| 1 | DONE | Standalone Phaser + rick-survival sprites |
+| 2 | DONE | Server → WebSocket → Phaser pipeline |
+| 3 | DONE | Server-side enemies, waves, shooting kills enemies |
+| 4 | DONE | Manual targeting + smart bot (Python) |
+| 5 | Next | Full game: teams, waves, shrink, 10-min round |
 
 ## Architecture
 
-Currently runs as a standalone client (Feronato's VS prototype + rick-survival sprites).
-Will evolve into a render-only spectator that receives state from the Clojure server via WebSocket.
-
 ```
-[Current: MVP 1]
-  Phaser client runs game logic locally (enemy spawning, physics, etc.)
-
-[Target: MVP 2+]
-  Bots ──REST──→ Clojure Server ──WebSocket──→ Phaser Spectator (render only)
+Bots ──REST──→ Clojure Server ──WebSocket──→ Phaser Spectator (render only)
+                     │
+              frame buffer (2000 ticks)
+                     │
+              GET /game/frame?tick=N ──→ Phaser frame replay mode
 ```

@@ -91,8 +91,45 @@
 ;;; Tick Hook
 ;;; ---------------------------------------------------------------------------
 
+;;; ---------------------------------------------------------------------------
+;;; Frame Buffer — save every tick for frame-by-frame replay
+;;; ---------------------------------------------------------------------------
+
+;; {tick-number json-string} — last 2000 frames
+(defonce frame-buffer (atom {}))
+(def max-frames 2000)
+
+(defn save-frame!
+  "Save a tick's JSON state to the frame buffer."
+  [game-state payload]
+  (let [tick (:tick game-state)]
+    (swap! frame-buffer
+           (fn [buf]
+             (let [buf (assoc buf tick payload)]
+               ;; Prune old frames
+               (if (> (count buf) max-frames)
+                 (into (sorted-map) (take-last max-frames (sort buf)))
+                 buf))))))
+
+(defn get-frame
+  "Retrieve a saved frame by tick number."
+  [tick]
+  (get @frame-buffer tick))
+
+(defn clear-frames! []
+  (reset! frame-buffer {}))
+
 (defn on-tick
-  "Called by engine after each tick. Pushes state to WebSocket spectators.
-   Can be composed with sse/on-tick."
+  "Called by engine after each tick. Saves frame + pushes to WebSocket spectators."
   [_sys game-state]
-  (broadcast-state! game-state))
+  (let [payload (state->json game-state)]
+    ;; Always save frame for replay
+    (save-frame! game-state payload)
+    ;; Push to connected spectators
+    (when (pos? (ws-client-count))
+      (doseq [ch @ws-clients]
+        (try
+          (http/send! ch payload)
+          (catch Exception e
+            (log/warn :ws-send-error :msg (.getMessage e))
+            (swap! ws-clients disj ch)))))))

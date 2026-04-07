@@ -327,3 +327,116 @@ time=2026-04-06T22:34:21.219-07:00 level=INFO msg="JSONL file created: %s" !BADK
 time=2026-04-06T22:34:22.220-07:00 level=INFO msg="Import triggered by file change"
 time=2026-04-06T22:34:22.221-07:00 level=INFO msg="Starting %s..." !BADKEY=auto-import
 time=2026-04-06T22:34:22.221-07:00 level=INFO msg="Skipping %s: JSONL content unchanged" !BADKEY=auto-import
+time=2026-04-06T22:40:41.630-07:00 level=INFO msg="JSONL removed/renamed, re-establishing watch"
+time=2026-04-06T22:40:41.681-07:00 level=INFO msg="Successfully re-established JSONL watch after %v" !BADKEY=50ms
+time=2026-04-06T22:40:41.681-07:00 level=INFO msg="JSONL file created: %s" !BADKEY=/Users/genekim/src.local/eais-gitlab-game/.beads/issues.jsonl
+time=2026-04-06T22:40:42.683-07:00 level=INFO msg="Import triggered by file change"
+time=2026-04-06T22:40:42.683-07:00 level=INFO msg="Starting %s..." !BADKEY=auto-import
+time=2026-04-06T22:40:42.684-07:00 level=INFO msg="Skipping %s: JSONL content unchanged" !BADKEY=auto-import
+time=2026-04-06T22:41:30.959-07:00 level=INFO msg="JSONL removed/renamed, re-establishing watch"
+time=2026-04-06T22:41:31.010-07:00 level=INFO msg="Successfully re-established JSONL watch after %v" !BADKEY=50ms
+time=2026-04-06T22:41:31.010-07:00 level=INFO msg="JSONL file created: %s" !BADKEY=/Users/genekim/src.local/eais-gitlab-game/.beads/issues.jsonl
+time=2026-04-06T22:41:32.013-07:00 level=INFO msg="Import triggered by file change"
+time=2026-04-06T22:41:32.013-07:00 level=INFO msg="Starting %s..." !BADKEY=auto-import
+time=2026-04-06T22:41:32.014-07:00 level=INFO msg="Skipping %s: JSONL content unchanged" !BADKEY=auto-import
+time=2026-04-06T22:51:11.901-07:00 level=INFO msg="JSONL removed/renamed, re-establishing watch"
+time=2026-04-06T22:51:11.952-07:00 level=INFO msg="Successfully re-established JSONL watch after %v" !BADKEY=50ms
+time=2026-04-06T22:51:11.953-07:00 level=INFO msg="JSONL file created: %s" !BADKEY=/Users/genekim/src.local/eais-gitlab-game/.beads/issues.jsonl
+time=2026-04-06T22:51:12.954-07:00 level=INFO msg="Import triggered by file change"
+time=2026-04-06T22:51:12.954-07:00 level=INFO msg="Starting %s..." !BADKEY=auto-import
+time=2026-04-06T22:51:12.955-07:00 level=INFO msg="Skipping %s: JSONL content unchanged" !BADKEY=auto-import
+time=2026-04-06T22:53:17.250-07:00 level=INFO msg="JSONL removed/renamed, re-establishing watch"
+time=2026-04-06T22:53:17.301-07:00 level=INFO msg="Successfully re-established JSONL watch after %v" !BADKEY=50ms
+time=2026-04-06T22:53:17.301-07:00 level=INFO msg="JSONL file created: %s" !BADKEY=/Users/genekim/src.local/eais-gitlab-game/.beads/issues.jsonl
+time=2026-04-06T22:53:18.304-07:00 level=INFO msg="Import triggered by file change"
+time=2026-04-06T22:53:18.304-07:00 level=INFO msg="Starting %s..." !BADKEY=auto-import
+time=2026-04-06T22:53:18.304-07:00 level=INFO msg="Skipping %s: JSONL content unchanged" !BADKEY=auto-import
+time=2026-04-06T22:58:40.795-07:00 level=INFO msg="JSONL removed/renamed, re-establishing watch"
+time=2026-04-06T22:58:40.847-07:00 level=INFO msg="Successfully re-established JSONL watch after %v" !BADKEY=50ms
+time=2026-04-06T22:58:40.847-07:00 level=INFO msg="JSONL file created: %s" !BADKEY=/Users/genekim/src.local/eais-gitlab-game/.beads/issues.jsonl
+time=2026-04-06T22:58:41.862-07:00 level=INFO msg="Import triggered by file change"
+time=2026-04-06T22:58:41.862-07:00 level=INFO msg="Starting %s..." !BADKEY=auto-import
+time=2026-04-06T22:58:41.862-07:00 level=INFO msg="Skipping %s: JSONL content unchanged" !BADKEY=auto-import
+time=2026-04-06T23:03:48.696-07:00 level=INFO msg="JSONL removed/renamed, re-establishing watch"
+time=2026-04-06T23:03:48.747-07:00 level=INFO msg="Successfully re-established JSONL watch after %v" !BADKEY=50ms
+time=2026-04-06T23:03:48.747-07:00 level=INFO msg="JSONL file created: %s" !BADKEY=/Users/genekim/src.local/eais-gitlab-game/.beads/issues.jsonl
+time=2026-04-06T23:03:49.749-07:00 level=INFO msg="Import triggered by file change"
+time=2026-04-06T23:03:49.750-07:00 level=INFO msg="Starting %s..." !BADKEY=auto-import
+time=2026-04-06T23:03:49.751-07:00 level=INFO msg="Skipping %s: JSONL content unchanged" !BADKEY=auto-import
+time=2026-04-06T23:13:27.093-07:00 level=INFO msg="JSONL removed/renamed, re-establishing watch"
+time=2026-04-06T23:13:27.146-07:00 level=INFO msg="Successfully re-established JSONL watch after %v" !BADKEY=50ms
+time=2026-04-06T23:13:27.146-07:00 level=INFO msg="JSONL file created: %s" !BADKEY=/Users/genekim/src.local/eais-gitlab-game/.beads/issues.jsonl
+time=2026-04-06T23:13:28.151-07:00 level=INFO msg="Import triggered by file change"
+time=2026-04-06T23:13:28.152-07:00 level=INFO msg="Starting %s..." !BADKEY=auto-import
+time=2026-04-06T23:13:28.153-07:00 level=INFO msg="Skipping %s: JSONL content unchanged" !BADKEY=auto-import
+time=2026-04-06T23:20:02.099-07:00 level=INFO msg="JSONL removed/renamed, re-establishing watch"
+time=2026-04-06T23:20:02.150-07:00 level=INFO msg="Successfully re-established JSONL watch after %v" !BADKEY=50ms
+time=2026-04-06T23:20:02.151-07:00 level=INFO msg="JSONL file created: %s" !BADKEY=/Users/genekim/src.local/eais-gitlab-game/.beads/issues.jsonl
+time=2026-04-06T23:20:03.152-07:00 level=INFO msg="Import triggered by file change"
+time=2026-04-06T23:20:03.153-07:00 level=INFO msg="Starting %s..." !BADKEY=auto-import
+time=2026-04-06T23:20:03.153-07:00 level=INFO msg="Skipping %s: JSONL content unchanged" !BADKEY=auto-import
+time=2026-04-06T23:22:13.766-07:00 level=INFO msg="Mutation detected: %s %s" create=eais-gitlab-game-xdg
+time=2026-04-06T23:22:14.267-07:00 level=INFO msg="Export triggered by mutation events"
+time=2026-04-06T23:22:14.267-07:00 level=INFO msg="Starting %s..." !BADKEY=export
+time=2026-04-06T23:22:14.269-07:00 level=INFO msg="Exported to JSONL"
+time=2026-04-06T23:22:14.269-07:00 level=INFO msg="Export complete"
+time=2026-04-06T23:22:14.269-07:00 level=INFO msg="JSONL removed/renamed, re-establishing watch"
+time=2026-04-06T23:22:14.321-07:00 level=INFO msg="Successfully re-established JSONL watch after %v" !BADKEY=50ms
+time=2026-04-06T23:22:14.321-07:00 level=INFO msg="JSONL file created: %s" !BADKEY=/Users/genekim/src.local/eais-gitlab-game/.beads/issues.jsonl
+time=2026-04-06T23:22:15.323-07:00 level=INFO msg="Import triggered by file change"
+time=2026-04-06T23:22:15.323-07:00 level=INFO msg="Starting %s..." !BADKEY=auto-import
+time=2026-04-06T23:22:15.323-07:00 level=INFO msg="JSONL content changed, proceeding with %s..." !BADKEY=auto-import
+time=2026-04-06T23:22:15.332-07:00 level=INFO msg="⚠️  WARNING: Uncommitted local changes detected in %s" !BADKEY=/Users/genekim/src.local/eais-gitlab-game/.beads/issues.jsonl
+time=2026-04-06T23:22:15.333-07:00 level=INFO msg="   Pulling from remote may overwrite local unpushed changes."
+time=2026-04-06T23:22:15.333-07:00 level=INFO msg="   Consider running 'bd sync' to commit and push your changes first."
+time=2026-04-06T23:22:15.349-07:00 level=INFO msg="Imported from JSONL"
+time=2026-04-06T23:22:15.364-07:00 level=INFO msg="Auto-import complete"
+time=2026-04-06T23:24:29.170-07:00 level=INFO msg="Mutation detected: %s %s" create=eais-gitlab-game-yi1
+time=2026-04-06T23:24:29.670-07:00 level=INFO msg="Export triggered by mutation events"
+time=2026-04-06T23:24:29.670-07:00 level=INFO msg="Starting %s..." !BADKEY=export
+time=2026-04-06T23:24:29.671-07:00 level=INFO msg="Pre-export validation failed: %v" !BADKEY="refusing to export: JSONL content has changed since last import (import first to avoid data loss)"
+time=2026-04-06T23:25:47.583-07:00 level=INFO msg="Mutation detected: %s %s" create=eais-gitlab-game-hky
+time=2026-04-06T23:25:48.085-07:00 level=INFO msg="Export triggered by mutation events"
+time=2026-04-06T23:25:48.085-07:00 level=INFO msg="Starting %s..." !BADKEY=export
+time=2026-04-06T23:25:48.085-07:00 level=INFO msg="Pre-export validation failed: %v" !BADKEY="refusing to export: JSONL content has changed since last import (import first to avoid data loss)"
+time=2026-04-06T23:25:55.060-07:00 level=INFO msg="Mutation detected: %s %s" status=eais-gitlab-game-yi1
+time=2026-04-06T23:25:55.561-07:00 level=INFO msg="Export triggered by mutation events"
+time=2026-04-06T23:25:55.562-07:00 level=INFO msg="Starting %s..." !BADKEY=export
+time=2026-04-06T23:25:55.562-07:00 level=INFO msg="Pre-export validation failed: %v" !BADKEY="refusing to export: JSONL content has changed since last import (import first to avoid data loss)"
+time=2026-04-06T23:30:21.150-07:00 level=INFO msg="Mutation detected: %s %s" status=eais-gitlab-game-yi1
+time=2026-04-06T23:30:21.652-07:00 level=INFO msg="Export triggered by mutation events"
+time=2026-04-06T23:30:21.652-07:00 level=INFO msg="Starting %s..." !BADKEY=export
+time=2026-04-06T23:30:21.652-07:00 level=INFO msg="Pre-export validation failed: %v" !BADKEY="refusing to export: JSONL content has changed since last import (import first to avoid data loss)"
+time=2026-04-06T23:30:42.212-07:00 level=INFO msg="File change detected: %s" !BADKEY=/Users/genekim/src.local/eais-gitlab-game/.beads/issues.jsonl
+time=2026-04-06T23:30:43.214-07:00 level=INFO msg="Import triggered by file change"
+time=2026-04-06T23:30:43.214-07:00 level=INFO msg="Starting %s..." !BADKEY=auto-import
+time=2026-04-06T23:30:43.217-07:00 level=INFO msg="JSONL content changed, proceeding with %s..." !BADKEY=auto-import
+time=2026-04-06T23:30:43.231-07:00 level=INFO msg="⚠️  WARNING: Uncommitted local changes detected in %s" !BADKEY=/Users/genekim/src.local/eais-gitlab-game/.beads/issues.jsonl
+time=2026-04-06T23:30:43.231-07:00 level=INFO msg="   Pulling from remote may overwrite local unpushed changes."
+time=2026-04-06T23:30:43.231-07:00 level=INFO msg="   Consider running 'bd sync' to commit and push your changes first."
+time=2026-04-06T23:30:43.243-07:00 level=INFO msg="Imported from JSONL"
+time=2026-04-06T23:30:43.246-07:00 level=INFO msg="Auto-import complete"
+time=2026-04-06T23:31:15.703-07:00 level=INFO msg="JSONL removed/renamed, re-establishing watch"
+time=2026-04-06T23:31:15.753-07:00 level=INFO msg="Successfully re-established JSONL watch after %v" !BADKEY=50ms
+time=2026-04-06T23:31:15.753-07:00 level=INFO msg="JSONL file created: %s" !BADKEY=/Users/genekim/src.local/eais-gitlab-game/.beads/issues.jsonl
+time=2026-04-06T23:31:16.756-07:00 level=INFO msg="Import triggered by file change"
+time=2026-04-06T23:31:16.756-07:00 level=INFO msg="Starting %s..." !BADKEY=auto-import
+time=2026-04-06T23:31:16.757-07:00 level=INFO msg="JSONL content changed, proceeding with %s..." !BADKEY=auto-import
+time=2026-04-06T23:31:16.790-07:00 level=INFO msg="Imported from JSONL"
+time=2026-04-06T23:31:16.794-07:00 level=INFO msg="Auto-import complete"
+time=2026-04-06T23:32:19.456-07:00 level=INFO msg="Mutation detected: %s %s" create=eais-gitlab-game-od1
+time=2026-04-06T23:32:19.957-07:00 level=INFO msg="Export triggered by mutation events"
+time=2026-04-06T23:32:19.958-07:00 level=INFO msg="Starting %s..." !BADKEY=export
+time=2026-04-06T23:32:19.959-07:00 level=INFO msg="Exported to JSONL"
+time=2026-04-06T23:32:19.959-07:00 level=INFO msg="Export complete"
+time=2026-04-06T23:32:19.960-07:00 level=INFO msg="JSONL removed/renamed, re-establishing watch"
+time=2026-04-06T23:32:20.011-07:00 level=INFO msg="Successfully re-established JSONL watch after %v" !BADKEY=50ms
+time=2026-04-06T23:32:20.011-07:00 level=INFO msg="JSONL file created: %s" !BADKEY=/Users/genekim/src.local/eais-gitlab-game/.beads/issues.jsonl
+time=2026-04-06T23:32:21.013-07:00 level=INFO msg="Import triggered by file change"
+time=2026-04-06T23:32:21.013-07:00 level=INFO msg="Starting %s..." !BADKEY=auto-import
+time=2026-04-06T23:32:21.014-07:00 level=INFO msg="JSONL content changed, proceeding with %s..." !BADKEY=auto-import
+time=2026-04-06T23:32:21.024-07:00 level=INFO msg="⚠️  WARNING: Uncommitted local changes detected in %s" !BADKEY=/Users/genekim/src.local/eais-gitlab-game/.beads/issues.jsonl
+time=2026-04-06T23:32:21.024-07:00 level=INFO msg="   Pulling from remote may overwrite local unpushed changes."
+time=2026-04-06T23:32:21.024-07:00 level=INFO msg="   Consider running 'bd sync' to commit and push your changes first."
+time=2026-04-06T23:32:21.037-07:00 level=INFO msg="Imported from JSONL"
+time=2026-04-06T23:32:21.039-07:00 level=INFO msg="Auto-import complete"

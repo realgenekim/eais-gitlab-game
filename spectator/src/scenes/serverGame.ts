@@ -54,13 +54,72 @@ export class ServerGame extends Phaser.Scene {
     mapWidth        : number = 21;
     mapHeight       : number = 19;
 
+    frameMode       : boolean = false;
+    currentFrame    : number = 0;
+
     create(): void {
         this.statusText = this.add.text(16, 16, 'Connecting...', {
             fontSize: '16px', color: '#4ecdc4', fontFamily: 'monospace',
             stroke: '#000', strokeThickness: 2
         }).setDepth(100);
 
-        this.connectWebSocket();
+        // Check for frame=N in URL
+        const params = new URLSearchParams(window.location.search);
+        const frameParam = params.get('frame');
+
+        if (frameParam !== null) {
+            this.frameMode = true;
+            this.currentFrame = parseInt(frameParam) || 0;
+            this.loadFrame(this.currentFrame);
+            this.setupFrameControls();
+        } else {
+            this.connectWebSocket();
+        }
+    }
+
+    async loadFrame(tick: number): Promise<void> {
+        const serverUrl = GameOptions.serverUrl || 'http://localhost:33333';
+        try {
+            const resp = await fetch(`${serverUrl}/game/frame?tick=${tick}`);
+            if (resp.ok) {
+                const state = await resp.json();
+                this.currentFrame = tick;
+                this.applyServerState(state);
+                this.statusText.setText(`FRAME ${tick} | ${state.players.length} players | ${(state.enemies||[]).length} enemies | J/K to step`);
+                // Update URL without reload
+                const url = new URL(window.location.href);
+                url.searchParams.set('frame', tick.toString());
+                history.replaceState(null, '', url.toString());
+            } else {
+                const err = await resp.json();
+                this.statusText.setText(`Frame ${tick} not found (${err['frame-count'] || 0} frames available)`);
+            }
+        } catch (e) {
+            this.statusText.setText(`Error loading frame ${tick}`);
+        }
+    }
+
+    setupFrameControls(): void {
+        // J/K to step through frames, like the battle-cab test page
+        this.input.keyboard!.on('keydown-J', () => {
+            this.loadFrame(Math.max(0, this.currentFrame - 1));
+        });
+        this.input.keyboard!.on('keydown-K', () => {
+            this.loadFrame(this.currentFrame + 1);
+        });
+        this.input.keyboard!.on('keydown-LEFT', () => {
+            this.loadFrame(Math.max(0, this.currentFrame - 1));
+        });
+        this.input.keyboard!.on('keydown-RIGHT', () => {
+            this.loadFrame(this.currentFrame + 1);
+        });
+        // Shift+J/K for 10-frame jumps
+        this.input.keyboard!.on('keydown-H', () => {
+            this.loadFrame(Math.max(0, this.currentFrame - 10));
+        });
+        this.input.keyboard!.on('keydown-L', () => {
+            this.loadFrame(this.currentFrame + 10);
+        });
     }
 
     connectWebSocket(): void {
