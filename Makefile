@@ -68,6 +68,12 @@ bot-move:
 	done
 	@echo "Bot movement done."
 
+# Run the smart bot (aims and shoots at enemies)
+# Usage: make smart-bot NAME=MyBot
+smart-bot:
+	$(eval NAME ?= SmartBot)
+	python3 bots/smart_bot.py --name $(NAME)
+
 # ============================================================
 # Setup
 # ============================================================

@@ -44,7 +44,7 @@
 
 (defn player-view
   "Build the fog-of-war view for a specific player.
-   Includes visible shots (bullet tracers) so bots can dodge."
+   Includes visible enemies, players, shots so bots can decide what to shoot."
   [game-state player-id]
   (let [visible (visible-positions game-state player-id)
         me (get-in game-state [:players player-id])
@@ -55,14 +55,17 @@
                     (map (fn [[id p]]
                            {:id id :x (:x p) :y (:y p)
                             :has-passenger (some? (:passenger p))})))
+        enemies (->> (or (:enemies game-state) {})
+                     (filter (fn [[_ e]] (visible [(:x e) (:y e)])))
+                     (map (fn [[id e]]
+                            {:id id :x (:x e) :y (:y e)
+                             :hp (:hp e) :type (name (:type e))})))
         passengers (->> (:passengers game-state)
                         (filter (fn [p] (and (nil? (:picked-up-by p))
                                              (visible [(:x p) (:y p)]))))
                         (map #(select-keys % [:id :x :y :dest])))
-        ;; Shots with any tracer cell in visibility range
         shots (->> (:recent-shots game-state)
-                   (filter (fn [shot]
-                             (some visible (:path shot))))
+                   (filter (fn [shot] (some visible (:path shot))))
                    (map (fn [shot]
                           {:shooter-id (:shooter-id shot)
                            :origin (:origin shot)
@@ -73,6 +76,7 @@
               (select-keys [:x :y :hp :score :passenger :ammo :grenades :alive?])
               (assoc :id player-id))
      :visible {:players (vec others)
+               :enemies (vec enemies)
                :passengers (vec passengers)
                :shots (vec shots)}
      :map {:width (get-in game-state [:map :width])

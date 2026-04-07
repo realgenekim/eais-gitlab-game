@@ -31,7 +31,7 @@
     (let [[state creds] (core/add-player (fresh-state) "Bob")
           player (get-in state [:players (:id creds)])]
       (is (:alive? player))
-      (is (= 100 (:hp player))))))
+      (is (= 500 (:hp player))))))
 
 (deftest movement-test
   (testing "valid move updates position"
