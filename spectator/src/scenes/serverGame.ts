@@ -266,26 +266,36 @@ export class ServerGame extends Phaser.Scene {
         }
     }
 
-    drawHpBar(playerId: string, x: number, y: number, hp: number, maxHp: number): void {
-        let bar = this.playerHpBars.get(playerId);
-        if (!bar) {
-            bar = this.add.graphics().setDepth(60);
-            this.playerHpBars.set(playerId, bar);
+    // Store last known HP per player for update() loop
+    playerHpValues  : Map<string, number> = new Map();
+
+    drawAllHpBars(): void {
+        for (const [id, sprite] of this.playerSprites) {
+            if (!sprite.visible) {
+                if (this.playerHpBars.has(id)) this.playerHpBars.get(id)!.setVisible(false);
+                continue;
+            }
+            let bar = this.playerHpBars.get(id);
+            if (!bar) {
+                bar = this.add.graphics().setDepth(60);
+                this.playerHpBars.set(id, bar);
+            }
+            bar.clear();
+            bar.setVisible(true);
+            const w = 40;
+            const h = 5;
+            const x = sprite.x - w / 2;
+            const y = sprite.y - 45;
+            const hp = this.playerHpValues.get(id) || 500;
+            const pct = Math.max(0, hp / 500);
+            // Background
+            bar.fillStyle(0x333333, 0.8);
+            bar.fillRect(x, y, w, h);
+            // HP fill
+            const color = pct > 0.5 ? 0x4ecdc4 : pct > 0.25 ? 0xffe66d : 0xff6b6b;
+            bar.fillStyle(color, 1);
+            bar.fillRect(x, y, w * pct, h);
         }
-        bar.clear();
-        bar.setVisible(true);
-        const w = 40;
-        const h = 4;
-        const bx = x - w / 2;
-        const by = y;
-        const pct = Math.max(0, hp / maxHp);
-        // Background
-        bar.fillStyle(0x333333, 0.8);
-        bar.fillRect(bx, by, w, h);
-        // HP fill — green > yellow > red
-        const color = pct > 0.5 ? 0x4ecdc4 : pct > 0.25 ? 0xffe66d : 0xff6b6b;
-        bar.fillStyle(color, 1);
-        bar.fillRect(bx, by, w * pct, h);
     }
 
     detectWave(state: ServerState): void {
@@ -362,15 +372,10 @@ export class ServerGame extends Phaser.Scene {
                         sprite.play(`${avatar.prefix}-idle`, true);
                     }
                     label.setText(p.name);
-
-                    // HP bar
-                    this.drawHpBar(p.id, sprite.x, sprite.y - 50, p.hp, 500);
+                    this.playerHpValues.set(p.id, p.hp);
                 } else {
                     sprite.setVisible(false);
                     label.setVisible(false);
-                    if (this.playerHpBars.has(p.id)) {
-                        this.playerHpBars.get(p.id)!.setVisible(false);
-                    }
                 }
             } else {
                 // New player — use assigned avatar, down_1 frame (consistent size)
@@ -385,8 +390,7 @@ export class ServerGame extends Phaser.Scene {
                     stroke: '#000', strokeThickness: 3
                 }).setOrigin(0.5).setDepth(50);
                 this.playerLabels.set(p.id, label);
-
-                this.drawHpBar(p.id, targetX, targetY - 50, p.hp, 500);
+                this.playerHpValues.set(p.id, p.hp);
 
                 if (!p.alive) { sprite.setVisible(false); label.setVisible(false); }
             }
@@ -554,5 +558,10 @@ export class ServerGame extends Phaser.Scene {
                 ease: 'Sine.easeInOut'
             });
         }
+    }
+
+    update(): void {
+        // HP bars follow sprite positions every frame (smooth during tweens)
+        this.drawAllHpBars();
     }
 }
