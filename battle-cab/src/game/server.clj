@@ -1,9 +1,10 @@
 (ns game.server
-  "HTTP server — REST API + spectator SSE. Delegates state to game.engine."
+  "HTTP server — REST API + spectator SSE + WebSocket. Delegates state to game.engine."
   (:require [game.core :as core]
             [game.maps :as maps]
             [game.engine :as engine]
             [game.sse :as sse]
+            [game.ws :as ws]
             [game.views :as views]
             [game.test-views :as test-views]
             [game.sprite-viewer :as sprite-viewer]
@@ -221,6 +222,7 @@
          ;; Spectator
          ["/" {:get {:handler #'handle-spectator-page}}]
          ["/spectate" {:get {:handler #'handle-spectate}}]
+         ["/spectate-ws" {:get {:handler #'ws/handle-ws-spectate}}]
          ["/game/restart" {:post {:handler #'handle-restart}}]
          ["/game/map-swap" {:post {:handler #'handle-map-swap}}]
          ["/game/lightning" {:post {:handler #'handle-lightning}}]
@@ -247,15 +249,21 @@
   "Wrap app with code-reload + browser-reload for dev mode."
   []
   (let [wrap-reload-script (requiring-resolve 'browser-reload.core/wrap-reload-script)
-        wrap-reload        (requiring-resolve 'ring.middleware.reload/wrap-reload)]
+        wrap-reload (requiring-resolve 'ring.middleware.reload/wrap-reload)]
     (-> #'app
         wrap-reload-script
         (wrap-reload {:dirs ["src" "resources"]
                       :reload-compile-errors? true}))))
 
+(defn- on-tick-all
+  "Composed on-tick: pushes to both SSE (HTML) and WebSocket (JSON) spectators."
+  [sys game-state]
+  (sse/on-tick sys game-state)
+  (ws/on-tick sys game-state))
+
 (defn -main [& _args]
-  (engine/start-game! {:on-tick #'sse/on-tick})
-  (let [port   (Integer/parseInt (or (System/getenv "PORT") "33333"))
+  (engine/start-game! {:on-tick #'on-tick-all})
+  (let [port (Integer/parseInt (or (System/getenv "PORT") "33333"))
         is-dev (= "dev" (System/getenv "ENV"))
         handler (if is-dev (make-dev-app) #'app)]
     (when is-dev
@@ -266,4 +274,4 @@
     (log/info :server-started :port port
               :endpoints ["/game/join" "/game/state" "/game/action"
                           "/game/scoreboard" "/game/map" "/game/ascii"
-                          "/" "/spectate"])))
+                          "/" "/spectate" "/spectate-ws"])))
