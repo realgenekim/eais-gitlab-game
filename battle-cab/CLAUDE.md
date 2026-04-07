@@ -6,10 +6,11 @@ Players write bots (LLM or hand-coded) that control taxis on a grid maze via RES
 Pick up passengers, deliver to destinations, shoot rival cabs.
 
 ## Architecture
-- **Clojure backend** — http-kit + reitit + Datastar SSE
-- **Tick-based game loop** — state advances every 500ms, pure functions
+- **Clojure backend** — http-kit + reitit
+- **Phaser spectator** — `spectator/` Vite+TypeScript app, reads game state via WebSocket JSON
+- **Tick-based game loop** — state advances every 250ms, pure functions
 - **Full replay** — every command and state transition saved
-- **Datastar SSE spectator view** — live HTML fragment push to browser
+- **SSE view is ABANDONED** — game.sse, game.views, game.ds are legacy; do not invest in them. Phaser is the spectator UI going forward.
 
 ## Namespace Layout
 ```
@@ -47,6 +48,62 @@ curl -s http://localhost:33333/game/status   # tick, players, running?
 curl -s http://localhost:33333/game/ascii    # ASCII map render
 curl -X POST http://localhost:33333/game/restart -H 'Content-Type: application/json' -d '{"map":"arena"}'
 ```
+
+## Frame-by-Frame Replay (Debugging Power Tool)
+
+The server saves every tick's full state JSON to an in-memory ring buffer (last 2000 frames).
+This is the primary debugging tool for visual issues — inspect exactly what the server sent for any tick.
+
+### How to use
+
+**Check what frames are available:**
+```bash
+curl -s http://localhost:33333/game/frame | python3 -m json.tool
+# {"latest-tick": 200, "frame-count": 200, "oldest-tick": 1}
+```
+
+**Fetch a specific frame:**
+```bash
+curl -s "http://localhost:33333/game/frame?tick=70" | python3 -m json.tool
+```
+
+**View in Phaser spectator (frozen, steppable):**
+```
+http://localhost:5173/?server&frame=70
+```
+Keyboard: J/Left = prev frame, K/Right = next, H = back 10, L = forward 10
+
+**Inspect shot data in a frame (CLI):**
+```bash
+curl -s "http://localhost:33333/game/frame?tick=70" | python3 -c "
+import sys, json
+d = json.load(sys.stdin)
+shots = d.get('recent-shots', [])
+print(f'tick={d[\"tick\"]} shots={len(shots)}')
+for s in shots:
+    print(f'  fired-tick={s.get(\"fired-tick\")} dir={s[\"direction\"]} path={s[\"path\"]}')
+"
+```
+
+### Why this matters
+
+This tool caught and fixed the shot accumulation bug: shots had a backwards expiry filter
+(`(> (+ tick 3) fired-tick)` is always true) causing shots to never expire. Frame inspection
+showed tick=70 had 7 shots with fired-ticks=[18,22,22,30,30,50,69] — immediately obvious
+that old shots were persisting. Fixed to `(>= (+ fired-tick 3) tick)`, verified same frame
+now shows 3 shots (fired-ticks=[67,68,69]).
+
+### Typical debugging workflow
+
+1. Let bots play for a while: `make reset-game && make add-bots`
+2. Notice visual bug in spectator
+3. Check available frames: `curl http://localhost:33333/game/frame`
+4. Open frame in browser: `http://localhost:5173/?server&frame=N`
+5. Step through with J/K to find exact tick where issue appears
+6. Fetch that frame's JSON via curl to inspect data
+7. Fix server code, restart, verify same frame range looks correct
+
+### Frame buffer clears on game restart (reset-game)
 
 ## Key Conventions
 - Route handlers: named `defn handle-xxx`, referenced as `#'handle-xxx` in routes
