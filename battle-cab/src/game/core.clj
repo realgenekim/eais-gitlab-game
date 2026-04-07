@@ -10,6 +10,8 @@
 (def directions
   {:north [0 -1] :south [0 1] :east [1 0] :west [-1 0]})
 
+(def START-HP "Starting and respawn hit points for players." 500)
+
 (defn in-bounds? [{:keys [width height]} [x y]]
   (and (>= x 0) (< x width) (>= y 0) (< y height)))
 
@@ -341,7 +343,7 @@
                          spawn)]
            (-> s
                (assoc-in [:players id :alive?] true)
-               (assoc-in [:players id :hp] 100)
+               (assoc-in [:players id :hp] 500)
                (assoc-in [:players id :x] sx)
                (assoc-in [:players id :y] sy)
                (assoc-in [:players id :ammo] 5)
@@ -731,7 +733,7 @@
                    {:name player-name
                     :x (first spawn)
                     :y (second spawn)
-                    :hp 500
+                    :hp START-HP
                     :score 0
                     :passenger nil
                     :ammo 5

@@ -574,3 +574,9 @@ time=2026-04-07T06:24:38.338-07:00 level=INFO msg="JSONL file created: %s" !BADK
 time=2026-04-07T06:24:39.341-07:00 level=INFO msg="Import triggered by file change"
 time=2026-04-07T06:24:39.342-07:00 level=INFO msg="Starting %s..." !BADKEY=auto-import
 time=2026-04-07T06:24:39.343-07:00 level=INFO msg="Skipping %s: JSONL content unchanged" !BADKEY=auto-import
+time=2026-04-07T06:28:11.026-07:00 level=INFO msg="JSONL removed/renamed, re-establishing watch"
+time=2026-04-07T06:28:11.077-07:00 level=INFO msg="Successfully re-established JSONL watch after %v" !BADKEY=50ms
+time=2026-04-07T06:28:11.077-07:00 level=INFO msg="JSONL file created: %s" !BADKEY=/Users/genekim/src.local/eais-gitlab-game/.beads/issues.jsonl
+time=2026-04-07T06:28:12.080-07:00 level=INFO msg="Import triggered by file change"
+time=2026-04-07T06:28:12.080-07:00 level=INFO msg="Starting %s..." !BADKEY=auto-import
+time=2026-04-07T06:28:12.080-07:00 level=INFO msg="Skipping %s: JSONL content unchanged" !BADKEY=auto-import

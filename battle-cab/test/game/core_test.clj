@@ -31,7 +31,35 @@
     (let [[state creds] (core/add-player (fresh-state) "Bob")
           player (get-in state [:players (:id creds)])]
       (is (:alive? player))
-      (is (= 500 (:hp player))))))
+      (is (= core/START-HP (:hp player))))))
+
+(deftest respawn-test
+  (testing "dead player respawns with full HP after timer"
+    (let [[state creds] (core/add-player (fresh-state) "Bob")
+          id (:id creds)
+          ;; Kill the player
+          state (-> state
+                    (assoc-in [:players id :hp] 0)
+                    (assoc-in [:players id :alive?] false)
+                    (assoc-in [:players id :respawn-at] 5))
+          ;; Advance to tick 5 (respawn tick)
+          state (assoc state :tick 5)
+          state (core/respawn-dead-players state)
+          player (get-in state [:players id])]
+      (is (:alive? player))
+      (is (= core/START-HP (:hp player)))))
+
+  (testing "dead player stays dead before respawn timer"
+    (let [[state creds] (core/add-player (fresh-state) "Bob")
+          id (:id creds)
+          state (-> state
+                    (assoc-in [:players id :hp] 0)
+                    (assoc-in [:players id :alive?] false)
+                    (assoc-in [:players id :respawn-at] 10))
+          state (assoc state :tick 5)
+          state (core/respawn-dead-players state)
+          player (get-in state [:players id])]
+      (is (not (:alive? player))))))
 
 (deftest movement-test
   (testing "valid move updates position"
