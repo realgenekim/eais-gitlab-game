@@ -111,6 +111,40 @@ export class ServerGame extends Phaser.Scene {
 
         this.updatePlayers(state);
         this.updateEnemies(state);
+        this.renderShots(state);
+    }
+
+    renderShots(state: ServerState): void {
+        const shots = (state as any)['recent-shots'] || [];
+        for (const shot of shots) {
+            const path: number[][] = shot.path || [];
+            if (path.length === 0) continue;
+
+            const [ox, oy] = this.gridToPixel(shot.origin[0], shot.origin[1]);
+            const lastCell = path[path.length - 1];
+            const [tx, ty] = this.gridToPixel(lastCell[0], lastCell[1]);
+
+            // Draw tracer line
+            const line = this.add.graphics();
+            line.lineStyle(3, 0xff4400, 0.9);
+            line.beginPath();
+            line.moveTo(ox, oy);
+            line.lineTo(tx, ty);
+            line.strokePath();
+            line.setDepth(15);
+
+            // Bright tip at impact point
+            const tip = this.add.circle(tx, ty, 6, 0xffcc00, 1);
+            tip.setDepth(16);
+
+            // Fade out and destroy
+            this.tweens.add({
+                targets: [line, tip],
+                alpha: 0,
+                duration: 200,
+                onComplete: () => { line.destroy(); tip.destroy(); }
+            });
+        }
     }
 
     updatePlayers(state: ServerState): void {
