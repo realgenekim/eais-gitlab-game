@@ -1,6 +1,6 @@
 {;; ===== Tick & Timing =====
  :tick-ms              250    ;; ms per tick (250 = 4 ticks/sec)
- :game-duration-ticks  1000   ;; total ticks per round (~4 min at 250ms)
+ :game-duration-ticks  99999  ;; effectively infinite for dev (~7 hours at 250ms)
 
  ;; ===== Players =====
  :max-players          8

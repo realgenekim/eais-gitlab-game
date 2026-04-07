@@ -1,6 +1,6 @@
 // SERVER-CONNECTED GAME (MVP 2)
 // Receives game state from Clojure server via WebSocket.
-// Players are rendered from server state. Enemies are local (until MVP 3).
+// Players rendered from server state. Enemies local (until MVP 3).
 
 import { GameOptions } from '../gameOptions';
 
@@ -31,7 +31,7 @@ export class ServerGame extends Phaser.Scene {
     ws              : WebSocket | null = null;
     connected       : boolean = false;
     lastState       : ServerState | null = null;
-    playerSprites   : Map<string, Phaser.Physics.Arcade.Sprite> = new Map();
+    playerSprites   : Map<string, Phaser.GameObjects.Sprite> = new Map();
     playerLabels    : Map<string, Phaser.GameObjects.Text> = new Map();
     enemyGroup      : Phaser.Physics.Arcade.Group;
     coinGroup       : Phaser.Physics.Arcade.Group;
@@ -39,10 +39,12 @@ export class ServerGame extends Phaser.Scene {
     killCount       : number = 0;
     killText        : Phaser.GameObjects.Text;
     statusText      : Phaser.GameObjects.Text;
-    tileSize        : number = 64;  // pixels per grid cell
+    tileSize        : number = 48;  // pixels per grid cell (fits 21x19 in ~1000x900)
+    mapWidth        : number = 21;
+    mapHeight       : number = 19;
 
     create(): void {
-        // Groups for local enemies (until MVP 3 moves them server-side)
+        // Groups for local enemies
         this.enemyGroup = this.physics.add.group();
         this.coinGroup = this.physics.add.group();
         this.bulletGroup = this.physics.add.group();
@@ -52,14 +54,14 @@ export class ServerGame extends Phaser.Scene {
         this.killText = this.add.text(16, 16, 'Kills: 0', {
             fontSize: '24px', color: '#ff6b6b', fontFamily: 'monospace',
             stroke: '#000', strokeThickness: 3
-        }).setScrollFactor(0).setDepth(100);
+        }).setDepth(100);
 
         this.statusText = this.add.text(16, 48, 'Connecting...', {
             fontSize: '16px', color: '#4ecdc4', fontFamily: 'monospace',
             stroke: '#000', strokeThickness: 2
-        }).setScrollFactor(0).setDepth(100);
+        }).setDepth(100);
 
-        // Connect to server WebSocket
+        // Connect to server
         this.connectWebSocket();
 
         // Local enemy spawning (temporary — moves to server in MVP 3)
@@ -68,12 +70,13 @@ export class ServerGame extends Phaser.Scene {
 
     connectWebSocket(): void {
         const url = GameOptions.serverWsUrl || 'ws://localhost:33333/spectate-ws';
+        console.log('Connecting to', url);
         this.ws = new WebSocket(url);
 
         this.ws.onopen = () => {
             this.connected = true;
             this.statusText.setText('Connected to server');
-            console.log('WebSocket connected to', url);
+            console.log('WebSocket connected');
         };
 
         this.ws.onmessage = (event) => {
@@ -83,43 +86,62 @@ export class ServerGame extends Phaser.Scene {
                     this.applyServerState(state);
                 }
             } catch (e) {
-                console.error('Failed to parse server state:', e);
+                console.error('Parse error:', e);
             }
         };
 
         this.ws.onclose = () => {
             this.connected = false;
             this.statusText.setText('Disconnected — reconnecting...');
-            // Reconnect after 2s
             this.time.delayedCall(2000, () => this.connectWebSocket());
         };
 
-        this.ws.onerror = (err) => {
-            console.error('WebSocket error:', err);
+        this.ws.onerror = () => {
+            console.error('WebSocket error');
         };
+    }
+
+    gridToPixel(gx: number, gy: number): [number, number] {
+        return [gx * this.tileSize + this.tileSize / 2,
+                gy * this.tileSize + this.tileSize / 2];
     }
 
     applyServerState(state: ServerState): void {
         this.lastState = state;
-        this.statusText.setText(`Tick ${state.tick} | ${state.players.length} players`);
 
-        // Update or create player sprites
+        // Update map size on first state
+        if (state.map) {
+            this.mapWidth = state.map.width;
+            this.mapHeight = state.map.height;
+        }
+
+        this.statusText.setText(
+            `Tick ${state.tick} | ${state.players.length} players | WS connected`);
+
         const seenIds = new Set<string>();
 
         for (const p of state.players) {
             seenIds.add(p.id);
-            const targetX = p.x * this.tileSize + this.tileSize / 2;
-            const targetY = p.y * this.tileSize + this.tileSize / 2;
+            const [targetX, targetY] = this.gridToPixel(p.x, p.y);
 
             if (this.playerSprites.has(p.id)) {
-                // Existing player — tween to new position
+                // Existing player — move to new position
                 const sprite = this.playerSprites.get(p.id)!;
                 const label = this.playerLabels.get(p.id)!;
 
                 if (p.alive) {
                     sprite.setVisible(true);
                     label.setVisible(true);
-                    // Smooth interpolation to server position
+
+                    // Kill existing tweens for this sprite to prevent stacking
+                    this.tweens.killTweensOf(sprite);
+                    this.tweens.killTweensOf(label);
+
+                    // Direction for animation
+                    const dx = targetX - sprite.x;
+                    const dy = targetY - sprite.y;
+
+                    // Tween to new position
                     this.tweens.add({
                         targets: sprite,
                         x: targetX,
@@ -127,17 +149,15 @@ export class ServerGame extends Phaser.Scene {
                         duration: GameOptions.tickMs || 250,
                         ease: 'Linear'
                     });
-                    // Label follows sprite
                     this.tweens.add({
                         targets: label,
                         x: targetX,
-                        y: targetY - 50,
+                        y: targetY - 40,
                         duration: GameOptions.tickMs || 250,
                         ease: 'Linear'
                     });
-                    // Pick walk animation based on movement
-                    const dx = targetX - sprite.x;
-                    const dy = targetY - sprite.y;
+
+                    // Walk animation
                     if (Math.abs(dx) > 2 || Math.abs(dy) > 2) {
                         if (Math.abs(dy) > Math.abs(dx)) {
                             sprite.play(dy > 0 ? 'rick-walk-down' : 'rick-walk-up', true);
@@ -149,27 +169,28 @@ export class ServerGame extends Phaser.Scene {
                     } else {
                         sprite.play('rick-idle', true);
                     }
+
                     label.setText(`${p.name} [${p.hp}hp]`);
                 } else {
                     sprite.setVisible(false);
                     label.setVisible(false);
                 }
             } else {
-                // New player — create sprite
-                const sprite = this.physics.add.sprite(targetX, targetY,
+                // New player — create sprite (use add.sprite, NOT physics)
+                const sprite = this.add.sprite(targetX, targetY,
                     'RickDefault', 'RickDefault_front');
-                sprite.setScale(0.4);
-                sprite.body.setSize(60, 100);
+                sprite.setScale(0.25);
+                sprite.setDepth(10);
                 this.playerSprites.set(p.id, sprite);
 
-                const label = this.add.text(targetX, targetY - 50, p.name, {
-                    fontSize: '14px', color: '#fff', fontFamily: 'monospace',
+                const label = this.add.text(targetX, targetY - 40, p.name, {
+                    fontSize: '12px', color: '#fff', fontFamily: 'monospace',
                     stroke: '#000', strokeThickness: 3
                 }).setOrigin(0.5).setDepth(50);
                 this.playerLabels.set(p.id, label);
 
-                // Set up bullet collision with enemies for this player's shots
-                // (auto-fire from player position toward nearest enemy)
+                console.log(`Created sprite for ${p.name} at (${p.x},${p.y}) → pixel (${targetX},${targetY})`);
+
                 if (!p.alive) {
                     sprite.setVisible(false);
                     label.setVisible(false);
@@ -189,48 +210,40 @@ export class ServerGame extends Phaser.Scene {
     }
 
     spawnLocalEnemies(): void {
-        // Enemy spawn zone
-        const outerRect = new Phaser.Geom.Rectangle(
-            -150, -150,
-            GameOptions.gameSize.width + 300, GameOptions.gameSize.height + 300
-        );
-        const innerRect = new Phaser.Geom.Rectangle(
-            -50, -50,
-            GameOptions.gameSize.width + 100, GameOptions.gameSize.height + 100
-        );
+        const w = this.mapWidth * this.tileSize;
+        const h = this.mapHeight * this.tileSize;
+        const outerRect = new Phaser.Geom.Rectangle(-150, -150, w + 300, h + 300);
+        const innerRect = new Phaser.Geom.Rectangle(-50, -50, w + 100, h + 100);
 
-        // Spawn enemies on timer
         this.time.addEvent({
             delay: GameOptions.enemyRate,
             loop: true,
             callback: () => {
                 const pt = Phaser.Geom.Rectangle.RandomOutside(outerRect, innerRect);
                 const enemy = this.physics.add.sprite(pt.x, pt.y, 'FloopyDoops', 'FloopyDoops_down_1');
-                enemy.setScale(0.35);
+                enemy.setScale(0.3);
                 enemy.body.setSize(60, 80);
                 enemy.play('floopy-walk-down');
                 this.enemyGroup.add(enemy);
             },
         });
 
-        // Auto-fire bullets from first player toward nearest enemy
+        // Auto-fire from nearest player
         this.time.addEvent({
             delay: GameOptions.bulletRate,
             loop: true,
             callback: () => {
-                // Find first alive player sprite
-                let shooter: Phaser.Physics.Arcade.Sprite | null = null;
-                for (const [_id, sprite] of this.playerSprites) {
-                    if (sprite.visible) { shooter = sprite; break; }
+                let shooter: Phaser.GameObjects.Sprite | null = null;
+                for (const [, s] of this.playerSprites) {
+                    if (s.visible) { shooter = s; break; }
                 }
                 if (!shooter) return;
 
-                const visibleEnemies = this.enemyGroup.getMatching('visible', true);
-                const closest: any = this.physics.closest(shooter, visibleEnemies);
+                const enemies = this.enemyGroup.getMatching('visible', true);
+                const closest: any = this.physics.closest(shooter as any, enemies);
                 if (closest) {
                     const bullet = this.physics.add.sprite(
-                        shooter.x, shooter.y, 'Bullets', 'blaster1'
-                    );
+                        shooter.x, shooter.y, 'Bullets', 'blaster1');
                     bullet.setScale(0.5);
                     this.bulletGroup.add(bullet);
                     this.physics.moveToObject(bullet, closest, GameOptions.bulletSpeed);
@@ -250,29 +263,21 @@ export class ServerGame extends Phaser.Scene {
             this.killCount++;
             this.killText.setText('Kills: ' + this.killCount);
         });
-
-        // Enemy touches player → damage (don't restart, just log)
-        for (const [_id, sprite] of this.playerSprites) {
-            this.physics.add.collider(sprite, this.enemyGroup, () => {
-                // In server mode, damage is handled server-side
-                // For now just flash the sprite
-            });
-        }
     }
 
     update(): void {
         // Move enemies toward nearest visible player
-        let targetSprite: Phaser.Physics.Arcade.Sprite | null = null;
-        for (const [_id, sprite] of this.playerSprites) {
-            if (sprite.visible) { targetSprite = sprite; break; }
+        let target: Phaser.GameObjects.Sprite | null = null;
+        for (const [, s] of this.playerSprites) {
+            if (s.visible) { target = s; break; }
         }
 
-        if (targetSprite) {
-            const target = targetSprite;
+        if (target) {
+            const t = target;
             this.enemyGroup.getMatching('visible', true).forEach((enemy: any) => {
-                this.physics.moveToObject(enemy, target, GameOptions.enemySpeed);
-                const dx = target.x - enemy.x;
-                const dy = target.y - enemy.y;
+                this.physics.moveToObject(enemy, t, GameOptions.enemySpeed);
+                const dx = t.x - enemy.x;
+                const dy = t.y - enemy.y;
                 if (Math.abs(dy) > Math.abs(dx)) {
                     enemy.play(dy > 0 ? 'floopy-walk-down' : 'floopy-walk-up', true);
                     enemy.setFlipX(false);
@@ -282,15 +287,14 @@ export class ServerGame extends Phaser.Scene {
                 }
             });
 
-            // Magnet: attract nearby XP gems toward nearest player
+            // Magnet XP gems
             const nearby = this.physics.overlapCirc(
-                target.x, target.y,
-                GameOptions.magnetRadius, true, true
+                t.x, t.y, GameOptions.magnetRadius, true, true
             ) as Phaser.Physics.Arcade.Body[];
             nearby.forEach((body: any) => {
-                const sprite = body.gameObject as Phaser.Physics.Arcade.Sprite;
-                if (sprite.texture.key === 'game-items') {
-                    this.physics.moveToObject(sprite, target, 500);
+                const s = body.gameObject as Phaser.Physics.Arcade.Sprite;
+                if (s.texture.key === 'game-items') {
+                    this.physics.moveToObject(s, t, 500);
                 }
             });
         }
