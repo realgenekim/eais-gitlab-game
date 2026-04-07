@@ -688,7 +688,7 @@
                    {:name player-name
                     :x (first spawn)
                     :y (second spawn)
-                    :hp 100
+                    :hp 500
                     :score 0
                     :passenger nil
                     :ammo 5
