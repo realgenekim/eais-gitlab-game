@@ -239,6 +239,22 @@ export class ServerGame extends Phaser.Scene {
                 onComplete: () => { line.destroy(); tip.destroy(); }
             });
 
+            // Floating damage text at impact
+            if (shot['hit-id']) {
+                const dmgText = this.add.text(tx, ty - 10, '-30', {
+                    fontSize: '16px', color: '#ff4400', fontFamily: 'monospace',
+                    stroke: '#000', strokeThickness: 3
+                }).setOrigin(0.5).setDepth(100);
+                this.tweens.add({
+                    targets: dmgText,
+                    y: ty - 50,
+                    alpha: 0,
+                    duration: 600,
+                    ease: 'Power2',
+                    onComplete: () => dmgText.destroy()
+                });
+            }
+
             // Clean up old shot keys (prevent memory leak)
             if (this.renderedShots.size > 200) {
                 this.renderedShots.clear();
@@ -356,19 +372,43 @@ export class ServerGame extends Phaser.Scene {
             }
         }
 
-        // Remove dead enemies
+        // Remove dead enemies — death effects
+        let killCount = 0;
         for (const [id, sprite] of this.enemySprites) {
             if (!seenIds.has(id)) {
-                // Quick death flash then destroy
+                killCount++;
+                const dx = sprite.x;
+                const dy = sprite.y;
+
+                // Score popup
+                const scoreText = this.add.text(dx, dy - 15, '+10', {
+                    fontSize: '14px', color: '#ffe66d', fontFamily: 'monospace',
+                    stroke: '#000', strokeThickness: 3
+                }).setOrigin(0.5).setDepth(100);
+                this.tweens.add({
+                    targets: scoreText,
+                    y: dy - 55,
+                    alpha: 0,
+                    duration: 800,
+                    ease: 'Power2',
+                    onComplete: () => scoreText.destroy()
+                });
+
+                // Death flash + shrink
                 this.tweens.add({
                     targets: sprite,
                     alpha: 0,
-                    scale: 0.1,
-                    duration: 150,
+                    scale: 0.05,
+                    duration: 200,
                     onComplete: () => sprite.destroy()
                 });
                 this.enemySprites.delete(id);
             }
+        }
+
+        // Screen shake when enemies die
+        if (killCount > 0) {
+            this.cameras.main.shake(80, 0.003 * killCount);
         }
     }
 
