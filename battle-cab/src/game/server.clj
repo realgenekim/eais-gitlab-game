@@ -19,6 +19,57 @@
             [taoensso.timbre :as log]))
 
 ;;; ---------------------------------------------------------------------------
+;;; Request Rate Tracking
+;;; ---------------------------------------------------------------------------
+
+;; Ring buffer of [timestamp-ms endpoint] for computing requests/sec.
+(defonce request-log (atom []))
+
+(def ^:private rate-window-ms
+  "How far back to look when computing rates (10 seconds)."
+  10000)
+
+(defn record-request!
+  "Record an API request for rate tracking."
+  [endpoint]
+  (let [now (System/currentTimeMillis)]
+    (swap! request-log
+           (fn [log]
+             (let [cutoff (- now (* 2 rate-window-ms))]
+               ;; Prune old entries, append new
+               (conj (into [] (filter #(> (first %) cutoff)) log)
+                     [now endpoint]))))))
+
+(defn compute-rates
+  "Returns {:total-rps N :by-endpoint {path rps}} over the last window."
+  []
+  (let [now (System/currentTimeMillis)
+        cutoff (- now rate-window-ms)
+        window-secs (/ rate-window-ms 1000.0)
+        recent (filter #(> (first %) cutoff) @request-log)
+        total (count recent)
+        by-ep (frequencies (map second recent))]
+    {:total-rps (/ total window-secs)
+     :by-endpoint (into (sorted-map)
+                        (map (fn [[k v]] [k (/ v window-secs)]))
+                        by-ep)
+     :window-secs window-secs
+     :sample-count total}))
+
+(defn wrap-request-tracking
+  "Middleware that records every request for rate computation."
+  [handler]
+  (fn [request]
+    (let [uri (:uri request)]
+      ;; Track API and page requests, skip static assets
+      (when-not (or (str/starts-with? uri "/css/")
+                    (str/starts-with? uri "/sprites/")
+                    (str/starts-with? uri "/vendor/")
+                    (str/starts-with? uri "/favicon"))
+        (record-request! uri))
+      (handler request))))
+
+;;; ---------------------------------------------------------------------------
 ;;; Helpers
 ;;; ---------------------------------------------------------------------------
 
@@ -154,10 +205,22 @@
   (let [body (:body request)
         map-id (get body "map" "arena")
         game-map (maps/get-map-by-id map-id)]
+    (require 'game.bots)
+    ((resolve 'game.bots/stop-all-bots!))
     (engine/stop-game!)
     (engine/start-game! {:on-tick #'on-tick-all
                          :game-map game-map})
     (json-response 200 {:status "restarted" :map map-id :tick 0})))
+
+(defn handle-add-bot [request]
+  (let [body (:body request)
+        bot-name (get body "name" (str "Bot-" (rand-int 9999)))]
+    (require 'game.bots)
+    (if-let [creds ((resolve 'game.bots/add-vs-bot!) bot-name)]
+      (json-response 200 {:status "bot-added"
+                          :name bot-name
+                          :player-id (:id creds)})
+      (json-response 400 {:error "Game is full"}))))
 
 (defn handle-lightning [_request]
   (let [result (engine/trigger-lightning! (sys))]
@@ -184,6 +247,15 @@
     {:status 200
      :headers {"Content-Type" "text/html"}
      :body (sprite-viewer/sprite-viewer-page selected frame-str)}))
+
+(defn handle-server-stats [_request]
+  (let [state (engine/get-state)
+        rates (compute-rates)]
+    {:status 200
+     :headers {"Content-Type" "text/html"}
+     :body (views/server-stats-page state rates
+                                    (sse/subscriber-count)
+                                    (ws/ws-client-count))}))
 
 (defn handle-test [request]
   (let [params (:query-params request)
@@ -227,11 +299,13 @@
          ["/spectate" {:get {:handler #'handle-spectate}}]
          ["/spectate-ws" {:get {:handler #'ws/handle-ws-spectate}}]
          ["/game/restart" {:post {:handler #'handle-restart}}]
+         ["/game/add-bot" {:post {:handler #'handle-add-bot}}]
          ["/game/map-swap" {:post {:handler #'handle-map-swap}}]
          ["/game/lightning" {:post {:handler #'handle-lightning}}]
          ["/game/seek" {:post {:handler #'handle-seek}}]
          ["/game/resume" {:post {:handler #'handle-resume}}]
-         ;; Visual test & tools
+         ;; Tools
+         ["/server-stats" {:get {:handler #'handle-server-stats}}]
          ["/test" {:get {:handler #'handle-test}}]
          ["/sprite-viewer" {:get {:handler #'handle-sprite-viewer}}]
          ;; Dev reload endpoint (browser-reload polls this)
@@ -243,6 +317,7 @@
        {:middleware [wrap-params wrap-json]})
       (wrap-resource "public")
       wrap-content-type
+      wrap-request-tracking
       wrap-cors))
 
 ;;; ---------------------------------------------------------------------------

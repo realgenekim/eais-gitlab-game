@@ -216,3 +216,51 @@
                  [name {:creds creds
                         :future (start-bot! creds think-fn)}]))
              bot-specs)))
+
+;;; ---------------------------------------------------------------------------
+;;; VS-mode bot — targets server-side enemies (not players)
+;;; ---------------------------------------------------------------------------
+
+(defn vs-hunter-think
+  "VS bot: align with nearest enemy, shoot it, dodge when hurt."
+  [state me-id]
+  (let [me (get-in state [:players me-id])
+        my-pos [(:x me) (:y me)]
+        enemies (->> (or (:enemies state) {})
+                     (map (fn [[id e]] {:id id :pos [(:x e) (:y e)] :hp (:hp e)}))
+                     (sort-by #(distance my-pos (:pos %))))]
+    (when (:alive? me)
+      (cond
+        ;; 1. SHOOT — if enemy is on same row/col and we have ammo
+        (and (pos? (:ammo me)) (seq enemies))
+        (if-let [shot-dir (some #(line-of-sight-dir my-pos (:pos %)) enemies)]
+          [{:type :shoot :direction shot-dir}]
+          ;; 2. MOVE to align with nearest enemy
+          (let [nearest (first enemies)]
+            [{:type :move :direction (toward state my-pos (:pos nearest))}]))
+
+        ;; 3. No enemies visible — move toward center
+        :else
+        [{:type :move :direction (toward state my-pos [10 9])}]))))
+
+;;; ---------------------------------------------------------------------------
+;;; Managed bot pool — cleared on game reset
+;;; ---------------------------------------------------------------------------
+
+;; {:name {:creds ... :future ...}} for managed bots
+(defonce active-bots (atom {}))
+
+(defn stop-all-bots!
+  "Stop all managed bots. Call on game reset."
+  []
+  (doseq [[name {:keys [future]}] @active-bots]
+    (when future (future-cancel future)))
+  (reset! active-bots {}))
+
+(defn add-vs-bot!
+  "Create a VS-mode bot: joins the game, starts thinking. Returns creds or nil."
+  [bot-name]
+  (when-let [creds (engine/add-player! @engine/system bot-name)]
+    (let [f (start-bot! creds vs-hunter-think)]
+      (swap! active-bots assoc bot-name {:creds creds :future f})
+      creds)))

@@ -241,7 +241,8 @@
                   :origin [(:x player) (:y player)]
                   :direction (keyword direction)
                   :path path
-                  :hit-id (or hit-id hit-enemy-id)}
+                  :hit-id (or hit-id hit-enemy-id)
+                  :fired-tick (:tick state)}
             state (-> state
                       (update-in [:players player-id :ammo] dec)
                       (update :recent-shots conj shot))]
@@ -647,7 +648,11 @@
   "Pure function: old state + commands → new state."
   [state commands]
   (-> state
-      (assoc :recent-shots [])
+      ;; Keep shots for 3 ticks so spectator client always sees them
+      (update :recent-shots (fn [shots]
+                              (vec (filter #(> (+ (:tick state) 3)
+                                               (or (:fired-tick %) 0))
+                                           shots))))
       (assoc :recent-effects [])
       (apply-commands commands)
       (respawn-dead-players)
