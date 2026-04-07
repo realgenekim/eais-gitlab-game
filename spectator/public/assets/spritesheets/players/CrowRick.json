@@ -1,0 +1,289 @@
+{
+  "frames": {
+    "CrowRick_front": {
+      "frame": {
+        "x": 4,
+        "y": 4,
+        "w": 574,
+        "h": 730
+      },
+      "rotated": false,
+      "trimmed": true,
+      "spriteSourceSize": {
+        "x": 4,
+        "y": 0,
+        "w": 574,
+        "h": 730
+      },
+      "sourceSize": {
+        "w": 580,
+        "h": 730
+      }
+    },
+    "CrowRick_back": {
+      "frame": {
+        "x": 4,
+        "y": 742,
+        "w": 654,
+        "h": 703
+      },
+      "rotated": false,
+      "trimmed": true,
+      "spriteSourceSize": {
+        "x": 4,
+        "y": 5,
+        "w": 654,
+        "h": 703
+      },
+      "sourceSize": {
+        "w": 662,
+        "h": 708
+      }
+    },
+    "CrowRick_side_4": {
+      "frame": {
+        "x": 4,
+        "y": 1453,
+        "w": 124,
+        "h": 161
+      },
+      "rotated": false,
+      "trimmed": true,
+      "spriteSourceSize": {
+        "x": 1,
+        "y": 0,
+        "w": 124,
+        "h": 161
+      },
+      "sourceSize": {
+        "w": 126,
+        "h": 162
+      }
+    },
+    "CrowRick_down_2": {
+      "frame": {
+        "x": 4,
+        "y": 1622,
+        "w": 123,
+        "h": 159
+      },
+      "rotated": false,
+      "trimmed": true,
+      "spriteSourceSize": {
+        "x": 1,
+        "y": 0,
+        "w": 123,
+        "h": 159
+      },
+      "sourceSize": {
+        "w": 126,
+        "h": 162
+      }
+    },
+    "CrowRick_side_1": {
+      "frame": {
+        "x": 4,
+        "y": 1789,
+        "w": 123,
+        "h": 159
+      },
+      "rotated": false,
+      "trimmed": true,
+      "spriteSourceSize": {
+        "x": 1,
+        "y": 1,
+        "w": 123,
+        "h": 159
+      },
+      "sourceSize": {
+        "w": 126,
+        "h": 162
+      }
+    },
+    "CrowRick_side_2": {
+      "frame": {
+        "x": 135,
+        "y": 1622,
+        "w": 123,
+        "h": 159
+      },
+      "rotated": false,
+      "trimmed": true,
+      "spriteSourceSize": {
+        "x": 1,
+        "y": 0,
+        "w": 123,
+        "h": 159
+      },
+      "sourceSize": {
+        "w": 126,
+        "h": 162
+      }
+    },
+    "CrowRick_side_3": {
+      "frame": {
+        "x": 136,
+        "y": 1453,
+        "w": 123,
+        "h": 159
+      },
+      "rotated": false,
+      "trimmed": true,
+      "spriteSourceSize": {
+        "x": 1,
+        "y": 1,
+        "w": 123,
+        "h": 159
+      },
+      "sourceSize": {
+        "w": 126,
+        "h": 162
+      }
+    },
+    "CrowRick_down_4": {
+      "frame": {
+        "x": 135,
+        "y": 1789,
+        "w": 123,
+        "h": 158
+      },
+      "rotated": false,
+      "trimmed": true,
+      "spriteSourceSize": {
+        "x": 1,
+        "y": 0,
+        "w": 123,
+        "h": 158
+      },
+      "sourceSize": {
+        "w": 126,
+        "h": 162
+      }
+    },
+    "CrowRick_down_1": {
+      "frame": {
+        "x": 266,
+        "y": 1620,
+        "w": 122,
+        "h": 157
+      },
+      "rotated": false,
+      "trimmed": true,
+      "spriteSourceSize": {
+        "x": 2,
+        "y": 2,
+        "w": 122,
+        "h": 157
+      },
+      "sourceSize": {
+        "w": 126,
+        "h": 162
+      }
+    },
+    "CrowRick_down_3": {
+      "frame": {
+        "x": 267,
+        "y": 1453,
+        "w": 122,
+        "h": 157
+      },
+      "rotated": false,
+      "trimmed": true,
+      "spriteSourceSize": {
+        "x": 2,
+        "y": 2,
+        "w": 122,
+        "h": 157
+      },
+      "sourceSize": {
+        "w": 126,
+        "h": 162
+      }
+    },
+    "CrowRick_up_4": {
+      "frame": {
+        "x": 266,
+        "y": 1785,
+        "w": 122,
+        "h": 157
+      },
+      "rotated": false,
+      "trimmed": true,
+      "spriteSourceSize": {
+        "x": 2,
+        "y": 3,
+        "w": 122,
+        "h": 157
+      },
+      "sourceSize": {
+        "w": 126,
+        "h": 162
+      }
+    },
+    "CrowRick_up_1": {
+      "frame": {
+        "x": 396,
+        "y": 1618,
+        "w": 122,
+        "h": 154
+      },
+      "rotated": false,
+      "trimmed": true,
+      "spriteSourceSize": {
+        "x": 2,
+        "y": 6,
+        "w": 122,
+        "h": 154
+      },
+      "sourceSize": {
+        "w": 126,
+        "h": 162
+      }
+    },
+    "CrowRick_up_2": {
+      "frame": {
+        "x": 397,
+        "y": 1453,
+        "w": 122,
+        "h": 154
+      },
+      "rotated": false,
+      "trimmed": true,
+      "spriteSourceSize": {
+        "x": 2,
+        "y": 5,
+        "w": 122,
+        "h": 154
+      },
+      "sourceSize": {
+        "w": 126,
+        "h": 162
+      }
+    },
+    "CrowRick_up_3": {
+      "frame": {
+        "x": 396,
+        "y": 1780,
+        "w": 122,
+        "h": 154
+      },
+      "rotated": false,
+      "trimmed": true,
+      "spriteSourceSize": {
+        "x": 2,
+        "y": 6,
+        "w": 122,
+        "h": 154
+      },
+      "sourceSize": {
+        "w": 126,
+        "h": 162
+      }
+    }
+  },
+  "meta": {
+    "app": "http://free-tex-packer.com",
+    "version": "0.6.7",
+    "image": "CrowRick"
+  }
+}

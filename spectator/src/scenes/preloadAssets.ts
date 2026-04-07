@@ -1,25 +1,37 @@
 // CLASS TO PRELOAD ASSETS
 // Loads rick-survival sprite sheets for players, enemies, bullets, items
 
+// All available Rick variants
+const RICK_VARIANTS = [
+    'RickDefault', 'PickleRick', 'CrowRick', 'RickNinja',
+    'RickMiami', 'TinyRick', 'RickWarrior', 'RickRobot'
+];
+
+// Enemy types
+const ENEMY_TYPES = ['FloopyDoops', 'Squanchy'];
+
+export { RICK_VARIANTS };
+
 export class PreloadAssets extends Phaser.Scene {
 
     constructor() {
-        super({ key : 'PreloadAssets' });
+        super({ key: 'PreloadAssets' });
     }
 
-    preload() : void {
-        // Player sprite sheets (rick-survival TexturePacker atlases)
-        this.load.atlas('RickDefault',
-            'assets/spritesheets/players/RickDefault.png',
-            'assets/spritesheets/players/RickDefault.json');
+    preload(): void {
+        // Load all Rick variants
+        for (const rick of RICK_VARIANTS) {
+            this.load.atlas(rick,
+                `assets/spritesheets/players/${rick}.png`,
+                `assets/spritesheets/players/${rick}.json`);
+        }
 
         // Enemy sprite sheets
-        this.load.atlas('FloopyDoops',
-            'assets/spritesheets/enemies/FloopyDoops.png',
-            'assets/spritesheets/enemies/FloopyDoops.json');
-        this.load.atlas('Squanchy',
-            'assets/spritesheets/enemies/Squanchy.png',
-            'assets/spritesheets/enemies/Squanchy.json');
+        for (const enemy of ENEMY_TYPES) {
+            this.load.atlas(enemy,
+                `assets/spritesheets/enemies/${enemy}.png`,
+                `assets/spritesheets/enemies/${enemy}.json`);
+        }
 
         // Bullets
         this.load.atlas('Bullets',
@@ -32,114 +44,83 @@ export class PreloadAssets extends Phaser.Scene {
             'assets/spritesheets/items/game_items_atlas.json');
     }
 
-    create() : void {
-        // Create walk animations for RickDefault
-        this.anims.create({
-            key: 'rick-walk-down',
-            frames: [
-                { key: 'RickDefault', frame: 'RickDefault_down_1' },
-                { key: 'RickDefault', frame: 'RickDefault_down_2' },
-                { key: 'RickDefault', frame: 'RickDefault_down_3' },
-                { key: 'RickDefault', frame: 'RickDefault_down_4' },
-            ],
-            frameRate: 8,
-            repeat: -1
-        });
-        this.anims.create({
-            key: 'rick-walk-up',
-            frames: [
-                { key: 'RickDefault', frame: 'RickDefault_up_1' },
-                { key: 'RickDefault', frame: 'RickDefault_up_2' },
-                { key: 'RickDefault', frame: 'RickDefault_up_3' },
-                { key: 'RickDefault', frame: 'RickDefault_up_4' },
-            ],
-            frameRate: 8,
-            repeat: -1
-        });
-        this.anims.create({
-            key: 'rick-walk-side',
-            frames: [
-                { key: 'RickDefault', frame: 'RickDefault_side_1' },
-                { key: 'RickDefault', frame: 'RickDefault_side_2' },
-                { key: 'RickDefault', frame: 'RickDefault_side_3' },
-                { key: 'RickDefault', frame: 'RickDefault_side_4' },
-            ],
-            frameRate: 8,
-            repeat: -1
-        });
-        this.anims.create({
-            key: 'rick-idle',
-            frames: [{ key: 'RickDefault', frame: 'RickDefault_front' }],
-            frameRate: 1,
-            repeat: 0
-        });
+    create(): void {
+        // Create walk animations for each Rick variant
+        for (const rick of RICK_VARIANTS) {
+            const prefix = rick.toLowerCase().replace(/[^a-z0-9]/g, '');
 
-        // FloopyDoops walk animations
-        this.anims.create({
-            key: 'floopy-walk-down',
-            frames: [
-                { key: 'FloopyDoops', frame: 'FloopyDoops_down_1' },
-                { key: 'FloopyDoops', frame: 'FloopyDoops_down_2' },
-                { key: 'FloopyDoops', frame: 'FloopyDoops_down_3' },
-                { key: 'FloopyDoops', frame: 'FloopyDoops_down_4' },
-            ],
-            frameRate: 8,
-            repeat: -1
-        });
-        this.anims.create({
-            key: 'floopy-walk-up',
-            frames: [
-                { key: 'FloopyDoops', frame: 'FloopyDoops_up_1' },
-                { key: 'FloopyDoops', frame: 'FloopyDoops_up_2' },
-                { key: 'FloopyDoops', frame: 'FloopyDoops_up_3' },
-                { key: 'FloopyDoops', frame: 'FloopyDoops_up_4' },
-            ],
-            frameRate: 8,
-            repeat: -1
-        });
-        this.anims.create({
-            key: 'floopy-walk-side',
-            frames: [
-                { key: 'FloopyDoops', frame: 'FloopyDoops_side_1' },
-                { key: 'FloopyDoops', frame: 'FloopyDoops_side_2' },
-                { key: 'FloopyDoops', frame: 'FloopyDoops_side_3' },
-                { key: 'FloopyDoops', frame: 'FloopyDoops_side_4' },
-            ],
-            frameRate: 8,
-            repeat: -1
-        });
+            this.anims.create({
+                key: `${prefix}-walk-down`,
+                frames: [
+                    { key: rick, frame: `${rick}_down_1` },
+                    { key: rick, frame: `${rick}_down_2` },
+                    { key: rick, frame: `${rick}_down_3` },
+                    { key: rick, frame: `${rick}_down_4` },
+                ],
+                frameRate: 8, repeat: -1
+            });
+            this.anims.create({
+                key: `${prefix}-walk-up`,
+                frames: [
+                    { key: rick, frame: `${rick}_up_1` },
+                    { key: rick, frame: `${rick}_up_2` },
+                    { key: rick, frame: `${rick}_up_3` },
+                    { key: rick, frame: `${rick}_up_4` },
+                ],
+                frameRate: 8, repeat: -1
+            });
+            this.anims.create({
+                key: `${prefix}-walk-side`,
+                frames: [
+                    { key: rick, frame: `${rick}_side_1` },
+                    { key: rick, frame: `${rick}_side_2` },
+                    { key: rick, frame: `${rick}_side_3` },
+                    { key: rick, frame: `${rick}_side_4` },
+                ],
+                frameRate: 8, repeat: -1
+            });
+            this.anims.create({
+                key: `${prefix}-idle`,
+                frames: [{ key: rick, frame: `${rick}_down_1` }],
+                frameRate: 1, repeat: 0
+            });
+        }
 
-        // Squanchy walk animations
-        this.anims.create({
-            key: 'squanchy-walk-down',
-            frames: [
-                { key: 'Squanchy', frame: 'Squanchy_down_1' },
-                { key: 'Squanchy', frame: 'Squanchy_down_2' },
-                { key: 'Squanchy', frame: 'Squanchy_down_3' },
-                { key: 'Squanchy', frame: 'Squanchy_down_4' },
-            ],
-            frameRate: 8, repeat: -1
-        });
-        this.anims.create({
-            key: 'squanchy-walk-up',
-            frames: [
-                { key: 'Squanchy', frame: 'Squanchy_up_1' },
-                { key: 'Squanchy', frame: 'Squanchy_up_2' },
-                { key: 'Squanchy', frame: 'Squanchy_up_3' },
-                { key: 'Squanchy', frame: 'Squanchy_up_4' },
-            ],
-            frameRate: 8, repeat: -1
-        });
-        this.anims.create({
-            key: 'squanchy-walk-side',
-            frames: [
-                { key: 'Squanchy', frame: 'Squanchy_side_1' },
-                { key: 'Squanchy', frame: 'Squanchy_side_2' },
-                { key: 'Squanchy', frame: 'Squanchy_side_3' },
-                { key: 'Squanchy', frame: 'Squanchy_side_4' },
-            ],
-            frameRate: 8, repeat: -1
-        });
+        // Enemy walk animations
+        for (const enemy of ENEMY_TYPES) {
+            const prefix = enemy.toLowerCase().replace(/[^a-z0-9]/g, '');
+
+            this.anims.create({
+                key: `${prefix}-walk-down`,
+                frames: [
+                    { key: enemy, frame: `${enemy}_down_1` },
+                    { key: enemy, frame: `${enemy}_down_2` },
+                    { key: enemy, frame: `${enemy}_down_3` },
+                    { key: enemy, frame: `${enemy}_down_4` },
+                ],
+                frameRate: 8, repeat: -1
+            });
+            this.anims.create({
+                key: `${prefix}-walk-up`,
+                frames: [
+                    { key: enemy, frame: `${enemy}_up_1` },
+                    { key: enemy, frame: `${enemy}_up_2` },
+                    { key: enemy, frame: `${enemy}_up_3` },
+                    { key: enemy, frame: `${enemy}_up_4` },
+                ],
+                frameRate: 8, repeat: -1
+            });
+            this.anims.create({
+                key: `${prefix}-walk-side`,
+                frames: [
+                    { key: enemy, frame: `${enemy}_side_1` },
+                    { key: enemy, frame: `${enemy}_side_2` },
+                    { key: enemy, frame: `${enemy}_side_3` },
+                    { key: enemy, frame: `${enemy}_side_4` },
+                ],
+                frameRate: 8, repeat: -1
+            });
+        }
 
         // Route to correct scene based on URL
         const useServer = window.location.search.includes('server');

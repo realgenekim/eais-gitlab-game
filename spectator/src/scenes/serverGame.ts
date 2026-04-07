@@ -2,6 +2,7 @@
 // All state from Clojure server via WebSocket. Phaser is render-only.
 
 import { GameOptions } from '../gameOptions';
+import { RICK_VARIANTS } from './preloadAssets';
 
 interface ServerPlayer {
     id: string;
@@ -53,7 +54,9 @@ export class ServerGame extends Phaser.Scene {
     shrinkGraphics  : Phaser.GameObjects.Graphics | null = null;
     shrinkTween     : Phaser.Tweens.Tween | null = null;
     wallGraphics    : Phaser.GameObjects.Graphics | null = null;
-    lastWallCount   : number = -1;  // redraw walls only when count changes
+    lastWallCount   : number = -1;
+    playerAvatars   : Map<string, string> = new Map();  // player-id → rick variant
+    nextAvatarIndex : number = 0;
     statusText      : Phaser.GameObjects.Text;
     tileSize        : number = 48;
     mapWidth        : number = 21;
@@ -156,6 +159,17 @@ export class ServerGame extends Phaser.Scene {
         this.ws.onerror = () => {};
     }
 
+    getAvatar(playerId: string): { key: string; prefix: string } {
+        if (!this.playerAvatars.has(playerId)) {
+            const variant = RICK_VARIANTS[this.nextAvatarIndex % RICK_VARIANTS.length];
+            this.playerAvatars.set(playerId, variant);
+            this.nextAvatarIndex++;
+        }
+        const variant = this.playerAvatars.get(playerId)!;
+        const prefix = variant.toLowerCase().replace(/[^a-z0-9]/g, '');
+        return { key: variant, prefix };
+    }
+
     gridToPixel(gx: number, gy: number): [number, number] {
         return [gx * this.tileSize + this.tileSize / 2,
                 gy * this.tileSize + this.tileSize / 2];
@@ -239,6 +253,7 @@ export class ServerGame extends Phaser.Scene {
         for (const p of state.players) {
             seenIds.add(p.id);
             const [targetX, targetY] = this.gridToPixel(p.x, p.y);
+            const avatar = this.getAvatar(p.id);
 
             if (this.playerSprites.has(p.id)) {
                 const sprite = this.playerSprites.get(p.id)!;
@@ -258,14 +273,14 @@ export class ServerGame extends Phaser.Scene {
 
                     if (Math.abs(dx) > 2 || Math.abs(dy) > 2) {
                         if (Math.abs(dy) > Math.abs(dx)) {
-                            sprite.play(dy > 0 ? 'rick-walk-down' : 'rick-walk-up', true);
+                            sprite.play(dy > 0 ? `${avatar.prefix}-walk-down` : `${avatar.prefix}-walk-up`, true);
                             sprite.setFlipX(false);
                         } else {
-                            sprite.play('rick-walk-side', true);
+                            sprite.play(`${avatar.prefix}-walk-side`, true);
                             sprite.setFlipX(dx < 0);
                         }
                     } else {
-                        sprite.play('rick-idle', true);
+                        sprite.play(`${avatar.prefix}-idle`, true);
                     }
                     label.setText(`${p.name} [${p.hp}hp]`);
                 } else {
@@ -273,7 +288,9 @@ export class ServerGame extends Phaser.Scene {
                     label.setVisible(false);
                 }
             } else {
-                const sprite = this.add.sprite(targetX, targetY, 'RickDefault', 'RickDefault_front');
+                // New player — use assigned avatar, down_1 frame (consistent size)
+                const sprite = this.add.sprite(targetX, targetY,
+                    avatar.key, `${avatar.key}_down_1`);
                 sprite.setScale(0.5);
                 sprite.setDepth(10);
                 this.playerSprites.set(p.id, sprite);
