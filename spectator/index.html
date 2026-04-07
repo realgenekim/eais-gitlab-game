@@ -35,8 +35,22 @@
         #controls button:hover { background: rgba(60,60,80,0.9); }
         #controls button.danger { border-color: #ff6b6b; color: #ff6b6b; }
         #controls button.danger:hover { background: rgba(255,107,107,0.2); }
-        #controls .status { color: #4ecdc4; font-family: monospace; font-size: 12px; padding: 8px; }
-        #controls .status.error { color: #ff6b6b; }
+        /* Status messages — bottom-right */
+        #status-bar {
+            position: fixed;
+            bottom: 10px;
+            right: 10px;
+            z-index: 1000;
+            color: #4ecdc4;
+            font-family: monospace;
+            font-size: 13px;
+            background: rgba(15,15,25,0.85);
+            padding: 6px 12px;
+            border-radius: 4px;
+            border: 1px solid #333;
+            display: none;
+        }
+        #status-bar.error { color: #ff6b6b; border-color: #ff6b6b; }
 
         /* Scoreboard sidebar */
         #scoreboard {
@@ -84,9 +98,6 @@
             <button onclick="addBot()">+ Add Bot</button>
             <button onclick="resetGame()" class="danger">Reset Game</button>
         </div>
-        <div class="status-row">
-            <span class="status" id="ctrl-status"></span>
-        </div>
     </div>
 
     <!-- Scoreboard sidebar -->
@@ -94,6 +105,9 @@
         <h2>Scoreboard</h2>
         <div id="sb-players"></div>
     </div>
+
+    <!-- Status messages — bottom-right -->
+    <div id="status-bar"></div>
 
     <script>
         const SERVER = 'http://localhost:33333';
@@ -123,7 +137,7 @@
                     <div>
                         <div class="sb-name">${p.name}</div>
                         <div class="sb-stats">
-                            Ammo: ${p.ammo || '?'}
+                            Ammo: ${p.ammo || '?'} | HP: ${p.alive ? p.hp : 0}
                         </div>
                     </div>
                     <div>
@@ -137,7 +151,7 @@
         async function addBot() {
             const name = names[botNum % names.length];
             botNum++;
-            const el = document.getElementById('ctrl-status');
+            const el = document.getElementById('status-bar');
             try {
                 // Use server-side bot (aims + shoots, cleared on reset)
                 const resp = await fetch(SERVER + '/game/add-bot', {
@@ -163,9 +177,9 @@
                     body: JSON.stringify({})
                 });
                 botNum = 0;
-                document.getElementById('ctrl-status').textContent = 'Game reset!';
+                document.getElementById('status-bar').textContent = 'Game reset!';
             } catch(e) {
-                const el = document.getElementById('ctrl-status');
+                const el = document.getElementById('status-bar');
                 el.textContent = 'Server error: ' + e.message;
                 el.className = 'status error';
             }

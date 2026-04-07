@@ -48,6 +48,7 @@ export class ServerGame extends Phaser.Scene {
     playerSprites   : Map<string, Phaser.GameObjects.Sprite> = new Map();
     playerLabels    : Map<string, Phaser.GameObjects.Text> = new Map();
     enemySprites    : Map<string, Phaser.GameObjects.Sprite> = new Map();
+    renderedShots   : Set<string> = new Set();  // track rendered shots by fired-tick+shooter
     statusText      : Phaser.GameObjects.Text;
     tileSize        : number = 48;
     mapWidth        : number = 21;
@@ -117,6 +118,12 @@ export class ServerGame extends Phaser.Scene {
     renderShots(state: ServerState): void {
         const shots = (state as any)['recent-shots'] || [];
         for (const shot of shots) {
+            // Deduplicate: only render each shot once
+            const firedTick = shot['fired-tick'] || 0;
+            const shotKey = `${shot['shooter-id']}-${firedTick}-${shot.direction}`;
+            if (this.renderedShots.has(shotKey)) continue;
+            this.renderedShots.add(shotKey);
+
             const path: number[][] = shot.path || [];
             if (path.length === 0) continue;
 
@@ -126,7 +133,7 @@ export class ServerGame extends Phaser.Scene {
 
             // Draw tracer line
             const line = this.add.graphics();
-            line.lineStyle(3, 0xff4400, 0.9);
+            line.lineStyle(2, 0xff4400, 0.8);
             line.beginPath();
             line.moveTo(ox, oy);
             line.lineTo(tx, ty);
@@ -134,16 +141,21 @@ export class ServerGame extends Phaser.Scene {
             line.setDepth(15);
 
             // Bright tip at impact point
-            const tip = this.add.circle(tx, ty, 6, 0xffcc00, 1);
+            const tip = this.add.circle(tx, ty, 4, 0xffcc00, 1);
             tip.setDepth(16);
 
-            // Fade out and destroy
+            // Fade out and destroy quickly
             this.tweens.add({
                 targets: [line, tip],
                 alpha: 0,
-                duration: 200,
+                duration: 300,
                 onComplete: () => { line.destroy(); tip.destroy(); }
             });
+
+            // Clean up old shot keys (prevent memory leak)
+            if (this.renderedShots.size > 200) {
+                this.renderedShots.clear();
+            }
         }
     }
 
