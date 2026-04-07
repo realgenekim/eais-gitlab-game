@@ -299,6 +299,31 @@
             (apply-action s player-id action))
           state commands))
 
+(defn find-nearest-open
+  "Find the nearest open (non-wall) cell to [x y] using BFS."
+  [state x y]
+  (let [walls (get-in state [:map :walls])
+        {:keys [width height]} (:map state)]
+    (if (not (contains? walls [x y]))
+      [x y]
+      (loop [queue (conj clojure.lang.PersistentQueue/EMPTY [x y])
+             visited #{[x y]}]
+        (if (empty? queue)
+          ;; Fallback: center of map
+          [(quot width 2) (quot height 2)]
+          (let [[cx cy] (peek queue)
+                neighbors (for [[dx dy] [[0 1] [0 -1] [1 0] [-1 0]]
+                                :let [nx (+ cx dx) ny (+ cy dy)]
+                                :when (and (>= nx 0) (< nx width)
+                                           (>= ny 0) (< ny height)
+                                           (not (visited [nx ny])))]
+                            [nx ny])
+                open (first (filter #(not (contains? walls %)) neighbors))]
+            (if open
+              open
+              (recur (into (pop queue) (remove visited neighbors))
+                     (into visited neighbors)))))))))
+
 (defn respawn-dead-players
   "Respawn players whose respawn timer has elapsed.
    If spawn point is now a wall (shrink/lightning), bump to nearest open cell."
@@ -366,22 +391,22 @@
 ;;; ---------------------------------------------------------------------------
 
 (defn shrink-ring
-  "Return the set of wall cells for a ring at distance `d` from the border.
-   d=0 is the outermost ring (already walls), d=1 is one step in, etc."
+  "Return the set of wall cells for ALL cells at depth < d from the border.
+   d=1 fills the outermost ring, d=2 fills the two outermost rings, etc.
+   This ensures the area outside the playable zone is fully walled."
   [width height d]
   (set
-   (concat
-    ;; Top and bottom rows at depth d
-    (for [x (range d (- width d))] [x d])
-    (for [x (range d (- width d))] [x (- height 1 d)])
-    ;; Left and right columns at depth d
-    (for [y (range d (- height d))] [d y])
-    (for [y (range d (- height d))] [(- width 1 d) y]))))
+   (for [x (range width)
+         y (range height)
+         :when (or (< x d) (>= x (- width d))
+                   (< y d) (>= y (- height d)))]
+     [x y])))
 
 (defn battle-royale-shrink
   "Shrink the arena by adding wall rings. Shrinks every `shrink-interval` ticks
-   starting at `shrink-start`. Kills players caught in new walls.
-   Shows a fire warning ring for `shrink-warn-ticks` before each shrink."
+   starting at `shrink-start`. Kills players/enemies caught in new walls.
+   Shows a fire warning ring for `shrink-warn-ticks` before each shrink.
+   Stops shrinking when the playable area would be smaller than 3x3."
   [state]
   (let [tick (:tick state)
         shrink-start (get-in state [:config :shrink-start] 200)
@@ -389,6 +414,9 @@
         warn-ticks (get-in state [:config :shrink-warn-ticks] 10)
         {:keys [width height]} (:map state)
         current-walls (get-in state [:map :walls])
+        ;; Max ring depth — leave at least 3x3 playable area
+        max-ring (min (quot (dec width) 2) (quot (dec height) 2))
+        max-ring (max 1 (- max-ring 1))
         ;; Calculate ticks until next shrink
         next-shrink (if (< tick shrink-start)
                       shrink-start
@@ -400,7 +428,8 @@
         ;; Which ring will be added at next shrink?
         next-ring-num (if (< tick shrink-start)
                         1
-                        (+ 2 (quot (- tick shrink-start) shrink-interval)))
+                        (min (+ 2 (quot (- tick shrink-start) shrink-interval))
+                             max-ring))
         ;; Show fire warning if within warn window
         warning-cells (when (and (<= 1 ticks-until warn-ticks)
                                  (> next-ring-num 0))
@@ -410,15 +439,15 @@
     (if (and (>= tick shrink-start)
              (zero? (mod tick shrink-interval)))
       ;; Time to shrink — add the wall ring
-      (let [rings-added (inc (quot (- tick shrink-start) shrink-interval))
+      (let [rings-added (min (inc (quot (- tick shrink-start) shrink-interval))
+                             max-ring)
             new-walls (shrink-ring width height rings-added)
             added-walls (clojure.set/difference new-walls current-walls)]
         (if (empty? added-walls)
           state
           (let [state (update-in state [:map :walls] into added-walls)
-                ;; Clear warning now that walls are placed
                 state (assoc state :shrink-warning #{})
-                ;; Kill any player standing on a new wall
+                ;; Kill players standing on new walls
                 state (reduce-kv
                        (fn [s id player]
                          (if (and (:alive? player)
@@ -431,6 +460,12 @@
                                (assoc-in [:players id :passenger] nil))
                            s))
                        state (:players state))
+                ;; Remove enemies standing on new walls
+                state (update state :enemies
+                              (fn [enemies]
+                                (into {} (remove (fn [[_ e]]
+                                                   (contains? added-walls [(:x e) (:y e)]))
+                                                 enemies))))
                 ;; Remove passengers on new walls
                 state (update state :passengers
                               (fn [ps] (vec (remove #(contains? added-walls [(:x %) (:y %)])

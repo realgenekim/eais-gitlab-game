@@ -27,7 +27,8 @@ interface ServerState {
     tick: number;
     players: ServerPlayer[];
     enemies: ServerEnemy[];
-    map: { width: number; height: number };
+    map: { width: number; height: number; walls?: number[][] };
+    'shrink-warning'?: number[][];
 }
 
 // Map enemy type → sprite key + animation prefix
@@ -49,6 +50,10 @@ export class ServerGame extends Phaser.Scene {
     playerLabels    : Map<string, Phaser.GameObjects.Text> = new Map();
     enemySprites    : Map<string, Phaser.GameObjects.Sprite> = new Map();
     renderedShots   : Set<string> = new Set();  // track rendered shots by fired-tick+shooter
+    shrinkGraphics  : Phaser.GameObjects.Graphics | null = null;
+    shrinkTween     : Phaser.Tweens.Tween | null = null;
+    wallGraphics    : Phaser.GameObjects.Graphics | null = null;
+    lastWallCount   : number = -1;  // redraw walls only when count changes
     statusText      : Phaser.GameObjects.Text;
     tileSize        : number = 48;
     mapWidth        : number = 21;
@@ -160,6 +165,13 @@ export class ServerGame extends Phaser.Scene {
         if (state.map) {
             this.mapWidth = state.map.width;
             this.mapHeight = state.map.height;
+            // Dynamically size tiles to fill the canvas
+            const canvasW = this.scale.width;
+            const canvasH = this.scale.height;
+            this.tileSize = Math.max(1, Math.floor(Math.min(
+                canvasW / this.mapWidth,
+                canvasH / this.mapHeight
+            )));
         }
 
         const enemyCount = state.enemies ? state.enemies.length : 0;
@@ -169,9 +181,11 @@ export class ServerGame extends Phaser.Scene {
         // Dispatch to HTML scoreboard
         window.dispatchEvent(new CustomEvent('gameState', { detail: state }));
 
+        this.renderWalls(state);
         this.updatePlayers(state);
         this.updateEnemies(state);
         this.renderShots(state);
+        this.renderShrinkWarning(state);
     }
 
     renderShots(state: ServerState): void {
@@ -338,6 +352,79 @@ export class ServerGame extends Phaser.Scene {
                 });
                 this.enemySprites.delete(id);
             }
+        }
+    }
+
+    renderWalls(state: ServerState): void {
+        const walls = state.map?.walls || [];
+
+        // Only redraw when wall count changes (perf: avoid redrawing every tick)
+        if (walls.length === this.lastWallCount) return;
+        this.lastWallCount = walls.length;
+
+        if (!this.wallGraphics) {
+            this.wallGraphics = this.add.graphics();
+            this.wallGraphics.setDepth(1); // above background, below everything else
+        }
+
+        this.wallGraphics.clear();
+
+        const ts = Math.max(1, this.tileSize);  // minimum 1x1
+        for (const cell of walls) {
+            const [gx, gy] = cell;
+            const px = gx * ts;
+            const py = gy * ts;
+            // Dark wall fill
+            this.wallGraphics.fillStyle(0x2a2a3a, 1.0);
+            this.wallGraphics.fillRect(px, py, ts, ts);
+            // Subtle border
+            this.wallGraphics.lineStyle(1, 0x3a3a4a, 0.5);
+            this.wallGraphics.strokeRect(px, py, ts, ts);
+        }
+    }
+
+    renderShrinkWarning(state: ServerState): void {
+        const cells = state['shrink-warning'] || [];
+
+        // Create graphics object on first use
+        if (!this.shrinkGraphics) {
+            this.shrinkGraphics = this.add.graphics();
+            this.shrinkGraphics.setDepth(3); // above floor, below sprites
+        }
+
+        this.shrinkGraphics.clear();
+
+        if (cells.length === 0) {
+            // Kill pulse tween when no warnings
+            if (this.shrinkTween) {
+                this.shrinkTween.stop();
+                this.shrinkTween = null;
+            }
+            return;
+        }
+
+        // Draw warning cells — red/orange overlay
+        for (const cell of cells) {
+            const [gx, gy] = cell;
+            const px = gx * this.tileSize;
+            const py = gy * this.tileSize;
+            this.shrinkGraphics.fillStyle(0xff4400, 0.35);
+            this.shrinkGraphics.fillRect(px, py, this.tileSize, this.tileSize);
+            // Border
+            this.shrinkGraphics.lineStyle(1, 0xff6600, 0.6);
+            this.shrinkGraphics.strokeRect(px, py, this.tileSize, this.tileSize);
+        }
+
+        // Pulsing alpha animation
+        if (!this.shrinkTween) {
+            this.shrinkTween = this.tweens.add({
+                targets: this.shrinkGraphics,
+                alpha: { from: 0.4, to: 1.0 },
+                duration: 500,
+                yoyo: true,
+                repeat: -1,
+                ease: 'Sine.easeInOut'
+            });
         }
     }
 }

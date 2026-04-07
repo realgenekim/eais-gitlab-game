@@ -38,7 +38,7 @@
 
 (defn- state->json
   "Convert game state to JSON for Phaser spectator.
-   Sends full state including players, enemies, map."
+   Sends full state including players, enemies, map with walls, shrink warnings."
   [game-state]
   (let [players (->> (:players game-state)
                      (map (fn [[id p]]
@@ -64,7 +64,9 @@
         passengers (->> (:passengers game-state)
                         (filter #(nil? (:picked-up-by %)))
                         (map #(select-keys % [:id :x :y :dest]))
-                        vec)]
+                        vec)
+        shrink-warning (vec (or (:shrink-warning game-state) #{}))
+        walls (vec (get-in game-state [:map :walls]))]
     (json/write-str
      {:type "state"
       :tick (:tick game-state)
@@ -72,8 +74,10 @@
       :enemies enemies
       :passengers passengers
       :map {:width (get-in game-state [:map :width])
-            :height (get-in game-state [:map :height])}
-      :recent-shots (:recent-shots game-state)})))
+            :height (get-in game-state [:map :height])
+            :walls walls}
+      :recent-shots (:recent-shots game-state)
+      :shrink-warning shrink-warning})))
 
 (defn broadcast-state!
   "Push game state JSON to all connected WebSocket spectators."

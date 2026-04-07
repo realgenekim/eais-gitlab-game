@@ -4,8 +4,8 @@
 export const GameOptions : any = {
 
     gameSize : {
-        width               : 1280,     // 20 tiles × 64px
-        height              : 1280      // 20 tiles × 64px
+        width               : 1344,     // 21 tiles × 64px
+        height              : 1216      // 19 tiles × 64px
     },
     gameBackgroundColor     : 0x222222, // game background color
 
