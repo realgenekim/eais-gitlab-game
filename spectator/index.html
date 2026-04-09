@@ -541,7 +541,21 @@
             }
         }
 
+        // Unlock audio on ANY user interaction (Chrome autoplay policy)
+        let audioUnlocked = false;
+        function unlockAudio() {
+            if (audioUnlocked) return;
+            audioUnlocked = true;
+            // Play a silent clip to unlock the audio context
+            const silence = new Audio('data:audio/mp3;base64,SUQzBAAAAAAAI1RTU0UAAAAPAAADTGF2ZjU4Ljc2LjEwMAAAAAAAAAAAAAAA//tQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWGluZwAAAA8AAAACAAABhgC7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7//////////////////////////////////////////////////////////////////8AAAAATGF2YzU4LjEzAAAAAAAAAAAAAAAAJAAAAAAAAAAAAYYoRwAAAAAAAAAAAAAAAAD/+xBkAA/wAABpAAAACAAADSAAAAEAAAGkAAAAIAAANIAAAARMQU1FMy4xMDBVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV');
+            silence.play().catch(() => {});
+            console.log('Audio unlocked');
+        }
+        document.addEventListener('click', unlockAudio, { once: false });
+        document.addEventListener('keydown', unlockAudio, { once: false });
+
         async function startGame() {
+            unlockAudio();  // Unlock audio on this click
             const btn = document.getElementById('start-game-btn');
             btn.disabled = true;
             btn.textContent = 'Starting...';
@@ -555,6 +569,8 @@
                 if (data.status === 'started') {
                     currentPhase = 'playing';
                     document.getElementById('lobby-overlay').classList.remove('active');
+                    // Play game start commentary immediately
+                    playCategory('game_start');
                 } else {
                     btn.textContent = 'Start Game';
                     btn.disabled = false;

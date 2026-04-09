@@ -266,9 +266,12 @@
                           :max-tick (:max-tick result)}))))
 
 (defn handle-start [_request]
+  (log/info :game-start-requested :phase (engine/get-phase)
+            :players (count (:players (engine/get-state))))
   (if-let [result (engine/begin-game!)]
-    (json-response 200 {:status "started"
-                        :players (:players result)})
+    (do (log/info :game-started-by-api :players (:players result))
+        (json-response 200 {:status "started"
+                            :players (:players result)}))
     (json-response 400 {:error "Game is not in lobby or armory phase"})))
 
 (defn handle-armory-open [_request]
