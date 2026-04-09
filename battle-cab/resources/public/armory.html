@@ -569,13 +569,15 @@
         // Init
         if (timelineMode) {
             timelineStep = parseInt(urlParams.get('step') || '0');
-            addEvent('join', 'Timeline mode: J/K to step, Space to auto-play. Pure functions, no bots.');
+            addEvent('join', 'Timeline mode: J/→ = next step, K/← = prev step, Space = auto-play.');
             loadTimelineStep(timelineStep);
             document.addEventListener('keydown', (e) => {
-                if (e.key === 'k' || e.key === 'K' || e.key === 'ArrowRight') {
-                    loadTimelineStep(timelineStep + 1);
-                } else if (e.key === 'j' || e.key === 'J' || e.key === 'ArrowLeft') {
-                    loadTimelineStep(Math.max(0, timelineStep - 1));
+                if (e.key === 'j' || e.key === 'J' || e.key === 'ArrowRight') {
+                    timelineStep++;
+                    loadTimelineStep(timelineStep);
+                } else if (e.key === 'k' || e.key === 'K' || e.key === 'ArrowLeft') {
+                    timelineStep = Math.max(0, timelineStep - 1);
+                    loadTimelineStep(timelineStep);
                 } else if (e.key === ' ') {
                     // Auto-play toggle
                     if (autoPlayTimer) {
