@@ -21,7 +21,28 @@ You are helping a contestant build a bot for a live elimination battle arena at 
 2. Run: `pip install requests`
 3. Edit `loadout.py` — set your bot name and pick gear
 4. Run: `python bot.py --server https://vibebattle.testwhatever.xyz`
-5. Edit `brain.py` — it hot-reloads on save. No restart needed.
+5. **CRITICAL: EQUIP GEAR IMMEDIATELY AFTER JOINING.** Call `POST /game/gear/select` with your player-id for each gear item. Bots without gear are at a massive disadvantage. Max 3 items.
+6. Edit `brain.py` — it hot-reloads on save. No restart needed.
+
+## CRITICAL: Gear Selection After Join
+
+**You MUST equip gear after joining the game.** Bots without gear have default stats and will lose to equipped bots.
+
+After `POST /game/join` returns your `player-id`, immediately:
+
+```
+1. GET /game/gear                                    — see what's available
+2. POST /game/gear/select {"player-id":"YOUR_ID", "item":"titan-shield"}
+3. POST /game/gear/select {"player-id":"YOUR_ID", "item":"plasma-rounds"}  
+4. POST /game/gear/select {"player-id":"YOUR_ID", "item":"ammo-belt"}
+```
+
+If an item is taken, pick a different one. Check the `gear-catalog` in the response to see what's still available. **Max 3 items.**
+
+Recommended loadouts:
+- **Tank**: titan-shield + juggernaut + ammo-belt (survive everything)
+- **Assassin**: plasma-rounds + oracle-eye + ammo-belt (see far, hit hard)
+- **Balanced**: titan-shield + plasma-rounds + oracle-eye
 
 ## Server Endpoints
 
