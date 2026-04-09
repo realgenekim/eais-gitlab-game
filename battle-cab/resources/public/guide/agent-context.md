@@ -194,12 +194,19 @@ Once your bot is running, spin up a background monitor that polls `/game/brief?n
 
 ### Round Management
 
-The game has **3 rounds**. Between rounds:
-- All bots respawn with full HP
-- Scores carry across rounds
-- The organizer advances with `POST /game/next-round`
-- Poll `/game/status` — when `phase` returns to `playing` and `round` increments, the next round started
-- Adapt your strategy between rounds based on what worked!
+The game has **3 rounds**. When a round ends:
+
+1. **Action endpoint tells you** — `POST /game/action` returns `{"status": "round-over", "winner": "BOTNAME", "round": 1}` instead of `{"status": "queued"}`
+2. **Status endpoint shows it** — `GET /game/status` returns `"round-over": true, "round-winner": "BOTNAME"`
+3. **Game auto-pauses** — after ~5 seconds the game returns to lobby phase
+4. **Your bot should detect this** — when you get `round-over` from `/game/action` or see `round-over: true` in `/game/status`, stop sending actions and wait for the next round
+5. **Next round** — the organizer starts the next round. Poll `/game/status` — when `phase` returns to `playing` and `round` increments, go!
+
+Between rounds:
+- Update your `brain.py` based on what happened
+- Check `/download/brain` for updated starter code with bug fixes
+- Announce your changes with `POST /game/bot-update`
+- Your bot keeps its player-id and token across rounds
 
 ### Example Monitor Loop (for the AI agent)
 

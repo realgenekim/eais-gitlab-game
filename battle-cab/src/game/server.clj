@@ -204,8 +204,13 @@
 
 (defn handle-state [request]
   (if-let [player-id (authenticate request)]
-    (let [view (core/player-view (engine/get-state) player-id)]
-      (json-response 200 (assoc view :phase (name (engine/get-phase)))))
+    (let [state (engine/get-state)
+          view (core/player-view state player-id)]
+      (json-response 200 (-> view
+                              (assoc :phase (name (engine/get-phase)))
+                              (assoc :round (or (:round state) 1))
+                              (assoc :round-over (boolean (:round-over state)))
+                              (assoc :round-winner (:round-winner state)))))
     (json-response 401 {:error "Invalid token"})))
 
 (defn handle-bot-brief [request]
@@ -302,16 +307,29 @@
                                            (:score (first scoreboard)) " pts")))})))))
 
 (defn handle-action [request]
-  (if-let [player-id (authenticate request)]
-    (let [body (:body request)
-          action {:type (keyword (get body "action"))
-                  :direction (get body "direction")
-                  :angle (get body "angle")
-                  :dx (get body "dx")
-                  :dy (get body "dy")}]
-      (engine/enqueue-command! (sys) player-id action)
-      (json-response 200 {:status "queued" :tick (:tick (engine/get-state))}))
-    (json-response 401 {:error "Invalid token"})))
+  (let [state (engine/get-state)
+        phase (engine/get-phase)]
+    ;; Reject actions when round is over or not playing
+    (if (:round-over state)
+      (json-response 200 {:status "round-over"
+                          :winner (:round-winner state)
+                          :round (:round state)
+                          :message (str "Round " (:round state) " is over! "
+                                        (:round-winner state) " won. Waiting for next round.")})
+      (if (not= phase :playing)
+        (json-response 200 {:status "waiting"
+                            :phase (name phase)
+                            :message "Game is not active. Waiting in lobby."})
+        (if-let [player-id (authenticate request)]
+          (let [body (:body request)
+                action {:type (keyword (get body "action"))
+                        :direction (get body "direction")
+                        :angle (get body "angle")
+                        :dx (get body "dx")
+                        :dy (get body "dy")}]
+            (engine/enqueue-command! (sys) player-id action)
+            (json-response 200 {:status "queued" :tick (:tick state)}))
+          (json-response 401 {:error "Invalid token"}))))))
 
 (defn handle-scoreboard [_request]
   (let [state (engine/get-state)
@@ -338,6 +356,9 @@
     (json-response 200
                    {:tick (:tick state)
                     :phase (name (engine/get-phase))
+                    :round (or (:round state) 1)
+                    :round-over (boolean (:round-over state))
+                    :round-winner (:round-winner state)
                     :players (count (:players state))
                     :player-names (vec (map :name (vals (:players state))))
                     :passengers (count (filter #(nil? (:picked-up-by %))
