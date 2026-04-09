@@ -1,84 +1,49 @@
 # Bot Battle Arena: Contestant Guide
 
-## Welcome to the Enterprise AI Summit Bot Battle!
-
-You're about to build an AI-powered bot that fights in a live arena. You don't need to know how to code — you'll use an AI coding assistant (vibecoding!) to build your challenger for you.
-
-**Your bot enters a battle arena.** Fight rival bots, eliminate NPC enemies, complete missions for points, and survive the shrinking arena. The audience watches on a giant screen while a live commentator calls the action.
+You're building an AI bot that fights in a live arena. Use an AI coding assistant to vibecode your strategy — no coding experience needed.
 
 ---
 
-## What You Need
+## Setup (3 minutes)
 
-- A laptop with Python installed
-- An AI coding tool (pick one):
-  - **Claude Code** (recommended) — `npm install -g @anthropic-ai/claude-code` then run `claude`
-  - **ChatGPT / Claude.ai** — just use the web interface and copy-paste code
-  - **Cursor / VS Code + Copilot** — any AI-assisted editor works
+### 1. Get the files
 
----
+You need these 3 files in a folder:
 
-## Step 1: Get the SDK (2 minutes)
-
-Open your terminal and run:
-
-```bash
-mkdir bot-battle && cd bot-battle
+```
+my-bot/
+  bot.py       — the runner (DON'T EDIT)
+  brain.py     — your strategy (EDIT THIS!)
+  loadout.py   — your gear selection
 ```
 
-Create two files. Copy-paste these exactly:
+Download from the shared link on the screen, or copy from the organizer.
 
-### File 1: `cab_battle.py` (the SDK — don't edit this)
-
-Download from the game organizer, or copy from the shared link provided on the screen.
-
-### File 2: `my_bot.py` (your bot — edit this!)
-
-Download from the game organizer, or copy from the shared link provided on the screen.
-
-### Install the one dependency:
+### 2. Install Python dependency
 
 ```bash
 pip install requests
 ```
 
-That's it. You're ready.
-
 ---
 
-## Step 2: Pick Your Bot Name
+## Connect to the Arena
 
-Think of a name for your challenger. This shows up on the scoreboard for the audience.
-
----
-
-## Step 3: Enter the Arena
-
-The game server IP will be shown on the big screen. Run:
+The server IP is on the big screen. Run:
 
 ```bash
-python my_bot.py --name "YourBotName" --server http://SERVER_IP:33333
+python bot.py --name "YourBotName" --server http://SERVER_IP:33333
 ```
 
-Replace `SERVER_IP` with the IP address on the screen (e.g., `192.168.1.42`).
-
-You should see:
-
-```
-  Joined as 'YourBotName' (id: player-abc123)
-  Confirmed: 'YourBotName' is in the lobby (2 players total)
-  Registered! Waiting for game to start...
-```
-
-Your bot is now in the lobby. The audience can see your challenger on the big screen. Wait for the game organizer to start the match.
+Your bot joins the lobby. The audience sees you on the big screen. Wait for the organizer to start the match.
 
 ---
 
-## Step 4: Make Your Bot Smarter (the fun part!)
+## Vibecode Your Strategy
 
-The starter bot has a basic strategy. To win, you need to give your challenger an edge.
+**This is the game.** Open `brain.py` in your AI tool and make it smarter.
 
-### Using Claude Code (recommended):
+### With Claude Code (recommended):
 
 ```bash
 claude
@@ -86,44 +51,54 @@ claude
 
 Then say:
 
-> Read my_bot.py and make the decide() function smarter. I want my bot to:
-> - Shoot enemies when they're lined up on my row or column
+> Read brain.py. Make my think() function smarter. I want to:
+> - Shoot enemies and rivals when lined up on my row or column
 > - Run away when my HP is below 200
 > - Complete missions (deliver passengers) when it's safe
-> - Stay near the center of the map (the edges shrink over time)
+> - Stay near the center (the edges shrink over time)
 
-Claude Code will edit the file for you. Then restart your bot:
+Claude edits the file. **Your bot reloads automatically — no restart needed.**
 
-```bash
-python my_bot.py --name "YourBotName" --server http://SERVER_IP:33333
-```
+### With ChatGPT / Claude.ai:
 
-### Using ChatGPT or Claude.ai:
+1. Copy `brain.py` contents
+2. Paste with your strategy request
+3. Copy the response back into `brain.py`
+4. Save — your bot reloads live!
 
-1. Copy the entire contents of `my_bot.py`
-2. Paste it into ChatGPT/Claude with a prompt like:
+### With Cursor / VS Code:
 
-> Here's my bot for a battle arena game. Make the decide() function smarter.
-> I want it to shoot enemies, dodge bullets, and complete missions.
-> Keep using the helper functions already in the file.
-
-3. Copy the response back into `my_bot.py`
-4. Restart your bot
-
-### Using Cursor / VS Code:
-
-Open `my_bot.py`, highlight the `decide()` function, and use the AI assistant to improve it.
+Open `brain.py`, highlight `think()`, use the AI assistant.
 
 ---
 
-## Game Rules (Quick Reference)
+## Pick Your Gear
 
-### The Arena
-- Grid-based battle arena, ~20x19 tiles
-- **Fog of war**: your bot can only see 5 tiles around it
-- **Battle royale**: walls close in over time — if they reach your bot, it's eliminated!
-- **Lightning strikes**: random blasts that destroy walls and eliminate anyone nearby
-- **Enemy waves**: NPC enemies swarm the arena in escalating waves
+Edit `loadout.py` to choose gear **before** you run your bot:
+
+| Gear | Effect |
+|------|--------|
+| `plasma-rounds` | 2x shot damage |
+| `titan-shield` | 50% damage reduction |
+| `oracle-eye` | Double vision radius |
+| `sprint-boots` | Move twice per tick (temporary) |
+| `vampiric-rounds` | Heal 15 HP per hit |
+| `juggernaut` | +300 bonus HP |
+| `ammo-belt` | Double ammo regen |
+| `cluster-shot` | Shots hit 3-wide (temporary) |
+
+Gear is **first come, first served** — if someone took it, pick something else.
+
+---
+
+## Game Rules
+
+- **500 HP** — die at 0, respawn in ~3 seconds
+- **Ammo** regenerates over time (max 10)
+- **Shooting** is line-of-sight: same row or column only
+- **Getting hit** flings you away (knockback)
+- **Arena shrinks** over time (battle royale)
+- **Enemy waves** spawn throughout the match
 
 ### Scoring
 
@@ -133,67 +108,42 @@ Open `my_bot.py`, highlight the `decide()` function, and use the AI assistant to
 | Eliminate a rival bot | **+150** |
 | Eliminate an NPC enemy | **+10 to +50** |
 
-### Your Bot's Stats
-- **500 HP** (eliminated at 0, respawns after ~3 seconds)
-- **Ammo**: starts at 5, regenerates over time (max 10)
-- **Shooting**: line-of-sight only (same row or column), range 20 tiles, 30 damage per hit
-- **Knockback**: getting hit flings your bot away from the attacker
-
-### Actions (one per tick, ~4 times per second)
-
-| Action | What it does |
-|--------|-------------|
-| `move` north/south/east/west | Move one tile in a direction |
-| `shoot` north/south/east/west | Fire a shot (costs 1 ammo) |
-| `pickup` | Pick up a mission passenger at your tile |
-| `dropoff` | Complete the mission at the destination |
-
 ---
 
-## What Your Bot Sees
+## The think() Function
 
-Every tick, your `decide(state)` function receives:
+Your `brain.py` has one function. It's called 4 times per second:
 
 ```python
-state["you"]                     # Your position, HP, score, ammo
-state["visible"]["players"]      # Rival bots you can see
-state["visible"]["enemies"]      # NPC enemies nearby
-state["visible"]["passengers"]   # Mission objectives to pick up
-state["visible"]["shots"]        # Incoming fire you can see
-state["map"]                     # Arena dimensions
+def think(state):
+    # state["you"]                  — your position, HP, ammo, score
+    # state["visible"]["enemies"]   — nearby NPC enemies
+    # state["visible"]["players"]   — nearby rival bots
+    # state["visible"]["passengers"]— missions to pick up
+    # state["visible"]["shots"]     — incoming bullets
+
+    return ("move", "north")   # action, direction
 ```
 
-Your bot can only see 5 tiles around it. The audience sees everything.
+Return one of:
+- `("move", "north/south/east/west")`
+- `("shoot", "north/south/east/west")`
+- `("pickup", None)`
+- `("dropoff", None)`
 
 ---
 
-## Helper Functions (already in your bot)
+## Strategy Prompts
 
-| Function | What it does |
-|----------|-------------|
-| `move_toward(my_x, my_y, target_x, target_y)` | Move one step toward a target |
-| `move_away(my_x, my_y, threat_x, threat_y)` | Move one step away from a threat |
-| `distance(x1, y1, x2, y2)` | Manhattan distance between two points |
-| `direction_to(my_x, my_y, target_x, target_y)` | Get cardinal direction to target |
-| `can_shoot_at(my_x, my_y, target_x, target_y)` | Check if target is on same row/column (shootable) |
+Copy-paste to your AI tool:
 
----
+**Assassin:** "Make my bot shoot everything. Chase targets to line up shots. Only do missions if nothing else is around."
 
-## Strategy Ideas to Tell Your AI
+**Strategist:** "Focus on missions for steady +100 points. Only fight in self-defense. Stay near center."
 
-Pick a fighting style and tell your AI assistant:
+**Survivor:** "Stay alive above all else. Run from threats below 300 HP. Hug the center."
 
-### The Assassin
-> "Make my bot aggressive. Shoot every enemy and rival I can see. Chase targets to line up shots. Only do missions if nothing else is around."
-
-### The Strategist
-> "Make my bot focus on missions for steady points. Complete objectives fast. Only fight in self-defense. Stay near the center where it's safer."
-
-### The Survivor
-> "Make my bot focus on staying alive. Flee from threats when HP is below 300. Stay near the center to avoid the shrinking walls. Only fight when cornered."
-
-### The Balanced Fighter
-> "Make my bot balanced. Shoot enemies when lined up, complete missions when safe, dodge incoming fire, and stay away from the edges."
+**Balanced:** "Shoot when lined up, do missions when safe, dodge bullets, avoid edges."
 
 ---
 
@@ -201,34 +151,14 @@ Pick a fighting style and tell your AI assistant:
 
 | Problem | Fix |
 |---------|-----|
-| `pip install requests` fails | Try `pip3 install requests` or `python -m pip install requests` |
-| "Could not connect to server" | Check the server IP on the big screen. Is your laptop on the same WiFi? |
-| "Game is full" | Max 8 players. Wait for the organizer. |
-| Bot does nothing | Make sure `decide()` returns an action dict |
-| Bot keeps getting eliminated | Add logic to check HP and flee when low |
-| Bot gets stuck on walls | The basic `move_toward` doesn't avoid walls. Ask your AI to add pathfinding! |
-| Need to restart bot | Press `Ctrl+C` then run the command again |
+| "Could not connect" | Check server IP on screen. Same WiFi? |
+| "Name already taken" | Pick a different name |
+| Bot does nothing | brain.py needs a `think()` function that returns `(action, direction)` |
+| Syntax error in brain.py | Fix and save — previous strategy stays active |
+| Bot gets stuck | Ask your AI to add wall avoidance |
 
 ---
 
-## Timeline
+## Key Insight
 
-1. **Setup** (5 min) — Get the SDK, install requests, pick a bot name
-2. **Connect** (1 min) — Run your bot, see your challenger in the lobby
-3. **Vibecode** (10 min) — Use your AI assistant to build a killer strategy
-4. **Battle!** (~5 min) — Watch your bot fight on the big screen
-5. **Iterate** (if time) — Tweak your strategy and run it back
-
----
-
-## Tips
-
-- **Start simple, iterate fast** — Get a working bot first, then improve
-- **Watch the big screen** — See what your bot is doing and adjust your strategy
-- **The fog of war is real** — Your bot can only see 5 tiles. The audience sees everything.
-- **The arena shrinks** — Don't let your bot camp in the corners
-- **Ammo regenerates** — Don't hoard it, shoot things!
-- **Getting hit flings you** — Use knockback to your advantage (or avoid it)
-- **Ask your AI to add `print()` statements** — See what your bot is thinking in your terminal
-
-**May the best bot win!**
+**Save brain.py to hot-reload.** You don't restart your bot. Edit strategy, save, watch it change on the big screen. Iterate fast. That's how you win.
