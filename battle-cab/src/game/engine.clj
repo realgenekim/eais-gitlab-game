@@ -249,8 +249,13 @@
   "Advance the game one tick. Called by the timer."
   [sys]
   (try
+    (let [old-state @(:game-state sys)]
+      (if (:round-over old-state)
+        ;; Round is over — keep broadcasting state but don't advance
+        (when-let [on-tick (:on-tick sys)]
+          (if (var? on-tick) (@on-tick sys old-state) (on-tick sys old-state)))
+        ;; Normal tick
     (let [commands (drain-commands! sys)
-          old-state @(:game-state sys)
           new-state (core/advance-tick old-state commands)
           events (detect-events old-state new-state commands)
           commentary (detect-commentary old-state new-state)
@@ -274,7 +279,7 @@
                               :scores (->> (:players new-state)
                                            (map (fn [[id p]] {:id id :name (:name p) :score (:score p)}))
                                            (sort-by :score >))}])
-        (stop-game! sys)))
+        (stop-game! sys))))  ;; close if + outer let
     (catch Exception e
       (log/error :tick-error :msg (.getMessage e) :error e))))
 
