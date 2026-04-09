@@ -227,7 +227,10 @@
                                            " — kill for +150 pts!"))
                                 (> rank 1)
                                 (conj (str "You're rank " rank " — leader has "
-                                           (:score (first scoreboard)) " pts")))})))))
+                                           (:score (first scoreboard)) " pts"))
+                                ;; Breadcrumb for secret items
+                                (>= (:tick state) 50)
+                                (conj "The arena whispers of hidden power... GET /game/secrets"))})))))
 
 (defn handle-action [request]
   (if-let [player-id (authenticate request)]
@@ -386,6 +389,26 @@
         (json-response 400 {:error msg
                             :gear-catalog (core/available-gear state)})))
     (json-response 401 {:error "Invalid token"})))
+
+;;; ---------------------------------------------------------------------------
+;;; Secret Items — hidden endpoints for vibe coders who explore the API
+;;; ---------------------------------------------------------------------------
+
+(defn handle-secret-equip [item-key request]
+  (if-let [player-id (authenticate request)]
+    (let [state (engine/get-state)
+          [new-state success? msg] (core/equip-secret state player-id item-key)]
+      (if success?
+        (do
+          (reset! (:game-state (sys)) new-state)
+          (json-response 200 {:status "unlocked" :message msg}))
+        (json-response 400 {:error msg})))
+    (json-response 401 {:error "Invalid token"})))
+
+(defn handle-secret-hint [_request]
+  (json-response 200 {:message "You found something... but what are you looking for?"
+                       :hint "The arena hides power beyond the armory. Try the shadows, the void, the pulse, the mirror, the pull."
+                       :whisper "POST with your auth token to claim what's hidden."}))
 
 (defn handle-start [_request]
   (log/info :game-start-requested :phase (engine/get-phase)
@@ -667,6 +690,13 @@
                               :post {:handler #'handle-commentary-post}}]
          ["/game/seek" {:post {:handler #'handle-seek}}]
          ["/game/resume" {:post {:handler #'handle-resume}}]
+         ;; Secret items — hidden endpoints, not in docs
+         ["/game/secrets" {:get {:handler #'handle-secret-hint}}]
+         ["/game/shadow"  {:post {:handler (fn [r] (handle-secret-equip :phase-cloak r))}}]
+         ["/game/void"    {:post {:handler (fn [r] (handle-secret-equip :teleporter r))}}]
+         ["/game/pulse"   {:post {:handler (fn [r] (handle-secret-equip :emp-blast r))}}]
+         ["/game/mirror"  {:post {:handler (fn [r] (handle-secret-equip :shadow-clone r))}}]
+         ["/game/pull"    {:post {:handler (fn [r] (handle-secret-equip :gravity-well r))}}]
          ;; Tools
          ["/server-stats" {:get {:handler #'handle-server-stats}}]
          ["/test" {:get {:handler #'handle-test}}]
