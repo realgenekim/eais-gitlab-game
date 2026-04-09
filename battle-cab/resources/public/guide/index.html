@@ -133,12 +133,12 @@ when lined up, run away when HP is low, and deliver passengers for points."</pre
 <script>
     // Auto-detect server URL and update the page
     const serverUrl = window.location.origin;
-    document.getElementById('agent-url').textContent = serverUrl + '/guide/agent-context.md';
+    document.getElementById('agent-url').textContent = serverUrl + '/agent-context';
     document.getElementById('connect-cmd').textContent =
         'python bot.py --name "YourBotName" --server ' + serverUrl;
 
     function copyUrl() {
-        navigator.clipboard.writeText(serverUrl + '/guide/agent-context.md');
+        navigator.clipboard.writeText(serverUrl + '/agent-context');
         document.querySelector('.copy-btn').textContent = 'Copied!';
         setTimeout(function() {
             document.querySelector('.copy-btn').textContent = 'Copy URL';
