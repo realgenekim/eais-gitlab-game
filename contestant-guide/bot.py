@@ -209,6 +209,31 @@ def main():
     client.join(bot_name)
     print("  Joined as " + bot_name + " (" + client.player_id + ")")
 
+    # Upload custom avatar if present
+    for ext in ['png', 'svg', 'jpg', 'jpeg', 'gif']:
+        avatar_path = BOT_DIR / ("avatar." + ext)
+        if avatar_path.exists():
+            ct_map = {'.png': 'image/png', '.svg': 'image/svg+xml',
+                      '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.gif': 'image/gif'}
+            ct = ct_map.get(avatar_path.suffix.lower(), 'image/png')
+            try:
+                with open(avatar_path, 'rb') as f:
+                    data = f.read()
+                if len(data) <= 512 * 1024:
+                    resp = requests.post(
+                        args.server.rstrip("/") + "/game/avatar",
+                        headers={"Authorization": client.token, "Content-Type": ct},
+                        data=data, timeout=5)
+                    if resp.status_code == 200:
+                        print("  Custom avatar uploaded: " + avatar_path.name)
+                    else:
+                        print("  Avatar upload failed: " + resp.text[:100])
+                else:
+                    print("  Avatar too large (max 512KB)")
+            except Exception as e:
+                print("  Avatar upload error: " + str(e))
+            break
+
     # Select gear
     for item in gear_list:
         result = client.select_gear(item)

@@ -8,6 +8,13 @@
 (declare state->json)
 
 ;;; ---------------------------------------------------------------------------
+;;; Avatar Store — in-memory, cleared on game restart
+;;; ---------------------------------------------------------------------------
+
+(defonce avatar-store (atom {}))
+;; {player-id {:content-type "image/png" :bytes <byte-array>}}
+
+;;; ---------------------------------------------------------------------------
 ;;; Subscriber Management
 ;;; ---------------------------------------------------------------------------
 
@@ -65,7 +72,8 @@
                              :buffs (into {} (map (fn [[k v]] [(name k) v])
                                                   (or (:buffs p) {})))
                              :debuffs (into {} (map (fn [[k v]] [(name k) v])
-                                                    (or (:debuffs p) {})))}))
+                                                    (or (:debuffs p) {})))
+                             :has-avatar (contains? @avatar-store id)}))
                      vec)
         enemies (->> (or (:enemies game-state) {})
                      (map (fn [[id e]]
