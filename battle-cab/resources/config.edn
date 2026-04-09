@@ -30,6 +30,6 @@
  :crater-fire-ticks    10     ;; how long craters burn after strike
 
  ;; ===== Enemies =====
- :enemy-grace-ticks    4      ;; first wave at tick 4 (~1 second)
- :wave-interval        24     ;; waves every 6 seconds (was 10)
+ :enemy-grace-ticks    999999 ;; no enemies — pure PVP
+ :wave-interval        999999
  }

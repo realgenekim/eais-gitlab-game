@@ -239,8 +239,19 @@
 
     <!-- Scoreboard sidebar -->
     <div id="scoreboard">
-        <h2>Scoreboard</h2>
+        <h2 id="round-header">Round 1</h2>
         <div id="sb-players"></div>
+        <div id="bot-updates-panel" style="margin-top:12px;border-top:1px solid #333;padding-top:8px;display:none;">
+            <div style="color:#ffe66d;font-size:11px;letter-spacing:0.1em;margin-bottom:6px;">LIVE UPDATES</div>
+            <div id="bot-updates-list" style="font-size:12px;color:#4ecdc4;"></div>
+        </div>
+    </div>
+
+    <!-- Round winner overlay -->
+    <div id="round-winner-overlay" style="position:fixed;top:0;left:0;right:0;bottom:0;z-index:3000;background:rgba(0,0,0,0.85);display:none;flex-direction:column;align-items:center;justify-content:center;font-family:monospace;">
+        <div style="font-size:24px;color:#ffe66d;letter-spacing:0.2em;margin-bottom:10px;">ROUND OVER</div>
+        <div id="winner-name" style="font-size:52px;color:#ff6b6b;font-weight:bold;letter-spacing:0.15em;text-shadow:0 0 30px rgba(255,107,107,0.5);"></div>
+        <div style="font-size:20px;color:#4ecdc4;margin-top:10px;">WINS THE ROUND!</div>
     </div>
 
     <!-- Status messages — bottom-right -->
@@ -406,6 +417,8 @@
                 if (phase === 'playing') {
                     updateScoreboard(state.players);
                     handleCommentary(state);
+                    handleRoundState(state);
+                    handleBotUpdates(state);
                     startAmbientTimer();
                 } else {
                     stopAmbientTimer();
@@ -631,6 +644,45 @@
         }
         if (true) {
             setInterval(pollCommentary, 1000);
+        }
+
+        // Round state handling
+        var lastRoundOver = false;
+        function handleRoundState(state) {
+            var roundNum = state.round || 1;
+            document.getElementById('round-header').textContent = 'Round ' + roundNum + ' of 3';
+
+            var overlay = document.getElementById('round-winner-overlay');
+            if (state['round-over'] && !lastRoundOver) {
+                document.getElementById('winner-name').textContent = state['round-winner'] || '???';
+                overlay.style.display = 'flex';
+                lastRoundOver = true;
+            } else if (!state['round-over']) {
+                overlay.style.display = 'none';
+                lastRoundOver = false;
+            }
+        }
+
+        // Bot update notifications
+        var seenUpdates = 0;
+        function handleBotUpdates(state) {
+            var updates = state['bot-updates'] || [];
+            if (updates.length === 0) return;
+            var panel = document.getElementById('bot-updates-panel');
+            var list = document.getElementById('bot-updates-list');
+            if (updates.length > seenUpdates) {
+                panel.style.display = 'block';
+                list.textContent = '';
+                // Show last 5 updates
+                var recent = updates.slice(-5);
+                for (var i = recent.length - 1; i >= 0; i--) {
+                    var div = document.createElement('div');
+                    div.style.cssText = 'padding:3px 0;border-bottom:1px solid #222;';
+                    div.textContent = recent[i].name + ' updated strategy!';
+                    list.appendChild(div);
+                }
+                seenUpdates = updates.length;
+            }
         }
 
         // moveBot removed — server-side bots handle their own movement + shooting

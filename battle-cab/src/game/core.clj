@@ -531,8 +531,20 @@
                      (into visited neighbors)))))))))
 
 (defn respawn-dead-players
-  "Respawn players whose respawn timer has elapsed.
-   If spawn point is a wall or occupied, bump to nearest free cell."
+  "In elimination mode: dead players stay dead. No respawn.
+   Round ends when 1 or 0 players alive."
+  [state]
+  ;; Check for round over — 1 or fewer alive
+  (let [alive-count (count (filter (fn [[_ p]] (:alive? p)) (:players state)))]
+    (if (and (> (count (:players state)) 1) (<= alive-count 1))
+      (let [winner (first (keep (fn [[id p]] (when (:alive? p) (:name p))) (:players state)))]
+        (-> state
+            (assoc :round-over true)
+            (assoc :round-winner (or winner "Nobody"))))
+      state)))
+
+(defn respawn-dead-players-DISABLED
+  "DISABLED — keeping for reference. Was: respawn near center."
   [state]
   (let [{:keys [width height walls]} (:map state)
         cx (quot width 2) cy (quot height 2)]
@@ -1198,6 +1210,10 @@
   "Create a fresh game state with the given map."
   [game-map]
   {:tick 0
+   :round 1
+   :round-over false
+   :round-winner nil
+   :bot-updates []
    :map game-map
    :players {}
    :enemies {}

@@ -99,12 +99,13 @@ class ArenaClient:
 # ---------------------------------------------------------------------------
 
 class HotBrain:
-    def __init__(self, bot_dir):
+    def __init__(self, bot_dir, on_reload=None):
         self.bot_dir = Path(bot_dir)
         self.brain_path = self.bot_dir / "brain.py"
         self._think_fn = None
         self._last_mtimes = {}
         self._load_count = 0
+        self._on_reload = on_reload
         self._reload()
 
     def _get_mtimes(self):
@@ -146,6 +147,8 @@ class HotBrain:
             print("  [brain] Loaded brain.py")
         else:
             print("  [brain] RELOADED brain.py (v" + str(self._load_count) + ") -- new strategy is LIVE!")
+            if self._on_reload:
+                self._on_reload(self._load_count)
 
     def check_reload(self):
         current = self._get_mtimes()
@@ -230,8 +233,17 @@ def main():
         time.sleep(0.5)
     print("  GAME ON! Let's go!\n")
 
-    # Init hot-reload brain
-    brain = HotBrain(BOT_DIR)
+    # Init hot-reload brain with server notification
+    def on_brain_reload(version):
+        try:
+            requests.post(
+                client.server + "/game/bot-update",
+                headers={"Authorization": client.token},
+                json={}, timeout=3)
+        except Exception:
+            pass
+
+    brain = HotBrain(BOT_DIR, on_reload=on_brain_reload)
 
     tick_count = 0
     last_score = 0

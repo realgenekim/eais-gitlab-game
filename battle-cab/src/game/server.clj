@@ -456,6 +456,51 @@
                             :gear-catalog (core/available-gear state)})))
     (json-response 401 {:error "Invalid token"})))
 
+(defn handle-bot-update [request]
+  "Bot announces it has been updated (hot-reload). Shows on spectator."
+  (if-let [player-id (authenticate request)]
+    (let [state (engine/get-state)
+          player (get-in state [:players player-id])
+          bot-name (:name player)]
+      (swap! (:game-state (sys))
+             update :bot-updates conj
+             {:name bot-name :tick (:tick state) :timestamp (System/currentTimeMillis)})
+      ;; Push state so spectator sees it
+      (when-let [on-tick (:on-tick (sys))]
+        (let [s @(:game-state (sys))]
+          (if (var? on-tick) (@on-tick (sys) s) (on-tick (sys) s))))
+      (json-response 200 {:status "update-announced" :name bot-name}))
+    (json-response 401 {:error "Invalid token"})))
+
+(defn handle-next-round [_request]
+  "Reset all players for the next round. Keep scores, advance round number."
+  (let [state @(:game-state (sys))
+        current-round (or (:round state) 1)]
+    (if (>= current-round 3)
+      (json-response 400 {:error "All 3 rounds complete!"
+                          :final-scores (->> (:players state)
+                                             (map (fn [[_ p]] {:name (:name p) :score (:score p)}))
+                                             (sort-by :score >)
+                                             vec)})
+      (let [new-round (inc current-round)
+            new-state (reduce-kv
+                       (fn [s id player]
+                         (-> s
+                             (assoc-in [:players id :alive?] true)
+                             (assoc-in [:players id :hp] 500)
+                             (assoc-in [:players id :ammo] 5)))
+                       (-> state
+                           (assoc :round new-round)
+                           (assoc :round-over false)
+                           (assoc :round-winner nil)
+                           (assoc :tick 0)
+                           (assoc :enemies {})
+                           (assoc :recent-shots [])
+                           (assoc :bot-updates []))
+                       (:players state))]
+        (reset! (:game-state (sys)) new-state)
+        (json-response 200 {:status "next-round" :round new-round})))))
+
 (defn handle-start [_request]
   (log/info :game-start-requested :phase (engine/get-phase)
             :players (count (:players (engine/get-state))))
@@ -729,6 +774,8 @@
                                             :headers {"Content-Type" "text/html"}
                                             :body (slurp (clojure.java.io/resource "public/guide/index.html"))})}}]
          ["/game/brief" {:get {:handler #'handle-bot-brief}}]
+         ["/game/bot-update" {:post {:handler #'handle-bot-update}}]
+         ["/game/next-round" {:post {:handler #'handle-next-round}}]
          ["/game/gear" {:get {:handler #'handle-gear-catalog}}]
          ["/game/gear/select" {:post {:handler #'handle-gear-select}}]
          ["/game/start" {:post {:handler #'handle-start}}]
