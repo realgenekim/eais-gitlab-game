@@ -652,6 +652,10 @@
          ["/game/frame" {:get {:handler #'handle-frame}}]
          ["/game/map-swap" {:post {:handler #'handle-map-swap}}]
          ["/game/lightning" {:post {:handler #'handle-lightning}}]
+         ["/guide.html" {:get {:handler (fn [_]
+                                           {:status 200
+                                            :headers {"Content-Type" "text/html"}
+                                            :body (slurp (clojure.java.io/resource "public/guide/index.html"))})}}]
          ["/game/brief" {:get {:handler #'handle-bot-brief}}]
          ["/game/gear" {:get {:handler #'handle-gear-catalog}}]
          ["/game/gear/select" {:post {:handler #'handle-gear-select}}]

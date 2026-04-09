@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bot Battle Arena — Contestant Guide</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: 'Courier New', monospace; background: #0a0a14; color: #ccc; line-height: 1.6; }
+        .container { max-width: 900px; margin: 0 auto; padding: 30px 20px; }
+        h1 { color: #ff6b6b; font-size: 36px; letter-spacing: 0.15em; text-align: center; margin-bottom: 8px; }
+        .subtitle { color: #888; text-align: center; margin-bottom: 30px; }
+        h2 { color: #4ecdc4; font-size: 20px; margin: 30px 0 12px; border-bottom: 1px solid #333; padding-bottom: 6px; }
+        h3 { color: #ffe66d; font-size: 16px; margin: 20px 0 8px; }
+        p { margin: 8px 0; }
+        code { background: #1a1a2e; color: #4ecdc4; padding: 2px 6px; border-radius: 3px; font-size: 14px; }
+        pre { background: #1a1a2e; border: 1px solid #333; border-radius: 6px; padding: 14px; margin: 12px 0; overflow-x: auto; font-size: 13px; color: #ddd; }
+        .step { background: rgba(78,205,196,0.08); border-left: 3px solid #4ecdc4; padding: 12px 16px; margin: 12px 0; border-radius: 0 6px 6px 0; }
+        .step-num { color: #4ecdc4; font-weight: bold; font-size: 18px; }
+        table { width: 100%; border-collapse: collapse; margin: 12px 0; }
+        th { background: #1a1a2e; color: #ffe66d; text-align: left; padding: 8px 12px; border: 1px solid #333; }
+        td { padding: 8px 12px; border: 1px solid #333; }
+        .copy-btn { background: #333; color: #4ecdc4; border: 1px solid #4ecdc4; padding: 4px 12px; border-radius: 4px; cursor: pointer; font-family: monospace; font-size: 12px; float: right; }
+        .copy-btn:hover { background: #4ecdc4; color: #000; }
+        .highlight { background: rgba(255,107,107,0.1); border: 1px solid #ff6b6b; border-radius: 6px; padding: 16px; margin: 16px 0; }
+        .agent-url { background: #1a1a2e; border: 2px solid #ffe66d; border-radius: 6px; padding: 16px; margin: 20px 0; text-align: center; }
+        .agent-url code { font-size: 16px; color: #ffe66d; background: none; }
+        a { color: #4ecdc4; }
+    </style>
+</head>
+<body>
+<div class="container">
+
+<h1>BOT BATTLE ARENA</h1>
+<p class="subtitle">Enterprise AI Summit — Contestant Guide</p>
+
+<div class="highlight">
+    <h3>For Your AI Coding Agent</h3>
+    <p>Paste this URL into Claude Code, ChatGPT, or Cursor to give your AI everything it needs:</p>
+    <div class="agent-url">
+        <code id="agent-url"></code>
+        <br><br>
+        <button class="copy-btn" onclick="copyUrl()">Copy URL</button>
+    </div>
+    <p style="color:#888; font-size:12px; margin-top:8px;">Your AI reads this and knows all the endpoints, file formats, and strategies.</p>
+</div>
+
+<h2>Setup (3 minutes)</h2>
+
+<div class="step">
+    <span class="step-num">1.</span> Download the 3 files:
+    <br><a href="/guide/bot.py">bot.py</a> (runner — don't edit) |
+    <a href="/guide/brain.py">brain.py</a> (your strategy — EDIT THIS) |
+    <a href="/guide/loadout.py">loadout.py</a> (gear selection)
+</div>
+
+<div class="step">
+    <span class="step-num">2.</span> Install dependency:
+    <pre>pip install requests</pre>
+</div>
+
+<div class="step">
+    <span class="step-num">3.</span> Connect to the arena:
+    <pre id="connect-cmd">python bot.py --name "YourBotName" --server SERVER_URL</pre>
+</div>
+
+<div class="step">
+    <span class="step-num">4.</span> Edit <code>brain.py</code> with your AI tool. Save = live reload. No restart needed!
+</div>
+
+<h2>Vibecoding Your Strategy</h2>
+
+<p>Open your AI coding tool and say:</p>
+
+<pre>"Read brain.py. Make my think() function smarter. I want to shoot enemies
+when lined up, run away when HP is low, and deliver passengers for points."</pre>
+
+<p>Or try these styles:</p>
+
+<table>
+<tr><th>Style</th><th>Tell your AI</th></tr>
+<tr><td>Assassin</td><td>"Shoot everything. Chase targets to line up shots."</td></tr>
+<tr><td>Strategist</td><td>"Focus on missions for steady +100 points. Fight only in self-defense."</td></tr>
+<tr><td>Survivor</td><td>"Stay alive. Run when HP below 300. Hug the center."</td></tr>
+<tr><td>Balanced</td><td>"Shoot when lined up, do missions when safe, dodge bullets."</td></tr>
+</table>
+
+<h2>Game Rules</h2>
+
+<table>
+<tr><th>Action</th><th>Points</th></tr>
+<tr><td>Complete a mission (deliver passenger)</td><td><strong>+100</strong></td></tr>
+<tr><td>Eliminate a rival bot</td><td><strong>+150</strong></td></tr>
+<tr><td>Eliminate an NPC enemy</td><td><strong>+5 to +30</strong></td></tr>
+</table>
+
+<p><strong>500 HP</strong> — respawn in ~3 sec | <strong>Ammo</strong> regens over time |
+<strong>Shooting</strong> = same row or column only | <strong>Arena shrinks</strong> over time</p>
+
+<h2>Pick Your Gear</h2>
+
+<p>Edit <code>loadout.py</code> before running. First come, first served!</p>
+
+<table>
+<tr><th>Gear</th><th>Effect</th></tr>
+<tr><td><code>plasma-rounds</code></td><td>2x shot damage</td></tr>
+<tr><td><code>titan-shield</code></td><td>50% damage reduction</td></tr>
+<tr><td><code>oracle-eye</code></td><td>Double vision radius</td></tr>
+<tr><td><code>sprint-boots</code></td><td>Move twice per tick</td></tr>
+<tr><td><code>vampiric-rounds</code></td><td>Heal 15 HP per hit</td></tr>
+<tr><td><code>juggernaut</code></td><td>+300 bonus HP</td></tr>
+<tr><td><code>ammo-belt</code></td><td>Double ammo regen</td></tr>
+<tr><td><code>cluster-shot</code></td><td>Shots hit 3-wide</td></tr>
+</table>
+
+<h2>Live Intel for Your AI</h2>
+
+<p>Your AI tool can poll this for real-time advice:</p>
+
+<pre>GET /game/brief?name=YourBotName</pre>
+
+<p>Returns HP, score, rank, nearby threats, and actionable tips.</p>
+
+<h2>Key Insight</h2>
+
+<div class="highlight">
+    <p><strong>Save brain.py to hot-reload.</strong> You don't restart your bot.
+    Edit strategy, save, watch it change on the big screen. Iterate fast. That's how you win.</p>
+</div>
+
+</div>
+
+<script>
+    // Auto-detect server URL and update the page
+    const serverUrl = window.location.origin;
+    document.getElementById('agent-url').textContent = serverUrl + '/guide/agent-context.md';
+    document.getElementById('connect-cmd').textContent =
+        'python bot.py --name "YourBotName" --server ' + serverUrl;
+
+    function copyUrl() {
+        navigator.clipboard.writeText(serverUrl + '/guide/agent-context.md');
+        document.querySelector('.copy-btn').textContent = 'Copied!';
+        setTimeout(function() {
+            document.querySelector('.copy-btn').textContent = 'Copy URL';
+        }, 2000);
+    }
+</script>
+</body>
+</html>
