@@ -518,11 +518,79 @@
             addBot(); addBot(); addBot(); addBot();
         }
 
+        // === Confetti burst ===
+        function confetti(x, y) {
+            const colors = ['#ffd700','#ff6b6b','#4ecdc4','#ffe66d','#c084fc','#ff4400'];
+            for (let i = 0; i < 30; i++) {
+                const dot = document.createElement('div');
+                dot.style.cssText = `position:fixed;left:${x}px;top:${y}px;width:8px;height:8px;
+                    border-radius:50%;background:${colors[i%colors.length]};pointer-events:none;z-index:9999;`;
+                document.body.appendChild(dot);
+                const angle = Math.random() * Math.PI * 2;
+                const dist = 80 + Math.random() * 200;
+                const dx = Math.cos(angle) * dist;
+                const dy = Math.sin(angle) * dist - 100;
+                dot.animate([
+                    {transform:'translate(0,0) scale(1)',opacity:1},
+                    {transform:`translate(${dx}px,${dy}px) scale(0)`,opacity:0}
+                ], {duration:800+Math.random()*400, easing:'cubic-bezier(.2,.8,.3,1)'});
+                setTimeout(() => dot.remove(), 1200);
+            }
+        }
+
+        // === Timeline mode ===
+        const timelineMode = urlParams.has('timeline');
+        let timelineStep = 0;
+        let autoPlayTimer = null;
+
+        async function loadTimelineStep(step) {
+            timelineStep = step;
+            try {
+                const resp = await fetch(SERVER + '/game/armory/demo?timeline&step=' + step);
+                const data = await resp.json();
+                const badge = document.getElementById('phase-badge');
+                badge.textContent = data.phase.toUpperCase();
+                badge.className = 'phase-badge phase-' + data.phase;
+                renderPlayers(data.players);
+                renderShop(data.shop);
+                renderCrates(data.crates || []);
+                if (data.event && step > 0) {
+                    addEvent('buy', `Step ${step}/${data['total-steps']}: ${data.event}`);
+                    // Confetti on purchase!
+                    confetti(window.innerWidth/2, window.innerHeight/3);
+                }
+                // Update URL
+                const url = new URL(window.location);
+                url.searchParams.set('step', step);
+                history.replaceState(null, '', url);
+            } catch(e) {}
+        }
+
         // Init
-        if (demoMode) {
-            addEvent('join', `Demo mode: scenario ${demoScenario}. Pure state, no polling. J/K to change scenario.`);
-            poll();  // Fetch once, render once, done.
-            // J/K to switch scenarios
+        if (timelineMode) {
+            timelineStep = parseInt(urlParams.get('step') || '0');
+            addEvent('join', 'Timeline mode: J/K to step, Space to auto-play. Pure functions, no bots.');
+            loadTimelineStep(timelineStep);
+            document.addEventListener('keydown', (e) => {
+                if (e.key === 'k' || e.key === 'K' || e.key === 'ArrowRight') {
+                    loadTimelineStep(timelineStep + 1);
+                } else if (e.key === 'j' || e.key === 'J' || e.key === 'ArrowLeft') {
+                    loadTimelineStep(Math.max(0, timelineStep - 1));
+                } else if (e.key === ' ') {
+                    // Auto-play toggle
+                    if (autoPlayTimer) {
+                        clearInterval(autoPlayTimer);
+                        autoPlayTimer = null;
+                        addEvent('buy', 'Auto-play paused.');
+                    } else {
+                        addEvent('buy', 'Auto-play started! (Space to pause)');
+                        autoPlayTimer = setInterval(() => loadTimelineStep(++timelineStep), 1500);
+                    }
+                }
+            });
+        } else if (demoMode) {
+            addEvent('join', `Demo scenario ${demoScenario}. J/K to switch.`);
+            poll();
             document.addEventListener('keydown', (e) => {
                 let s = parseInt(demoScenario);
                 if (e.key === 'k' || e.key === 'K' || e.key === 'ArrowRight') {
