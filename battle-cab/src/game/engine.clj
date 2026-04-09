@@ -95,7 +95,7 @@
                 (if (var? on-tick)
                   (@on-tick sys new-state)
                   (on-tick sys new-state))))
-            (assoc creds :gear-catalog (core/available-gear new-state)))))))))
+            (assoc creds :gear-catalog (core/available-gear new-state))))))))
 
 (declare stop-game! pause-game!)
 
@@ -251,35 +251,27 @@
   (try
     (let [old-state @(:game-state sys)]
       (if (:round-over old-state)
-        ;; Round is over — keep broadcasting state but don't advance
+        ;; Round over — broadcast frozen state, don't advance
         (when-let [on-tick (:on-tick sys)]
-          (if (var? on-tick) (@on-tick sys old-state) (on-tick sys old-state)))
+          (if (var? on-tick)
+            (@on-tick sys old-state)
+            (on-tick sys old-state)))
         ;; Normal tick
-    (let [commands (drain-commands! sys)
-          new-state (core/advance-tick old-state commands)
-          events (detect-events old-state new-state commands)
-          commentary (detect-commentary old-state new-state)
-          ;; Attach commentary to state so WS broadcast includes it
-          new-state (assoc new-state :commentary commentary)]
-      ;; Record for replay
-      (replay/record-tick! (:recorder sys) (:tick old-state) commands new-state)
-      ;; Advance state
-      (reset! (:game-state sys) new-state)
-      ;; Append events
-      (append-events! sys (conj events {:type :tick :tick (:tick new-state)}))
-      ;; Notify SSE subscribers (deref var for REPL reload)
-      (when-let [on-tick (:on-tick sys)]
-        (if (var? on-tick)
-          (@on-tick sys new-state)
-          (on-tick sys new-state)))
-      ;; Check game over
-      (when (>= (:tick new-state) (get-in new-state [:config :game-duration-ticks]))
-        (log/info :game-over :tick (:tick new-state))
-        (append-events! sys [{:type :game-over :tick (:tick new-state)
-                              :scores (->> (:players new-state)
-                                           (map (fn [[id p]] {:id id :name (:name p) :score (:score p)}))
-                                           (sort-by :score >))}])
-        (stop-game! sys))))  ;; close if + outer let
+        (let [commands (drain-commands! sys)
+              new-state (core/advance-tick old-state commands)
+              events (detect-events old-state new-state commands)
+              commentary (detect-commentary old-state new-state)
+              new-state (assoc new-state :commentary commentary)]
+          (replay/record-tick! (:recorder sys) (:tick old-state) commands new-state)
+          (reset! (:game-state sys) new-state)
+          (append-events! sys (conj events {:type :tick :tick (:tick new-state)}))
+          (when-let [on-tick (:on-tick sys)]
+            (if (var? on-tick)
+              (@on-tick sys new-state)
+              (on-tick sys new-state)))
+          (when (>= (:tick new-state) (get-in new-state [:config :game-duration-ticks]))
+            (log/info :game-over :tick (:tick new-state))
+            (stop-game! sys)))))
     (catch Exception e
       (log/error :tick-error :msg (.getMessage e) :error e))))
 

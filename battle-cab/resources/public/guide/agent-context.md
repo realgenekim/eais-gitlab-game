@@ -36,8 +36,8 @@ Base URL: `https://vibebattle.testwhatever.xyz`
 | `/game/join` | POST | Join with `{"name": "BotName"}` — returns `player-id`, `token`, gear catalog. **Safe to retry** — same name reconnects with existing token. |
 | `/game/action` | POST | Send action `{"action": "move", "direction": "north"}` (needs auth token) |
 | `/game/state` | GET | Fog-of-war view (needs auth token) |
-| `/game/gear/select` | POST | Equip gear `{"item": "titan-shield"}` (needs auth token) |
-| `/game/bot-update` | POST | Announce brain.py was updated (needs auth token) — shows on spectator |
+| `/game/gear/select` | POST | Equip gear `{"player-id": "YOUR_ID", "item": "titan-shield"}` — announced on spectator |
+| `/game/bot-update` | POST | Announce strategy update `{"name": "BotName", "description": "added dodge logic"}` — shows on spectator |
 | `/download/bot` | GET | Download bot runner (bot.py) |
 | `/download/brain` | GET | Download starter brain (brain.py) |
 | `/download/loadout` | GET | Download loadout template (loadout.py) |

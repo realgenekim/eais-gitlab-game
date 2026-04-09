@@ -60,6 +60,7 @@
                              :score (:score p)
                              :has-passenger (some? (:passenger p))
                              :ammo (:ammo p)
+                             :gear (vec (map name (or (:gear p) [])))
                              :points (:points p 0)
                              :items (vec (map name (or (:items p) [])))
                              :buffs (into {} (map (fn [[k v]] [(name k) v])

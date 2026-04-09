@@ -437,27 +437,37 @@
     (json-response 200 {:gear (core/available-gear state)})))
 
 (defn handle-gear-select [request]
-  (if-let [player-id (authenticate request)]
-    (let [body (:body request)
-          item-key (keyword (get body "item"))
-          state (engine/get-state)
-          [new-state success? msg] (core/select-gear state player-id item-key)]
-      (if success?
-        (do
-          (reset! (:game-state (sys)) new-state)
-          ;; Push updated state to spectators
-          (when (#{:lobby :armory} (engine/get-phase))
+  (let [body (:body request)
+        ;; Accept auth token OR player-id in body
+        player-id (or (authenticate request)
+                      (get body "player-id"))
+        item-key (keyword (get body "item"))]
+    (if-not player-id
+      (json-response 400 {:error "Pass 'player-id' or Authorization token"})
+      (let [state (engine/get-state)
+            [new-state success? msg] (core/select-gear state player-id item-key)]
+        (if success?
+          (let [player-name (get-in new-state [:players player-id :name] "Unknown")
+                item-name (get-in core/armory-items [item-key :name] (name item-key))]
+            (reset! (:game-state (sys)) new-state)
+            ;; Announce gear acquisition
+            (swap! (:game-state (sys))
+                   update :bot-updates conj
+                   {:name player-name
+                    :description (str "equipped " item-name "!")
+                    :tick (:tick new-state)
+                    :timestamp (System/currentTimeMillis)})
+            ;; Push to spectators
             (when-let [on-tick (:on-tick (sys))]
-              (if (var? on-tick)
-                (@on-tick (sys) new-state)
-                (on-tick (sys) new-state))))
-          (json-response 200 {:status "equipped"
-                              :item (name item-key)
-                              :message msg
-                              :gear-catalog (core/available-gear new-state)}))
-        (json-response 400 {:error msg
-                            :gear-catalog (core/available-gear state)})))
-    (json-response 401 {:error "Invalid token"})))
+              (let [s @(:game-state (sys))]
+                (if (var? on-tick) (@on-tick (sys) s) (on-tick (sys) s))))
+            (json-response 200 {:status "equipped"
+                                :item (name item-key)
+                                :item-name item-name
+                                :message msg
+                                :gear-catalog (core/available-gear new-state)}))
+          (json-response 400 {:error msg
+                              :gear-catalog (core/available-gear state)}))))))
 
 (defn handle-agent-context [request]
   (let [md-content (slurp (clojure.java.io/resource "public/guide/agent-context.md"))
@@ -484,20 +494,32 @@
        :body md-content})))
 
 (defn handle-bot-update [request]
-  "Bot announces it has been updated (hot-reload). Shows on spectator."
-  (if-let [player-id (authenticate request)]
-    (let [state (engine/get-state)
-          player (get-in state [:players player-id])
-          bot-name (:name player)]
-      (swap! (:game-state (sys))
-             update :bot-updates conj
-             {:name bot-name :tick (:tick state) :timestamp (System/currentTimeMillis)})
-      ;; Push state so spectator sees it
-      (when-let [on-tick (:on-tick (sys))]
-        (let [s @(:game-state (sys))]
-          (if (var? on-tick) (@on-tick (sys) s) (on-tick (sys) s))))
-      (json-response 200 {:status "update-announced" :name bot-name}))
-    (json-response 401 {:error "Invalid token"})))
+  "Bot announces it has been updated (hot-reload). Shows on spectator.
+   Pass player-id or name in body — no auth token needed."
+  (let [body (:body request)
+        state (engine/get-state)
+        ;; Accept player-id or name
+        player-id (get body "player-id")
+        bot-name (or (get body "name")
+                     (when player-id
+                       (get-in state [:players player-id :name])))
+        description (get body "description" "updated strategy")]
+    (if bot-name
+      (do
+        (swap! (:game-state (sys))
+               update :bot-updates conj
+               {:name bot-name
+                :description description
+                :tick (:tick state)
+                :timestamp (System/currentTimeMillis)})
+        ;; Push state so spectator sees it
+        (when-let [on-tick (:on-tick (sys))]
+          (let [s @(:game-state (sys))]
+            (if (var? on-tick) (@on-tick (sys) s) (on-tick (sys) s))))
+        (json-response 200 {:status "update-announced"
+                            :name bot-name
+                            :description description}))
+      (json-response 400 {:error "Pass 'name' or 'player-id' in body"}))))
 
 (defn handle-next-round [_request]
   "Reset all players for the next round. Keep scores, advance round number."
