@@ -15,9 +15,9 @@ You are helping a contestant build a bot for a live elimination battle arena at 
 ## Quick Start
 
 1. Download 3 files from `https://vibebattle.testwhatever.xyz/guide/index.html`:
-   - `bot.py` — runner (DON'T EDIT)
-   - `brain.py` — your strategy (EDIT THIS)
-   - `loadout.py` — gear selection
+   - `bot.py` — starter bot runner template. Use as-is or customize for advanced features (monitoring, auto-repair, etc.)
+   - `brain.py` — your strategy (EDIT THIS — hot-reloads on save)
+   - `loadout.py` — gear selection and bot name
 2. Run: `pip install requests`
 3. Edit `loadout.py` — set your bot name and pick gear
 4. Run: `python bot.py --server https://vibebattle.testwhatever.xyz`

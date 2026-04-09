@@ -1,21 +1,11 @@
 """
-CLAUDE-AGENT BRAIN — aggressive hunter with survival instincts.
+CLAUDE-AGENT BRAIN v2 — learned from round 1 death at edge.
 
+Fixes: Tighter center leash, shoot while retreating, never go past x=13.
 Gear: plasma-rounds (2x damage), oracle-eye (2x vision), ammo-belt (2x regen)
-Strategy: See far, shoot hard, never run out of ammo. Kill in 5 hits.
-
-Priority order:
-  1. Dodge incoming bullets (perpendicular escape)
-  2. Escape edges (arena shrinks = instant death)
-  3. Flee when HP critical (<150) — but never toward edge
-  4. Shoot any rival in line of sight
-  5. Aggressively chase nearest rival to line up a shot
-  6. Do missions only when no rivals visible
-  7. Patrol center with unpredictable movement
 """
 
 import random
-import math
 
 # =====================================================
 #  SETTINGS
@@ -23,22 +13,20 @@ import math
 
 CENTER_X = 10
 CENTER_Y = 9
-EDGE_DANGER = 6       # wider danger zone — be paranoid about edges
-FLEE_HP = 150          # flee threshold (we have plasma, so be braver)
-CHASE_RANGE = 12       # oracle-eye gives us 16 vision, chase aggressively
-SAFE_SHOOT_EDGE = 4    # don't shoot if within this many tiles of edge
+EDGE_DANGER = 6       # wider danger zone
+CENTER_LEASH = 4      # never go more than 4 tiles from center
+FLEE_HP = 200
 
 # Track state across ticks
 _last_positions = []
 _tick_count = 0
-_dodge_cooldown = 0
 
 # =====================================================
 #  BRAIN
 # =====================================================
 
 def think(state):
-    global _last_positions, _tick_count, _dodge_cooldown
+    global _last_positions, _tick_count
 
     me = state.get("you")
     if not me or not me.get("alive?", True):
@@ -55,8 +43,6 @@ def think(state):
     shots = state["visible"].get("shots", [])
 
     _tick_count += 1
-    if _dodge_cooldown > 0:
-        _dodge_cooldown -= 1
 
     # --- Anti-stuck: if same position for 4+ ticks, force random move ---
     _last_positions.append((mx, my))
@@ -67,49 +53,45 @@ def think(state):
         return "move", random.choice(["north", "south", "east", "west"])
 
     # --- PRIORITY 1: Dodge incoming bullets ---
-    # Check if ANY bullet path will hit our current tile or adjacent tile
     for shot in shots:
         path = shot.get("path", [])
         for cell in path:
             if cell[0] == mx and cell[1] == my:
                 d = shot.get("direction", "")
                 if d in ("north", "south"):
-                    # Bullet traveling vertically, dodge horizontally
-                    dodge = safe_dodge(mx, my, ["east", "west"], map_w, map_h)
-                else:
-                    # Bullet traveling horizontally, dodge vertically
-                    dodge = safe_dodge(mx, my, ["north", "south"], map_w, map_h)
-                _dodge_cooldown = 2
-                return "move", dodge
-            # Also dodge if bullet is 1 tile away and heading toward us
-            if abs(cell[0] - mx) + abs(cell[1] - my) == 1:
-                d = shot.get("direction", "")
-                if d in ("north", "south"):
-                    dodge = safe_dodge(mx, my, ["east", "west"], map_w, map_h)
-                else:
-                    dodge = safe_dodge(mx, my, ["north", "south"], map_w, map_h)
-                return "move", dodge
+                    return "move", safe_dodge(mx, my, ["east", "west"], map_w, map_h)
+                return "move", safe_dodge(mx, my, ["north", "south"], map_w, map_h)
 
-    # --- PRIORITY 2: ESCAPE EDGES — survival is everything ---
+    # --- PRIORITY 2: ESCAPE EDGES — #1 cause of death ---
     edge_dist = min(mx, my, map_w - 1 - mx, map_h - 1 - my)
-    if edge_dist < EDGE_DANGER:
+    dist_to_center = abs(mx - CENTER_X) + abs(my - CENTER_Y)
+
+    if edge_dist < EDGE_DANGER or dist_to_center > CENTER_LEASH:
+        # Even while fleeing to center, shoot if we can
+        if ammo > 0 and players:
+            for target in players:
+                d = can_shoot(mx, my, target["x"], target["y"])
+                if d and is_toward_center(mx, my, d, map_w, map_h):
+                    return "shoot", d
         return "move", best_toward_center(mx, my, map_w, map_h)
 
-    # --- PRIORITY 3: Flee when HP is critical ---
+    # --- PRIORITY 3: Flee when HP is low ---
     if hp < FLEE_HP and players:
         nearest = closest(mx, my, players)
         dist = manhattan(mx, my, nearest["x"], nearest["y"])
-        # Only flee if threat is close
         if dist <= 5:
+            # Shoot while fleeing if lined up
+            if ammo > 0:
+                d = can_shoot(mx, my, nearest["x"], nearest["y"])
+                if d:
+                    return "shoot", d
             d = away_from(mx, my, nearest["x"], nearest["y"])
             if not moves_toward_edge(mx, my, d, map_w, map_h):
                 return "move", d
             return "move", best_toward_center(mx, my, map_w, map_h)
 
     # --- PRIORITY 4: Shoot any rival in line of sight ---
-    # With plasma-rounds we do 100 damage per hit (2x), so prioritize shooting
-    if ammo > 0 and edge_dist >= SAFE_SHOOT_EDGE:
-        # Sort targets by HP (lowest first) to finish off weak rivals
+    if ammo > 0:
         shootable = []
         for target in players:
             d = can_shoot(mx, my, target["x"], target["y"])
@@ -117,32 +99,21 @@ def think(state):
                 dist = manhattan(mx, my, target["x"], target["y"])
                 shootable.append((dist, d, target))
         if shootable:
-            shootable.sort()  # closest first
+            shootable.sort()
             return "shoot", shootable[0][1]
 
-    # Even near edge, shoot if target is between us and center
-    if ammo > 0 and edge_dist < SAFE_SHOOT_EDGE:
-        for target in players:
-            d = can_shoot(mx, my, target["x"], target["y"])
-            if d and is_toward_center(mx, my, d, map_w, map_h):
-                return "shoot", d
-
-    # --- PRIORITY 5: Aggressively chase nearest rival ---
-    # With oracle-eye we see far, with plasma we kill fast — hunt them down
+    # --- PRIORITY 5: Chase nearest rival (stay within center leash) ---
     if players and ammo >= 2:
-        # Pick the closest rival
         target = closest(mx, my, players)
         dist = manhattan(mx, my, target["x"], target["y"])
-
-        if dist <= CHASE_RANGE:
-            # Try to get on same row or column for a shot
-            d = align_for_shot(mx, my, target["x"], target["y"], map_w, map_h)
+        if dist <= 10:
+            d = align_for_shot(mx, my, target["x"], target["y"])
             if d and not moves_toward_edge(mx, my, d, map_w, map_h):
-                return "move", d
-            # Just move toward them
-            d = toward(mx, my, target["x"], target["y"])
-            if not moves_toward_edge(mx, my, d, map_w, map_h):
-                return "move", d
+                # Check we won't go too far from center
+                ddx, ddy = DIRS.get(d, (0, 0))
+                nx, ny = mx + ddx, my + ddy
+                if abs(nx - CENTER_X) + abs(ny - CENTER_Y) <= CENTER_LEASH + 2:
+                    return "move", d
 
     # --- PRIORITY 6: Deliver mission if carrying ---
     if me.get("passenger"):
@@ -150,23 +121,32 @@ def think(state):
         if mx == dest["x"] and my == dest["y"]:
             return "dropoff", None
         d = toward(mx, my, dest["x"], dest["y"])
-        if not moves_toward_edge(mx, my, d, map_w, map_h):
+        ddx, ddy = DIRS.get(d, (0, 0))
+        nx, ny = mx + ddx, my + ddy
+        if not moves_toward_edge(mx, my, d, map_w, map_h) and abs(nx - CENTER_X) + abs(ny - CENTER_Y) <= CENTER_LEASH + 2:
             return "move", d
         return "move", best_toward_center(mx, my, map_w, map_h)
 
-    # --- PRIORITY 7: Pickup nearest mission (only if safe) ---
+    # --- PRIORITY 7: Pickup mission if safe and nearby ---
     if passengers and not players:
         p = closest(mx, my, passengers)
+        pdist = manhattan(mx, my, p["x"], p["y"])
         if p["x"] == mx and p["y"] == my:
             return "pickup", None
-        d = toward(mx, my, p["x"], p["y"])
-        if not moves_toward_edge(mx, my, d, map_w, map_h):
-            return "move", d
+        if pdist <= 3:
+            d = toward(mx, my, p["x"], p["y"])
+            if not moves_toward_edge(mx, my, d, map_w, map_h):
+                return "move", d
 
-    # --- DEFAULT: Unpredictable patrol near center ---
-    # Slight random jitter to avoid being a sitting duck
+    # --- DEFAULT: Stay near center with unpredictable jitter ---
     if _tick_count % 3 == 0:
-        return "move", random.choice(["north", "south", "east", "west"])
+        dirs = ["north", "south", "east", "west"]
+        random.shuffle(dirs)
+        for d in dirs:
+            ddx, ddy = DIRS.get(d, (0, 0))
+            nx, ny = mx + ddx, my + ddy
+            if abs(nx - CENTER_X) + abs(ny - CENTER_Y) <= CENTER_LEASH:
+                return "move", d
     return "move", best_toward_center(mx, my, map_w, map_h)
 
 
@@ -198,41 +178,33 @@ def closest(mx, my, targets):
     return min(targets, key=lambda t: abs(t["x"] - mx) + abs(t["y"] - my))
 
 def can_shoot(mx, my, tx, ty):
-    """Returns direction to shoot if target is on same row or column."""
     if tx == mx and ty != my:
         return "south" if ty > my else "north"
     if ty == my and tx != mx:
         return "east" if tx > mx else "west"
     return None
 
-def align_for_shot(mx, my, tx, ty, map_w, map_h):
-    """Move to get on the same row or column as target for a shot."""
+def align_for_shot(mx, my, tx, ty):
+    """Move to get on same row or column as target."""
     dx, dy = tx - mx, ty - my
-    # If close to same row, align vertically
     if abs(dx) <= abs(dy) and dx != 0:
         return "east" if dx > 0 else "west"
-    # If close to same column, align horizontally
     if abs(dy) < abs(dx) and dy != 0:
         return "south" if dy > 0 else "north"
-    # Already aligned, move closer
     return toward(mx, my, tx, ty)
 
 def safe_dodge(mx, my, prefer_dirs, map_w, map_h):
-    """Dodge in preferred directions, but never toward an edge."""
     for d in prefer_dirs:
         if not moves_toward_edge(mx, my, d, map_w, map_h):
             return d
-    # All preferred dodge dirs are toward edge — go to center instead
     return best_toward_center(mx, my, map_w, map_h)
 
 def is_toward_center(mx, my, direction, map_w, map_h):
-    """Check if a direction moves us closer to center."""
     ddx, ddy = DIRS.get(direction, (0, 0))
     nx, ny = mx + ddx, my + ddy
     return manhattan(nx, ny, CENTER_X, CENTER_Y) < manhattan(mx, my, CENTER_X, CENTER_Y)
 
 def best_toward_center(mx, my, map_w, map_h, prefer=None):
-    """Pick the direction that most reduces distance to center."""
     cx, cy = CENTER_X, CENTER_Y
     ranked = []
     for d, (ddx, ddy) in DIRS.items():
@@ -243,12 +215,9 @@ def best_toward_center(mx, my, map_w, map_h, prefer=None):
         bonus = -1 if (prefer and d in prefer) else 0
         ranked.append((dist + bonus, d))
     ranked.sort()
-    if ranked:
-        return ranked[0][1]
-    return "south"
+    return ranked[0][1] if ranked else "south"
 
 def moves_toward_edge(mx, my, direction, map_w, map_h):
-    """Returns True if moving in this direction puts us closer to an edge."""
     ddx, ddy = DIRS.get(direction, (0, 0))
     nx, ny = mx + ddx, my + ddy
     edge_dist_now = min(mx, my, map_w - 1 - mx, map_h - 1 - my)

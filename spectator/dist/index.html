@@ -226,6 +226,7 @@
             </div>
         </div>
         <button id="start-game-btn" onclick="startGame()" disabled>Start Game</button>
+        <button onclick="resetGame()" style="margin-top:12px;font-family:monospace;font-size:16px;padding:10px 30px;border:2px solid #ff6b6b;border-radius:8px;color:#ff6b6b;background:rgba(255,107,107,0.1);cursor:pointer;letter-spacing:0.1em;">Reset Game</button>
     </div>
 
     <!-- Control panel (only shown in server mode) -->
@@ -661,20 +662,7 @@
 
         // Round state handling
         var lastRoundOver = false;
-        function handleRoundState(state) {
-            var roundNum = state.round || 1;
-            document.getElementById('round-header').textContent = 'Round ' + roundNum + ' of 3';
-
-            var overlay = document.getElementById('round-winner-overlay');
-            if (state['round-over'] && !lastRoundOver) {
-                document.getElementById('winner-name').textContent = state['round-winner'] || '???';
-                overlay.style.display = 'flex';
-                lastRoundOver = true;
-            } else if (!state['round-over']) {
-                overlay.style.display = 'none';
-                lastRoundOver = false;
-            }
-        }
+        // handleRoundState defined below with audio support
 
         // Bot update notifications
         var seenUpdates = 0;
@@ -713,6 +701,15 @@
                 if (winnerEl) winnerEl.textContent = state['round-winner'] || '???';
                 overlay.style.display = 'flex';
                 lastRoundOver = true;
+                // Play winner announcement then stop all audio
+                stopAmbientTimer();
+                voiceEnqueue(function(done) { playCachedClip('game_over', function() {
+                    done();
+                    // Stop any further audio
+                    voiceBusy = false;
+                    voiceQueue = [];
+                    stopAmbientTimer();
+                }); });
             } else if (!state['round-over']) {
                 overlay.style.display = 'none';
                 lastRoundOver = false;
