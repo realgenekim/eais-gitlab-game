@@ -456,6 +456,11 @@
                             :gear-catalog (core/available-gear state)})))
     (json-response 401 {:error "Invalid token"})))
 
+(defn handle-agent-context [_request]
+  {:status 200
+   :headers {"Content-Type" "text/plain; charset=utf-8"}
+   :body (slurp (clojure.java.io/resource "public/guide/agent-context.md"))})
+
 (defn handle-bot-update [request]
   "Bot announces it has been updated (hot-reload). Shows on spectator."
   (if-let [player-id (authenticate request)]
@@ -769,10 +774,7 @@
          ["/signup" {:post {:handler #'handle-signup}
                     :get {:handler #'handle-signup-list}}]
          ["/signup/clear" {:post {:handler #'handle-signup-clear}}]
-         ["/agent-context" {:get {:handler (fn [_]
-                                            {:status 200
-                                             :headers {"Content-Type" "text/plain; charset=utf-8"}
-                                             :body (slurp (clojure.java.io/resource "public/guide/agent-context.md"))})}}]
+         ["/agent-context" {:get {:handler #'handle-agent-context}}]
          ["/guide.html" {:get {:handler (fn [_]
                                            {:status 200
                                             :headers {"Content-Type" "text/html"}
