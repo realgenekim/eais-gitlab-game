@@ -166,18 +166,23 @@
         dir-kw (keyword direction)
         [dx dy] (get directions dir-kw [0 0])
         new-pos [(+ (:x player) dx) (+ (:y player) dy)]
-        ;; Block immediate reversals (north→south, east→west) — looks terrible
+        ;; Block rapid oscillation: only reject reversal if last TWO moves
+        ;; were opposite (A→B→A pattern), not just one reversal
         last-dir (:last-direction player)
-        reversing? (and last-dir (= dir-kw (opposite-dir last-dir)))
+        prev-dir (:prev-direction player)
+        oscillating? (and last-dir prev-dir
+                         (= dir-kw (opposite-dir last-dir))
+                         (= dir-kw prev-dir))  ;; A→B→A pattern
         ;; Occupied by anyone OTHER than this player
         others (disj (occupied-cells state) [(:x player) (:y player)])]
     (if (and (:alive? player)
-             (not reversing?)
+             (not oscillating?)
              (walkable? state new-pos)
              (not (contains? others new-pos)))
       (-> state
           (assoc-in [:players player-id :x] (first new-pos))
           (assoc-in [:players player-id :y] (second new-pos))
+          (assoc-in [:players player-id :prev-direction] last-dir)
           (assoc-in [:players player-id :last-direction] dir-kw))
       state)))
 

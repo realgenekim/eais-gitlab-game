@@ -264,6 +264,17 @@
                         :players (:players result)})
     (json-response 400 {:error "Game is not in lobby phase"})))
 
+(defonce commentary-text (atom {:text "" :timestamp 0}))
+
+(defn handle-commentary-post [request]
+  (let [body (:body request)
+        text (get body "text" "")]
+    (reset! commentary-text {:text text :timestamp (System/currentTimeMillis)})
+    (json-response 200 {:status "ok"})))
+
+(defn handle-commentary-get [_request]
+  (json-response 200 @commentary-text))
+
 (defn handle-resume [_request]
   (engine/resume-game!)
   (json-response 200 {:status "resumed"}))
@@ -331,6 +342,8 @@
          ["/game/map-swap" {:post {:handler #'handle-map-swap}}]
          ["/game/lightning" {:post {:handler #'handle-lightning}}]
          ["/game/start" {:post {:handler #'handle-start}}]
+         ["/game/commentary" {:get {:handler #'handle-commentary-get}
+                              :post {:handler #'handle-commentary-post}}]
          ["/game/seek" {:post {:handler #'handle-seek}}]
          ["/game/resume" {:post {:handler #'handle-resume}}]
          ;; Tools

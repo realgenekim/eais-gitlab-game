@@ -52,6 +52,27 @@
         }
         #status-bar.error { color: #ff6b6b; border-color: #ff6b6b; }
 
+        /* Commentary subtitles */
+        #subtitle-bar {
+            position: fixed;
+            bottom: 30px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 2000;
+            color: #fff;
+            font-family: monospace;
+            font-size: 28px;
+            font-weight: bold;
+            background: rgba(0,0,0,0.75);
+            padding: 12px 30px;
+            border-radius: 8px;
+            text-align: center;
+            max-width: 80vw;
+            display: none;
+            text-shadow: 2px 2px 4px #000;
+            letter-spacing: 0.05em;
+        }
+
         /* Scoreboard sidebar */
         #scoreboard {
             position: fixed;
@@ -223,6 +244,9 @@
     <!-- Status messages — bottom-right -->
     <div id="status-bar"></div>
 
+    <!-- Commentary subtitles — bottom center -->
+    <div id="subtitle-bar"></div>
+
     <script>
         const SERVER = 'http://localhost:33333';
         let botNum = 0;
@@ -385,6 +409,27 @@
                 btn.textContent = 'Start Game';
                 btn.disabled = false;
             }
+        }
+
+        // Commentary subtitle polling
+        let lastCommentaryTs = 0;
+        let subtitleTimeout = null;
+        async function pollCommentary() {
+            try {
+                const resp = await fetch(SERVER + '/game/commentary');
+                const data = await resp.json();
+                if (data.timestamp > lastCommentaryTs && data.text) {
+                    lastCommentaryTs = data.timestamp;
+                    const el = document.getElementById('subtitle-bar');
+                    el.textContent = data.text;
+                    el.style.display = 'block';
+                    if (subtitleTimeout) clearTimeout(subtitleTimeout);
+                    subtitleTimeout = setTimeout(() => { el.style.display = 'none'; }, 6000);
+                }
+            } catch(e) {}
+        }
+        if (window.location.search.includes('server')) {
+            setInterval(pollCommentary, 1000);
         }
 
         // moveBot removed — server-side bots handle their own movement + shooting

@@ -66,7 +66,7 @@ export class ServerGame extends Phaser.Scene {
     mapHeight       : number = 19;
     arenaOffsetX    : number = 0;  // pixel offset to center arena with crowd padding
     arenaOffsetY    : number = 0;
-    crowdPadding    : number = 80; // pixels reserved for crowd on each side
+    crowdPadding    : number = 160; // pixels reserved for crowd on each side
 
     frameMode       : boolean = false;
     currentFrame    : number = 0;
@@ -75,8 +75,11 @@ export class ServerGame extends Phaser.Scene {
     crowdSprites    : Phaser.GameObjects.Shape[] = [];
 
     create(): void {
-        this.statusText = this.add.text(16, 16, 'Connecting...', {
-            fontSize: '16px', color: '#4ecdc4', fontFamily: 'monospace',
+        // Status text with solid black background for visibility
+        const statusBg = this.add.rectangle(0, 0, 500, 30, 0x000000, 0.85)
+            .setOrigin(0, 0).setDepth(99);
+        this.statusText = this.add.text(10, 6, 'Connecting...', {
+            fontSize: '18px', color: '#4ecdc4', fontFamily: 'monospace',
             stroke: '#000', strokeThickness: 2
         }).setDepth(100);
 
@@ -696,8 +699,8 @@ export class ServerGame extends Phaser.Scene {
             const shirt = shirtColors[Math.floor(Math.random() * shirtColors.length)];
             const hat = hatColors[Math.floor(Math.random() * hatColors.length)];
 
-            // South Park proportions: BIG round head, small body
-            const headR = 5 + Math.random() * 2;  // big head
+            // South Park proportions: BIG round head, small body — 2x scale
+            const headR = 10 + Math.random() * 4;  // big head
             const bodyW = headR * 1.4;
             const bodyH = headR * 1.0;
 
@@ -773,82 +776,36 @@ export class ServerGame extends Phaser.Scene {
             this.crowdSprites.push(body, head);
         };
 
-        // Fill ALL available padding with crowd — top, bottom, left, right
+        // Fill the ENTIRE border uniformly — full canvas width/height, no gaps
+        const spacing = 22;
+        const canvasW = this.scale.width;
+        const canvasH = this.scale.height;
 
-        // Top bleachers — multiple rows filling the padding
-        const topRows = Math.floor(oy / 16);
-        for (let row = 0; row < topRows; row++) {
-            const y = oy - margin - row * 16;
-            for (let i = 0; i < Math.floor(arenaW / 12); i++) {
-                const x = ox + 6 + i * 12 + (Math.random() - 0.5) * 6;
-                drawPerson(x, y, 'down');
+        // Top section — full width, all rows from y=0 to arena top
+        for (let y = 15; y < oy - 5; y += spacing) {
+            for (let x = 15; x < canvasW - 10; x += spacing) {
+                drawPerson(x + (Math.random()-0.5)*8, y + (Math.random()-0.5)*8, 'down');
             }
         }
 
-        // Bottom bleachers
-        const botRows = Math.floor((this.scale.height - oy - arenaH) / 16);
-        for (let row = 0; row < botRows; row++) {
-            const y = oy + arenaH + margin + row * 16;
-            for (let i = 0; i < Math.floor(arenaW / 12); i++) {
-                const x = ox + 6 + i * 12 + (Math.random() - 0.5) * 6;
-                drawPerson(x, y, 'up');
+        // Bottom section — full width, all rows from arena bottom to canvas bottom
+        for (let y = oy + arenaH + 10; y < canvasH - 5; y += spacing) {
+            for (let x = 15; x < canvasW - 10; x += spacing) {
+                drawPerson(x + (Math.random()-0.5)*8, y + (Math.random()-0.5)*8, 'up');
             }
         }
 
-        // Left bleachers
-        const leftCols = Math.floor(ox / 16);
-        for (let col = 0; col < leftCols; col++) {
-            const x = ox - margin - col * 16;
-            for (let i = 0; i < Math.floor(arenaH / 12); i++) {
-                const y = oy + 6 + i * 12 + (Math.random() - 0.5) * 6;
-                drawPerson(x, y, 'right');
+        // Left section — from arena top to arena bottom (middle band only, top/bottom already covered)
+        for (let x = 15; x < ox - 5; x += spacing) {
+            for (let y = oy; y < oy + arenaH; y += spacing) {
+                drawPerson(x + (Math.random()-0.5)*8, y + (Math.random()-0.5)*8, 'right');
             }
         }
 
-        // Right bleachers
-        const rightCols = Math.floor((this.scale.width - ox - arenaW) / 16);
-        for (let col = 0; col < rightCols; col++) {
-            const x = ox + arenaW + margin + col * 16;
-            for (let i = 0; i < Math.floor(arenaH / 12); i++) {
-                const y = oy + 6 + i * 12 + (Math.random() - 0.5) * 6;
-                drawPerson(x, y, 'left');
-            }
-        }
-
-        // Crowd ON the arena border walls — these are the front-row seats!
-        // The outer ring of the map is walls — put spectators there
-        const wallTs = this.tileSize;
-        // Top wall row
-        for (let gx = 0; gx < this.mapWidth; gx++) {
-            const [px, py] = this.gridToPixel(gx, 0);
-            drawPerson(px + (Math.random()-0.5)*wallTs*0.6, py + (Math.random()-0.5)*wallTs*0.4, 'down');
-        }
-        // Bottom wall row
-        for (let gx = 0; gx < this.mapWidth; gx++) {
-            const [px, py] = this.gridToPixel(gx, this.mapHeight - 1);
-            drawPerson(px + (Math.random()-0.5)*wallTs*0.6, py + (Math.random()-0.5)*wallTs*0.4, 'up');
-        }
-        // Left wall column
-        for (let gy = 1; gy < this.mapHeight - 1; gy++) {
-            const [px, py] = this.gridToPixel(0, gy);
-            drawPerson(px + (Math.random()-0.5)*wallTs*0.4, py + (Math.random()-0.5)*wallTs*0.6, 'right');
-        }
-        // Right wall column
-        for (let gy = 1; gy < this.mapHeight - 1; gy++) {
-            const [px, py] = this.gridToPixel(this.mapWidth - 1, gy);
-            drawPerson(px + (Math.random()-0.5)*wallTs*0.4, py + (Math.random()-0.5)*wallTs*0.6, 'left');
-        }
-
-        // Corner crowds — fill the diagonal gaps
-        const corners = [
-            [ox / 2, oy / 2],
-            [ox + arenaW + (this.scale.width - ox - arenaW) / 2, oy / 2],
-            [ox / 2, oy + arenaH + (this.scale.height - oy - arenaH) / 2],
-            [ox + arenaW + (this.scale.width - ox - arenaW) / 2, oy + arenaH + (this.scale.height - oy - arenaH) / 2]
-        ];
-        for (const [cx, cy] of corners) {
-            for (let i = 0; i < 12; i++) {
-                drawPerson(cx + (Math.random() - 0.5) * 50, cy + (Math.random() - 0.5) * 50, 'down');
+        // Right section — from arena top to arena bottom
+        for (let x = ox + arenaW + 10; x < canvasW - 5; x += spacing) {
+            for (let y = oy; y < oy + arenaH; y += spacing) {
+                drawPerson(x + (Math.random()-0.5)*8, y + (Math.random()-0.5)*8, 'left');
             }
         }
     }

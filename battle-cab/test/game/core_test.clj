@@ -248,3 +248,48 @@
           ;; Run several ticks
           state (reduce (fn [s _] (core/advance-tick s [])) state (range 20))]
       (is (no-cell-sharing? state)))))
+
+(deftest no-stuck-bots-test
+  (testing "players sending move commands should actually move over 20 ticks"
+    (let [[state c1] (core/add-player (fresh-state) "Alice")
+          id (:id c1)
+          start-x (get-in state [:players id :x])
+          start-y (get-in state [:players id :y])
+          ;; Send a variety of move commands over 20 ticks
+          dirs (cycle [:east :east :south :south :east :south :west :north])
+          state (reduce
+                 (fn [s dir]
+                   (core/advance-tick s [{:player-id id
+                                          :action {:type :move :direction dir}}]))
+                 state
+                 (take 20 dirs))
+          end-x (get-in state [:players id :x])
+          end-y (get-in state [:players id :y])]
+      ;; Player should have moved from starting position
+      (is (or (not= start-x end-x) (not= start-y end-y))
+          "Player should not be stuck at starting position after 20 move commands")))
+
+  (testing "oscillation prevention allows single reversal but blocks A-B-A-B"
+    (let [[state c1] (core/add-player (fresh-state) "Alice")
+          id (:id c1)
+          ;; Move east, then west (single reversal — should be allowed)
+          state (core/apply-action state id {:type :move :direction :east})
+          x-after-east (get-in state [:players id :x])
+          state (core/apply-action state id {:type :move :direction :west})
+          x-after-west (get-in state [:players id :x])]
+      ;; Single reversal should work
+      (is (= (dec x-after-east) x-after-west)
+          "Single reversal (east then west) should be allowed")))
+
+  (testing "A-B-A oscillation pattern is blocked"
+    (let [[state c1] (core/add-player (fresh-state) "Alice")
+          id (:id c1)
+          ;; East → West → East (A-B-A pattern — third move should be blocked)
+          state (core/apply-action state id {:type :move :direction :east})
+          state (core/apply-action state id {:type :move :direction :west})
+          x-before-third (get-in state [:players id :x])
+          state (core/apply-action state id {:type :move :direction :east})
+          x-after-third (get-in state [:players id :x])]
+      ;; The A-B-A should be blocked
+      (is (= x-before-third x-after-third)
+          "A-B-A oscillation pattern should be blocked"))))
