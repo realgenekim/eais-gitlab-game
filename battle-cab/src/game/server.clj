@@ -190,13 +190,16 @@
     (if (:error result)
       (json-response 400 result)
       (do
-        ;; Announce new challenger
-        (reset! commentary-text
-                {:text (str "A NEW CHALLENGER HAS ENTERED: " (str/upper-case player-name) "!")
-                 :timestamp (System/currentTimeMillis)})
+        (when-not (:reconnected result)
+          (reset! commentary-text
+                  {:text (str "A NEW CHALLENGER HAS ENTERED: " (str/upper-case player-name) "!")
+                   :timestamp (System/currentTimeMillis)}))
         (json-response 200 {:player-id (:id result)
                             :token (:token result)
-                            :message (str "Welcome, " player-name "!")
+                            :reconnected (boolean (:reconnected result))
+                            :message (if (:reconnected result)
+                                       (str "Reconnected as " player-name ".")
+                                       (str "Welcome, " player-name "!"))
                             :gear-catalog (:gear-catalog result)})))))
 
 (defn handle-state [request]
@@ -782,7 +785,7 @@
          ["/game/status" {:get {:handler #'handle-status}}]
          ["/game/ascii" {:get {:handler #'handle-ascii}}]
          ;; Spectator
-         ["/" {:get {:handler #'handle-spectator-page}}]
+         ["/" {:get {:handler (fn [_] (resp/redirect "/spectator/index.html"))}}]
          ["/spectate" {:get {:handler #'handle-spectate}}]
          ["/spectate-ws" {:get {:handler #'ws/handle-ws-spectate}}]
          ["/game/restart" {:post {:handler #'handle-restart}}]

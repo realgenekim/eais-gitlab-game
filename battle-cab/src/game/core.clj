@@ -1264,11 +1264,22 @@
       [(update-in state [:players player-id :gear] (fnil conj []) item-key)
        true "Item equipped"])))
 
-(defn add-player
-  "Add a player to the game. Returns [updated-state {:id :token}] or [state {:error msg}] if name taken."
+(defn find-player-by-name
+  "Find existing player entry by name. Returns [id player] or nil."
   [state player-name]
-  (if (name-taken? state player-name)
-    [state {:error (str "Name '" player-name "' is already taken. Pick a different name.")}]
+  (first (filter (fn [[_ p]] (= (:name p) player-name)) (:players state))))
+
+(defn add-player
+  "Add a player or reconnect to existing one.
+   If name exists, returns the existing token (reconnect).
+   Returns [updated-state {:id :token :reconnected?}]."
+  [state player-name]
+  (if-let [[existing-id existing-player] (find-player-by-name state player-name)]
+    ;; Reconnect — return existing credentials
+    [state {:id existing-id
+            :token (:token existing-player)
+            :reconnected true}]
+    ;; New player
     (let [id (str "player-" (subs (str (random-uuid)) 0 8))
           token (str (random-uuid))
           spawns (get-in state [:map :spawn-points] [[1 1] [18 1] [1 18] [18 18]])

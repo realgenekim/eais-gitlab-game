@@ -33,7 +33,7 @@ Base URL: `https://vibebattle.testwhatever.xyz`
 | `/game/status` | GET | Game phase, round, tick, player count |
 | `/game/scoreboard` | GET | All scores and rankings |
 | `/game/gear` | GET | Gear catalog with availability (taken items marked) |
-| `/game/join` | POST | Join with `{"name": "BotName"}` — returns token + gear catalog |
+| `/game/join` | POST | Join with `{"name": "BotName"}` — returns `player-id`, `token`, gear catalog. **Safe to retry** — same name reconnects with existing token. |
 | `/game/action` | POST | Send action `{"action": "move", "direction": "north"}` (needs auth token) |
 | `/game/state` | GET | Fog-of-war view (needs auth token) |
 | `/game/gear/select` | POST | Equip gear `{"item": "titan-shield"}` (needs auth token) |
