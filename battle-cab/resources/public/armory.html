@@ -546,7 +546,7 @@
         async function loadTimelineStep(step) {
             timelineStep = step;
             try {
-                const resp = await fetch(SERVER + '/game/armory/demo?timeline&step=' + step);
+                const resp = await fetch(SERVER + '/game/armory/demo?timeline&frame=' + step);
                 const data = await resp.json();
                 const badge = document.getElementById('phase-badge');
                 badge.textContent = data.phase.toUpperCase();
@@ -561,14 +561,14 @@
                 }
                 // Update URL
                 const url = new URL(window.location);
-                url.searchParams.set('step', step);
+                url.searchParams.set('frame', step);
                 history.replaceState(null, '', url);
             } catch(e) {}
         }
 
         // Init
         if (timelineMode) {
-            timelineStep = parseInt(urlParams.get('step') || '0');
+            timelineStep = parseInt(urlParams.get('frame') || '0');
             addEvent('join', 'Timeline mode: J/→ = next step, K/← = prev step, Space = auto-play.');
             loadTimelineStep(timelineStep);
             document.addEventListener('keydown', (e) => {

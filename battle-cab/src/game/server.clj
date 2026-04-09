@@ -416,7 +416,7 @@
         ;; Resolve state + event
         [state phase event]
         (if timeline?
-          (let [step (min (Integer/parseInt (or (get params "step") "0"))
+          (let [step (min (Integer/parseInt (or (get params "frame") "0"))
                           (count timeline-steps))
                 applied (take (inc step) timeline-steps)
                 state (reduce (fn [s [player-idx item _]]
@@ -476,7 +476,7 @@
                                 :players players
                                 :shop shop
                                 :crates crates}
-                         timeline? (assoc :step (Integer/parseInt (or (get params "step") "0"))
+                         timeline? (assoc :step (Integer/parseInt (or (get params "frame") "0"))
                                           :total-steps (dec (count timeline-steps))
                                           :event event)))))
 

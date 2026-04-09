@@ -146,15 +146,36 @@ Max 3 items per player. Remaining points can buy in-game crates (gold/silver/pur
 
 ### Testing the Armory in Isolation
 
-No bots needed, no server state mutation — pure function composition, served as JSON:
+No bots needed, no server state mutation — pure function composition, served as JSON.
 
+**Timeline mode** (step through purchases one by one):
+```
+http://localhost:33333/armory?timeline&frame=0
+```
+
+Keyboard controls (same as combat spectator):
+- **J** / **→** = next frame (next purchase, with confetti)
+- **K** / **←** = previous frame
+- **Space** = auto-play toggle (1.5s per frame)
+
+Frames: 0=fresh → 1-8=one purchase each → 9+=LOADOUT REVEAL
+
+**Static scenarios** (snapshot views):
 ```
 http://localhost:33333/armory?demo       — mid-shopping scenario (default)
 http://localhost:33333/armory?demo=0     — fresh (4 players, 30pts each)
 http://localhost:33333/armory?demo=2     — fully loaded + crates + debuffs
 ```
 
-The demo endpoint (`/game/armory/demo?scenario=N`) builds synthetic game state from pure `game.core` functions — `make-initial-state → add-player → buy-item → spawn-crate` — and returns the same JSON shape as the live endpoint. Zero side effects.
+The demo endpoint (`/game/armory/demo`) builds synthetic game state from pure `game.core` functions — `make-initial-state → add-player → buy-item → spawn-crate` — and returns the same JSON shape as the live endpoint. Zero side effects.
+
+### Brian: Configure Clojure MCP for Superpowers
+
+To get Claude Code editing Clojure files with structural awareness:
+```bash
+cd battle-cab && make mcp-configure
+```
+This enables the `clojure-mcp` tools: `clojure_edit` (structural form replacement), `clojure_eval` (nREPL evaluation), `deps_grep`/`deps_read` (dependency inspection). Requires nREPL running (`make nrepl`).
 
 ## What Makes It Fun for an Audience
 
