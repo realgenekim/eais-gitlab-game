@@ -267,24 +267,23 @@
         let ambientTimer = null;
         let lastCommentaryTick = -1;
 
-        // Load manifest and preload all clips
+        // Load manifest only — audio clips are fetched on first use (lazy)
         async function initAudio() {
             try {
                 const resp = await fetch(AUDIO_BASE + '/manifest.json');
                 audioManifest = await resp.json();
-                let total = 0;
-                for (const [cat, hashes] of Object.entries(audioManifest)) {
-                    for (const h of hashes) {
-                        const audio = new Audio(AUDIO_BASE + '/' + h + '.mp3');
-                        audio.preload = 'auto';
-                        audioCache[h] = audio;
-                        total++;
-                    }
-                }
-                console.log('Commentary: loaded ' + total + ' audio clips');
+                const total = Object.values(audioManifest).reduce((s, a) => s + a.length, 0);
+                console.log('Commentary: manifest loaded, ' + total + ' clips available (lazy)');
             } catch(e) {
                 console.warn('Commentary audio not available:', e);
             }
+        }
+
+        function getAudio(hash) {
+            if (!audioCache[hash]) {
+                audioCache[hash] = new Audio(AUDIO_BASE + '/' + hash + '.mp3');
+            }
+            return audioCache[hash];
         }
 
         function playCategory(category) {
@@ -345,8 +344,7 @@
             const hashes = audioManifest[category];
             if (!hashes || hashes.length === 0) { done(); return; }
             const hash = hashes[Math.floor(Math.random() * hashes.length)];
-            const audio = audioCache[hash];
-            if (!audio) { done(); return; }
+            const audio = getAudio(hash);
             const clone = audio.cloneNode();
             clone.onended = done;
             clone.onerror = done;
