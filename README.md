@@ -6,6 +6,11 @@ A multiplayer bot-programming game where players vibe code AI bots that battle i
 
 You write a Python bot that connects to a remote game server via REST API. Your bot reads game state each tick, decides what to do, and sends commands. The audience watches all bots battle it out on a live spectator view.
 
+## Prerequisites
+
+- **Python 3.10+** (check: `python3 --version`)
+- **Node.js 18+** (check: `node --version`) — only needed for the lobby gear room UI
+
 ## Quick Start (Competitors)
 
 ```bash
@@ -14,15 +19,18 @@ git clone <repo-url>
 cd eais-gitlab-game
 make setup NAME=my-bot
 
-# 2. Preview your bot in the gear room (edit loadout.py, see changes live)
-#    Open http://localhost:5173/?lobby in your browser
+# 2. Preview your bot in the gear room
+#    Terminal 1: start the lobby UI server
+cd spectator && npm install && npm run dev
+#    Terminal 2: start the lobby backend (watches your bot for changes)
 make lobby BOT=bots/my-bot
+#    Open http://localhost:5173/?lobby in your browser
 
 # 3. Deploy to the live arena
 make deploy BOT=bots/my-bot
 ```
 
-That's it. Three commands.
+Steps 1 and 3 are the essentials. Step 2 (the lobby) is optional but recommended — it lets you preview your gear and stats live as you edit.
 
 ### What `make setup` Does
 
@@ -135,6 +143,9 @@ The starter bot has a `think(state)` function that returns `(action, direction)`
 ```python
 def think(state):
     me = state["you"]
+    if not me.get("alive?", True):
+        return None, None  # dead, wait for respawn
+
     enemies = state["visible"]["enemies"]
 
     # Shoot at enemies on the same row/column
@@ -152,6 +163,38 @@ def think(state):
 
     return "move", "north"
 ```
+
+### Game State (`GET /game/state`)
+
+Your bot receives this each tick:
+
+```json
+{
+  "tick": 42,
+  "you": {
+    "id": "player-abc",
+    "x": 5, "y": 3,
+    "hp": 600, "alive?": true,
+    "score": 200, "ammo": 8, "grenades": 3,
+    "shield-hp": 50,
+    "loadout": {"items": ["shotgun", "light-vest"], "cost": 25},
+    "stats": {"max-hp": 600, "shoot-damage": 50, "shoot-range": 3, "speed": 1}
+  },
+  "visible": {
+    "players": [{"id": "player-xyz", "x": 7, "y": 3, "has-passenger": false}],
+    "enemies": [{"id": "enemy-1", "x": 6, "y": 4, "hp": 20, "type": "floopy"}],
+    "passengers": [{"id": "pax-1", "x": 3, "y": 5, "dest": {"x": 10, "y": 8}}],
+    "shots": []
+  },
+  "traps": [],
+  "map": {"width": 21, "height": 19}
+}
+```
+
+### Example Bots
+
+- **`bots/starter_bot/`** — basic template, shoots at visible enemies, moves toward threats
+- **`bots/berzerker/`** — aggressive close-range build (shotgun + speed boost + grenades + trap mines), demonstrates gear-specific actions
 
 ## Scoring
 
@@ -207,28 +250,45 @@ battle-cab/          Clojure game server
 
 ## For Game Admins
 
-Set the game server URL at the top of `Makefile` before distributing:
+### Before the Event
+
+1. Set the game server URL at the top of `Makefile` before distributing the repo:
 
 ```makefile
 GAME_SERVER ?= https://your-game-server.com
 ```
 
-### Running the Game Server
+2. Start the game server and spectator on your host machine:
 
 ```bash
+# Terminal 1: Game server (Clojure, requires Java)
 cd battle-cab
-make nrepl           # Terminal 1: nREPL
-make server-dev      # Terminal 2: Dev server on port 33333
-```
+make server-dev      # Runs on port 33333
 
-### Running the Spectator
-
-```bash
+# Terminal 2: Spectator UI
 cd spectator
 npm install
-npm run dev          # Vite dev server on port 5173
-# Open http://localhost:5173/?server
+npm run dev          # Runs on port 5173
+# Live game view: http://localhost:5173/?server
 ```
+
+3. When competitors deploy, their bots run locally on their machines and connect to your game server over HTTP.
+
+### During the Event
+
+```bash
+make reset-game      # Reset arena between rounds
+make status          # Check server status + player count
+```
+
+### How Deployment Works
+
+Competitors' bots run on **their own machines** — not on the game server. The bot is a Python process that:
+1. Calls `POST /game/join` with their name + loadout
+2. Polls `GET /game/state` every 250ms for their fog-of-war view
+3. Sends `POST /game/action` commands each tick
+
+This means competitors only need Python and an internet connection. No server access required.
 
 ## License
 
