@@ -1,0 +1,43 @@
+{
+  "frames": {
+    "PistolHealth": {
+      "frame": {
+        "w": 42,
+        "h": 42,
+        "x": 0,
+        "y": 0
+      },
+      "anchor": {
+        "x": 0.5,
+        "y": 0.5
+      }
+    },
+    "GoldCoin": {
+      "frame": {
+        "w": 26,
+        "h": 26,
+        "x": 42,
+        "y": 0
+      },
+      "anchor": {
+        "x": 0.5,
+        "y": 0.5
+      }
+    },
+    "ExpGem": {
+      "frame": {
+        "w": 26,
+        "h": 25,
+        "x": 42,
+        "y": 26
+      },
+      "anchor": {
+        "x": 0.5,
+        "y": 0.5
+      }
+    }
+  },
+  "meta": {
+    "image": "game_items.png"
+  }
+}

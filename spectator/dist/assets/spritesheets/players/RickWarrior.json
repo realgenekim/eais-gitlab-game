@@ -1,0 +1,289 @@
+{
+  "frames": {
+    "RickWarrior_front": {
+      "frame": {
+        "x": 4,
+        "y": 4,
+        "w": 687,
+        "h": 668
+      },
+      "rotated": false,
+      "trimmed": true,
+      "spriteSourceSize": {
+        "x": 15,
+        "y": 62,
+        "w": 687,
+        "h": 668
+      },
+      "sourceSize": {
+        "w": 846,
+        "h": 730
+      }
+    },
+    "RickWarrior_back": {
+      "frame": {
+        "x": 699,
+        "y": 4,
+        "w": 666,
+        "h": 663
+      },
+      "rotated": false,
+      "trimmed": true,
+      "spriteSourceSize": {
+        "x": 3,
+        "y": 62,
+        "w": 666,
+        "h": 663
+      },
+      "sourceSize": {
+        "w": 679,
+        "h": 725
+      }
+    },
+    "RickWarrior_up_1": {
+      "frame": {
+        "x": 1373,
+        "y": 4,
+        "w": 93,
+        "h": 134
+      },
+      "rotated": false,
+      "trimmed": true,
+      "spriteSourceSize": {
+        "x": 23,
+        "y": 26,
+        "w": 93,
+        "h": 134
+      },
+      "sourceSize": {
+        "w": 125,
+        "h": 162
+      }
+    },
+    "RickWarrior_up_3": {
+      "frame": {
+        "x": 1474,
+        "y": 4,
+        "w": 93,
+        "h": 134
+      },
+      "rotated": false,
+      "trimmed": true,
+      "spriteSourceSize": {
+        "x": 23,
+        "y": 26,
+        "w": 93,
+        "h": 134
+      },
+      "sourceSize": {
+        "w": 125,
+        "h": 162
+      }
+    },
+    "RickWarrior_down_1": {
+      "frame": {
+        "x": 1575,
+        "y": 4,
+        "w": 93,
+        "h": 133
+      },
+      "rotated": false,
+      "trimmed": true,
+      "spriteSourceSize": {
+        "x": 10,
+        "y": 26,
+        "w": 93,
+        "h": 133
+      },
+      "sourceSize": {
+        "w": 125,
+        "h": 162
+      }
+    },
+    "RickWarrior_down_2": {
+      "frame": {
+        "x": 1676,
+        "y": 4,
+        "w": 93,
+        "h": 133
+      },
+      "rotated": false,
+      "trimmed": true,
+      "spriteSourceSize": {
+        "x": 10,
+        "y": 27,
+        "w": 93,
+        "h": 133
+      },
+      "sourceSize": {
+        "w": 125,
+        "h": 162
+      }
+    },
+    "RickWarrior_down_3": {
+      "frame": {
+        "x": 1777,
+        "y": 4,
+        "w": 93,
+        "h": 133
+      },
+      "rotated": false,
+      "trimmed": true,
+      "spriteSourceSize": {
+        "x": 10,
+        "y": 26,
+        "w": 93,
+        "h": 133
+      },
+      "sourceSize": {
+        "w": 125,
+        "h": 162
+      }
+    },
+    "RickWarrior_down_4": {
+      "frame": {
+        "x": 1878,
+        "y": 4,
+        "w": 93,
+        "h": 131
+      },
+      "rotated": false,
+      "trimmed": true,
+      "spriteSourceSize": {
+        "x": 11,
+        "y": 27,
+        "w": 93,
+        "h": 131
+      },
+      "sourceSize": {
+        "w": 125,
+        "h": 162
+      }
+    },
+    "RickWarrior_up_2": {
+      "frame": {
+        "x": 1878,
+        "y": 143,
+        "w": 93,
+        "h": 131
+      },
+      "rotated": false,
+      "trimmed": true,
+      "spriteSourceSize": {
+        "x": 23,
+        "y": 28,
+        "w": 93,
+        "h": 131
+      },
+      "sourceSize": {
+        "w": 125,
+        "h": 162
+      }
+    },
+    "RickWarrior_up_4": {
+      "frame": {
+        "x": 1575,
+        "y": 145,
+        "w": 92,
+        "h": 134
+      },
+      "rotated": false,
+      "trimmed": true,
+      "spriteSourceSize": {
+        "x": 24,
+        "y": 26,
+        "w": 92,
+        "h": 134
+      },
+      "sourceSize": {
+        "w": 125,
+        "h": 162
+      }
+    },
+    "RickWarrior_side_2": {
+      "frame": {
+        "x": 1373,
+        "y": 146,
+        "w": 85,
+        "h": 131
+      },
+      "rotated": false,
+      "trimmed": true,
+      "spriteSourceSize": {
+        "x": 9,
+        "y": 29,
+        "w": 85,
+        "h": 131
+      },
+      "sourceSize": {
+        "w": 125,
+        "h": 162
+      }
+    },
+    "RickWarrior_side_4": {
+      "frame": {
+        "x": 1466,
+        "y": 146,
+        "w": 84,
+        "h": 132
+      },
+      "rotated": false,
+      "trimmed": true,
+      "spriteSourceSize": {
+        "x": 10,
+        "y": 30,
+        "w": 84,
+        "h": 132
+      },
+      "sourceSize": {
+        "w": 125,
+        "h": 162
+      }
+    },
+    "RickWarrior_side_1": {
+      "frame": {
+        "x": 1373,
+        "y": 285,
+        "w": 84,
+        "h": 129
+      },
+      "rotated": false,
+      "trimmed": true,
+      "spriteSourceSize": {
+        "x": 9,
+        "y": 31,
+        "w": 84,
+        "h": 129
+      },
+      "sourceSize": {
+        "w": 125,
+        "h": 162
+      }
+    },
+    "RickWarrior_side_3": {
+      "frame": {
+        "x": 1465,
+        "y": 286,
+        "w": 84,
+        "h": 129
+      },
+      "rotated": false,
+      "trimmed": true,
+      "spriteSourceSize": {
+        "x": 9,
+        "y": 31,
+        "w": 84,
+        "h": 129
+      },
+      "sourceSize": {
+        "w": 125,
+        "h": 162
+      }
+    }
+  },
+  "meta": {
+    "app": "http://free-tex-packer.com",
+    "version": "0.6.7",
+    "image": "RickWarrior"
+  }
+}

@@ -16,8 +16,12 @@ export const GameOptions : any = {
     enemyRate               : 800,      // enemy rate, in milliseconds per enemy
     magnetRadius            : 100,      // radius of the circle within which the coins are being attracted
 
-    // Server connection (MVP 2+)
-    serverUrl               : 'http://localhost:33333',
-    serverWsUrl             : 'ws://localhost:33333/spectate-ws',
+    // Server connection — auto-detect from page URL, fallback to localhost
+    serverUrl               : (typeof window !== 'undefined' && window.location.hostname !== 'localhost')
+                                ? window.location.origin
+                                : 'http://localhost:33333',
+    serverWsUrl             : (typeof window !== 'undefined' && window.location.hostname !== 'localhost')
+                                ? (window.location.protocol === 'https:' ? 'wss://' : 'ws://') + window.location.host + '/spectate-ws'
+                                : 'ws://localhost:33333/spectate-ws',
     tickMs                  : 250       // server tick interval for interpolation
 }

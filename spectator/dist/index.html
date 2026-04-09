@@ -1,0 +1,637 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>VS Arena — Spectator</title>
+    <style>
+        body { margin: 0; background: #111; overflow: hidden; }
+        #thegame { width: 100vw; height: 100vh; }
+
+        /* Control panel — top-right overlay */
+        #controls {
+            position: fixed;
+            top: 10px;
+            right: 10px;
+            z-index: 1000;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            align-items: flex-start;
+            max-width: 280px;
+        }
+        #controls .btn-row { display: flex; gap: 8px; width: 100%; }
+        #controls .status-row { width: 100%; }
+        #controls button {
+            font-family: monospace;
+            font-size: 13px;
+            padding: 6px 14px;
+            border: 1px solid #555;
+            border-radius: 4px;
+            cursor: pointer;
+            color: #fff;
+            background: rgba(30,30,40,0.85);
+        }
+        #controls button:hover { background: rgba(60,60,80,0.9); }
+        #controls button.danger { border-color: #ff6b6b; color: #ff6b6b; }
+        #controls button.danger:hover { background: rgba(255,107,107,0.2); }
+        /* Status messages — bottom-right */
+        #status-bar {
+            position: fixed;
+            bottom: 10px;
+            right: 10px;
+            z-index: 1000;
+            color: #4ecdc4;
+            font-family: monospace;
+            font-size: 13px;
+            background: rgba(15,15,25,0.85);
+            padding: 6px 12px;
+            border-radius: 4px;
+            border: 1px solid #333;
+            display: none;
+        }
+        #status-bar.error { color: #ff6b6b; border-color: #ff6b6b; }
+
+        /* Commentary subtitles */
+        #subtitle-bar {
+            position: fixed;
+            bottom: 30px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 2000;
+            color: #fff;
+            font-family: monospace;
+            font-size: 28px;
+            font-weight: bold;
+            background: rgba(0,0,0,0.75);
+            padding: 12px 30px;
+            border-radius: 8px;
+            text-align: center;
+            max-width: 80vw;
+            display: none;
+            text-shadow: 2px 2px 4px #000;
+            letter-spacing: 0.05em;
+        }
+
+        /* Scoreboard sidebar */
+        #scoreboard {
+            position: fixed;
+            top: 50px;
+            right: 10px;
+            z-index: 1000;
+            background: rgba(15,15,25,0.9);
+            border: 2px solid #333;
+            border-radius: 8px;
+            padding: 12px 16px;
+            min-width: 200px;
+            max-width: 260px;
+            max-height: calc(100vh - 70px);
+            overflow-y: auto;
+            font-family: monospace;
+            display: none;
+            box-sizing: border-box;
+        }
+        #scoreboard h2 {
+            color: #ff6b6b;
+            font-size: 16px;
+            margin: 0 0 10px 0;
+            letter-spacing: 0.15em;
+            text-transform: uppercase;
+        }
+        .sb-player {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 6px 0;
+            border-bottom: 1px solid #222;
+        }
+        .sb-player:last-child { border-bottom: none; }
+        .sb-name { color: #fff; font-size: 14px; font-weight: bold; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 120px; }
+        .sb-stats { color: #aaa; font-size: 11px; text-align: right; white-space: nowrap; }
+        .sb-hp { color: #4ecdc4; font-size: 14px; }
+        .sb-score { color: #ffe66d; font-size: 14px; font-weight: bold; }
+        .sb-dead { opacity: 0.4; }
+        .sb-dead .sb-name { text-decoration: line-through; }
+
+        /* Lobby overlay */
+        #lobby-overlay {
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            z-index: 2000;
+            background: rgba(10,10,20,0.95);
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            font-family: monospace;
+        }
+        #lobby-overlay.active { display: flex; }
+        #lobby-title {
+            font-size: 48px;
+            color: #ff6b6b;
+            letter-spacing: 0.2em;
+            text-transform: uppercase;
+            margin-bottom: 8px;
+        }
+        #lobby-subtitle {
+            font-size: 18px;
+            color: #888;
+            margin-bottom: 40px;
+        }
+        #lobby-roster {
+            min-width: 360px;
+            max-width: 500px;
+        }
+        #lobby-roster h3 {
+            color: #4ecdc4;
+            font-size: 14px;
+            letter-spacing: 0.15em;
+            text-transform: uppercase;
+            margin: 0 0 12px 0;
+        }
+        .lobby-player {
+            display: flex;
+            align-items: center;
+            padding: 10px 16px;
+            margin: 6px 0;
+            background: rgba(40,40,60,0.8);
+            border: 1px solid #333;
+            border-radius: 6px;
+            animation: fadeSlideIn 0.3s ease-out;
+        }
+        @keyframes fadeSlideIn {
+            from { opacity: 0; transform: translateX(-20px); }
+            to { opacity: 1; transform: translateX(0); }
+        }
+        .lobby-player-num {
+            color: #ffe66d;
+            font-size: 20px;
+            font-weight: bold;
+            margin-right: 16px;
+            min-width: 30px;
+        }
+        .lobby-player-name {
+            color: #fff;
+            font-size: 18px;
+            font-weight: bold;
+        }
+        .lobby-player-status {
+            color: #4ecdc4;
+            font-size: 12px;
+            margin-left: auto;
+        }
+        #lobby-empty {
+            color: #555;
+            font-size: 16px;
+            text-align: center;
+            padding: 30px;
+        }
+        #start-game-btn {
+            margin-top: 40px;
+            font-family: monospace;
+            font-size: 22px;
+            font-weight: bold;
+            padding: 16px 48px;
+            border: 2px solid #4ecdc4;
+            border-radius: 8px;
+            color: #4ecdc4;
+            background: rgba(78,205,196,0.1);
+            cursor: pointer;
+            letter-spacing: 0.15em;
+            text-transform: uppercase;
+            transition: all 0.2s;
+        }
+        #start-game-btn:hover {
+            background: rgba(78,205,196,0.25);
+            box-shadow: 0 0 20px rgba(78,205,196,0.3);
+        }
+        #start-game-btn:disabled {
+            opacity: 0.3;
+            cursor: not-allowed;
+        }
+    </style>
+  <script type="module" crossorigin src="/assets/index-DNkVNqnd.js"></script>
+</head>
+<body>
+    <div id="thegame"></div>
+
+    <!-- Lobby overlay -->
+    <div id="lobby-overlay">
+        <div id="lobby-title">Cab Battle</div>
+        <div id="lobby-subtitle">Waiting for players to join...</div>
+        <div id="lobby-roster">
+            <h3>Players</h3>
+            <div id="lobby-players">
+                <div id="lobby-empty">No players yet</div>
+            </div>
+        </div>
+        <button id="start-game-btn" onclick="startGame()" disabled>Start Game</button>
+    </div>
+
+    <!-- Control panel (only shown in server mode) -->
+    <div id="controls" style="display:none;">
+        <div class="btn-row">
+            <button onclick="addBot()">+ Add Bot</button>
+            <button onclick="openArmory()">Armory</button>
+            <button onclick="resetGame()" class="danger">Reset</button>
+        </div>
+    </div>
+
+    <!-- Scoreboard sidebar -->
+    <div id="scoreboard">
+        <h2>Scoreboard</h2>
+        <div id="sb-players"></div>
+    </div>
+
+    <!-- Status messages — bottom-right -->
+    <div id="status-bar"></div>
+
+    <!-- Commentary subtitles — bottom center -->
+    <div id="subtitle-bar"></div>
+
+    <script>
+        const SERVER = 'http://localhost:33333';
+        let botNum = 0;
+        const names = ['Rick-Alpha','Rick-Beta','Rick-Gamma','Rick-Delta',
+                        'Rick-Echo','Rick-Foxtrot','Rick-Golf','Rick-Hotel'];
+
+        let currentPhase = 'lobby';
+
+        // ============================================================
+        // Commentary Audio Player — plays pre-cached clips from server
+        // ============================================================
+        const AUDIO_BASE = SERVER + '/audio';
+        let audioManifest = {};       // {category: [hash, hash, ...]}
+        let audioCache = {};          // {hash: Audio element}
+        let audioPlaying = false;
+        let audioQueue = [];
+        let ambientTimer = null;
+        let lastCommentaryTick = -1;
+
+        // Load manifest only — audio clips are fetched on first use (lazy)
+        async function initAudio() {
+            try {
+                const resp = await fetch(AUDIO_BASE + '/manifest.json');
+                audioManifest = await resp.json();
+                const total = Object.values(audioManifest).reduce((s, a) => s + a.length, 0);
+                console.log('Commentary: manifest loaded, ' + total + ' clips available (lazy)');
+            } catch(e) {
+                console.warn('Commentary audio not available:', e);
+            }
+        }
+
+        function getAudio(hash) {
+            if (!audioCache[hash]) {
+                audioCache[hash] = new Audio(AUDIO_BASE + '/' + hash + '.mp3');
+            }
+            return audioCache[hash];
+        }
+
+        function playCategory(category) {
+            const hashes = audioManifest[category];
+            if (!hashes || hashes.length === 0) return;
+            const hash = hashes[Math.floor(Math.random() * hashes.length)];
+            queueClip(hash);
+        }
+
+        function queueClip(hash) {
+            if (audioPlaying) {
+                // Max 2 in queue
+                if (audioQueue.length < 2) audioQueue.push(hash);
+                return;
+            }
+            playClip(hash);
+        }
+
+        function playClip(hash) {
+            const audio = audioCache[hash];
+            if (!audio) return;
+            audioPlaying = true;
+            // Clone so we can play overlapping if needed
+            const clone = audio.cloneNode();
+            clone.play().catch(() => {});
+            clone.onended = () => {
+                audioPlaying = false;
+                if (audioQueue.length > 0) {
+                    playClip(audioQueue.shift());
+                }
+            };
+        }
+
+        // Single unified voice queue — nothing overlaps
+        let voiceBusy = false;
+        let voiceQueue = [];
+
+        function voiceEnqueue(fn) {
+            if (voiceBusy) {
+                if (voiceQueue.length < 2) voiceQueue.push(fn);
+                return;
+            }
+            voiceRun(fn);
+        }
+
+        function voiceRun(fn) {
+            voiceBusy = true;
+            fn(() => {
+                voiceBusy = false;
+                if (voiceQueue.length > 0) {
+                    voiceRun(voiceQueue.shift());
+                }
+            });
+        }
+
+        // Play a cached ElevenLabs clip, call done() when finished
+        function playCachedClip(category, done) {
+            const hashes = audioManifest[category];
+            if (!hashes || hashes.length === 0) { done(); return; }
+            const hash = hashes[Math.floor(Math.random() * hashes.length)];
+            const audio = getAudio(hash);
+            const clone = audio.cloneNode();
+            clone.onended = done;
+            clone.onerror = done;
+            clone.play().catch(() => done());
+        }
+
+        function handleCommentary(state) {
+            const commentary = state.commentary || [];
+            if (commentary.length === 0) return;
+            if (state.tick <= lastCommentaryTick) return;
+            lastCommentaryTick = state.tick;
+
+            // Sort by priority (lower = more important)
+            const sorted = [...commentary].sort((a, b) =>
+                (a.priority || 99) - (b.priority || 99));
+            const best = sorted[0];
+
+            // Play cached ElevenLabs clip — one at a time, no overlap
+            voiceEnqueue((done) => playCachedClip(best.category, done));
+        }
+
+        function startAmbientTimer() {
+            if (ambientTimer) return;
+            ambientTimer = setInterval(() => {
+                if (voiceBusy || voiceQueue.length > 0) return;
+                // 50% ambient, 50% score callout
+                const cat = Math.random() < 0.5 ? 'ambient' : 'score';
+                voiceEnqueue((done) => playCachedClip(cat, done));
+            }, 6000);  // every 6 seconds of silence
+        }
+
+        function stopAmbientTimer() {
+            if (ambientTimer) { clearInterval(ambientTimer); ambientTimer = null; }
+        }
+
+        // Init audio on page load
+        if (window.location.search.includes('server')) {
+            initAudio();
+        }
+
+        // Show controls + scoreboard only in server mode
+        if (window.location.search.includes('server')) {
+            document.getElementById('controls').style.display = 'flex';
+            document.getElementById('scoreboard').style.display = 'block';
+
+            // Listen for game state from Phaser scene via custom event
+            window.addEventListener('gameState', (e) => {
+                const state = e.detail;
+                const phase = state.phase || 'playing';
+
+                if (phase === 'lobby' || phase === 'armory') {
+                    currentPhase = phase;
+                    document.getElementById('lobby-overlay').classList.add('active');
+                    document.getElementById('lobby-title').textContent =
+                        phase === 'armory' ? 'The Armory' : 'Cab Battle';
+                    document.getElementById('lobby-subtitle').textContent =
+                        phase === 'armory' ? 'Buy your loadout!' : 'Waiting for players to join...';
+                    updateLobbyRoster(state.players || [], phase);
+                } else if ((currentPhase === 'lobby' || currentPhase === 'armory') && phase === 'playing') {
+                    currentPhase = 'playing';
+                    document.getElementById('lobby-overlay').classList.remove('active');
+                }
+
+                if (phase === 'playing') {
+                    updateScoreboard(state.players);
+                    handleCommentary(state);
+                    startAmbientTimer();
+                } else {
+                    stopAmbientTimer();
+                }
+            });
+
+            // Check initial phase
+            fetch(SERVER + '/game/status')
+                .then(r => r.json())
+                .then(data => {
+                    if (data.phase === 'lobby') {
+                        document.getElementById('lobby-overlay').classList.add('active');
+                    }
+                }).catch(() => {});
+        }
+
+        function updateScoreboard(players) {
+            const el = document.getElementById('sb-players');
+            if (!el || !players) return;
+            const sorted = [...players].sort((a,b) => b.score - a.score);
+            el.textContent = '';
+            sorted.forEach(p => {
+                const row = document.createElement('div');
+                row.className = 'sb-player' + (p.alive ? '' : ' sb-dead');
+
+                const left = document.createElement('div');
+                const nameEl = document.createElement('div');
+                nameEl.className = 'sb-name';
+                nameEl.textContent = p.name;
+                const statsEl = document.createElement('div');
+                statsEl.className = 'sb-stats';
+                const items = p.items || [];
+                const buffs = Object.keys(p.buffs || {});
+                const debuffs = Object.keys(p.debuffs || {});
+                let statsText = 'Ammo:' + (p.ammo || '?') + ' HP:' + (p.alive ? p.hp : 0);
+                if (items.length > 0) statsText += ' | ' + items.length + ' items';
+                if (debuffs.length > 0) statsText += ' | CURSED';
+                statsEl.textContent = statsText;
+                left.appendChild(nameEl);
+                left.appendChild(statsEl);
+
+                const right = document.createElement('div');
+                const scoreEl = document.createElement('div');
+                scoreEl.className = 'sb-score';
+                scoreEl.textContent = p.score + ' pts';
+                const hpEl = document.createElement('div');
+                hpEl.className = 'sb-hp';
+                hpEl.textContent = p.alive ? (p.points || 0) + ' gold' : 'DEAD';
+                right.appendChild(scoreEl);
+                right.appendChild(hpEl);
+
+                row.appendChild(left);
+                row.appendChild(right);
+                el.appendChild(row);
+            });
+        }
+
+        async function addBot() {
+            const name = names[botNum % names.length];
+            botNum++;
+            const el = document.getElementById('status-bar');
+            try {
+                // Use server-side bot (aims + shoots, cleared on reset)
+                const resp = await fetch(SERVER + '/game/add-bot', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({name})
+                });
+                const data = await resp.json();
+                el.textContent = data.status === 'bot-added'
+                    ? `Added ${name}` : (data.error || 'Error');
+                el.className = 'status';
+            } catch(e) {
+                el.textContent = 'Server error: ' + e.message;
+                el.className = 'status error';
+            }
+        }
+
+        async function openArmory() {
+            try {
+                await fetch(SERVER + '/game/armory-open', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({})
+                });
+            } catch(e) {
+                const el = document.getElementById('status-bar');
+                el.textContent = 'Error: ' + e.message;
+                el.className = 'status error';
+            }
+        }
+
+        async function resetGame() {
+            try {
+                await fetch(SERVER + '/game/restart', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({})
+                });
+                botNum = 0;
+                document.getElementById('status-bar').textContent = 'Game reset!';
+            } catch(e) {
+                const el = document.getElementById('status-bar');
+                el.textContent = 'Server error: ' + e.message;
+                el.className = 'status error';
+            }
+        }
+
+        function updateLobbyRoster(players, phase) {
+            const el = document.getElementById('lobby-players');
+            const btn = document.getElementById('start-game-btn');
+            if (!players || players.length === 0) {
+                el.textContent = '';
+                const empty = document.createElement('div');
+                empty.id = 'lobby-empty';
+                empty.textContent = 'No players yet';
+                el.appendChild(empty);
+                btn.disabled = true;
+                return;
+            }
+            btn.disabled = false;
+            btn.textContent = phase === 'armory' ? 'Start Battle' : 'Start Game';
+            el.textContent = '';
+            players.forEach((p, i) => {
+                const row = document.createElement('div');
+                row.className = 'lobby-player';
+
+                const num = document.createElement('div');
+                num.className = 'lobby-player-num';
+                num.textContent = String(i + 1);
+
+                const name = document.createElement('div');
+                name.className = 'lobby-player-name';
+                name.textContent = p.name;
+
+                const status = document.createElement('div');
+                status.className = 'lobby-player-status';
+                if (phase === 'armory') {
+                    const pts = p.points !== undefined ? p.points : 30;
+                    const items = p.items || [];
+                    status.textContent = pts + ' pts | ' + items.length + ' items';
+                    status.style.color = pts < 10 ? '#ff6b6b' : '#ffd700';
+                } else {
+                    status.textContent = 'READY';
+                }
+
+                row.appendChild(num);
+                row.appendChild(name);
+                row.appendChild(status);
+                el.appendChild(row);
+            });
+            if (phase !== 'armory') {
+                document.getElementById('lobby-subtitle').textContent =
+                    players.length + ' player' + (players.length !== 1 ? 's' : '') + ' in lobby';
+            }
+        }
+
+        // Unlock audio on ANY user interaction (Chrome autoplay policy)
+        let audioUnlocked = false;
+        function unlockAudio() {
+            if (audioUnlocked) return;
+            audioUnlocked = true;
+            // Play a silent clip to unlock the audio context
+            const silence = new Audio('data:audio/mp3;base64,SUQzBAAAAAAAI1RTU0UAAAAPAAADTGF2ZjU4Ljc2LjEwMAAAAAAAAAAAAAAA//tQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWGluZwAAAA8AAAACAAABhgC7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7//////////////////////////////////////////////////////////////////8AAAAATGF2YzU4LjEzAAAAAAAAAAAAAAAAJAAAAAAAAAAAAYYoRwAAAAAAAAAAAAAAAAD/+xBkAA/wAABpAAAACAAADSAAAAEAAAGkAAAAIAAANIAAAARMQU1FMy4xMDBVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV');
+            silence.play().catch(() => {});
+            console.log('Audio unlocked');
+        }
+        document.addEventListener('click', unlockAudio, { once: false });
+        document.addEventListener('keydown', unlockAudio, { once: false });
+
+        async function startGame() {
+            unlockAudio();  // Unlock audio on this click
+            const btn = document.getElementById('start-game-btn');
+            btn.disabled = true;
+            btn.textContent = 'Starting...';
+            try {
+                const resp = await fetch(SERVER + '/game/start', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({})
+                });
+                const data = await resp.json();
+                if (data.status === 'started') {
+                    currentPhase = 'playing';
+                    document.getElementById('lobby-overlay').classList.remove('active');
+                    // Play game start commentary immediately
+                    voiceEnqueue((done) => playCachedClip('game_start', done));
+                } else {
+                    btn.textContent = 'Start Game';
+                    btn.disabled = false;
+                }
+            } catch(e) {
+                btn.textContent = 'Start Game';
+                btn.disabled = false;
+            }
+        }
+
+        // Commentary subtitle polling
+        let lastCommentaryTs = 0;
+        let subtitleTimeout = null;
+        async function pollCommentary() {
+            try {
+                const resp = await fetch(SERVER + '/game/commentary');
+                const data = await resp.json();
+                if (data.timestamp > lastCommentaryTs && data.text) {
+                    lastCommentaryTs = data.timestamp;
+                    const el = document.getElementById('subtitle-bar');
+                    el.textContent = data.text;
+                    el.style.display = 'block';
+                    if (subtitleTimeout) clearTimeout(subtitleTimeout);
+                    subtitleTimeout = setTimeout(() => { el.style.display = 'none'; }, 6000);
+                }
+            } catch(e) {}
+        }
+        if (window.location.search.includes('server')) {
+            setInterval(pollCommentary, 1000);
+        }
+
+        // moveBot removed — server-side bots handle their own movement + shooting
+    </script>
+
+</body>
+</html>
