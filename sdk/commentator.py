@@ -35,6 +35,13 @@ LINES_KILL = [
     "{killer} just eliminated {victim}! Somebody call the incident commander! Oh wait, there IS no incident commander!",
     "Get schwifty! {killer} just turned {victim} into a post-mortem! Blameless, of course!",
     "Holy cow {victim}! {killer} just rolled back your entire existence! That's what happens when you skip the CAB meeting!",
+    "{killer} just sent {victim} through the ENTIRE deployment pipeline! Straight to DECOMMISSIONED!",
+    "That kill was more brutal than a failed database migration, Morty! {killer} is running the Three Ways out here!",
+    "{killer} just turned {victim} into technical debt! Gene Kim would write a BOOK about this carnage!",
+    "INCIDENT REPORT: {victim} got absolutely DevOps'd by {killer}! The value stream just got VIOLENT!",
+    "{killer} treating {victim} like a legacy system! DECOMMISSIONED! Time to modernize, baby!",
+    "Oh that's NASTY! {killer} just chaos monkey'd {victim} right out of the cluster!",
+    "{killer} with the ELIMINATION! That's what the Unicorn Project calls a REBELLION, Morty!",
 ]
 
 LINES_DEATH = [
@@ -44,6 +51,12 @@ LINES_DEATH = [
     "REST IN PIECES {name}! That was a career limiting move right there! Worse than deleting prod!",
     "{name} is OUT! Their mean time to recovery is looking pretty INFINITE right now!",
     "And {name} goes down like a deployment on a Friday! When will they LEARN, Morty?!",
+    "{name} just experienced an unplanned outage! The auditors are gonna have a FIELD DAY with this!",
+    "BLAMELESS POST-MORTEM for {name}! Just kidding, I'm totally blaming them! That was TERRIBLE!",
+    "{name} had ZERO observability! Couldn't even see that attack coming! Get some monitoring, Morty!",
+    "{name} just proved why you need a disaster recovery plan! The Visible Ops handbook is WEEPING right now!",
+    "That's what happens when your toil exceeds fifty percent, {name}! The SRE handbook tried to WARN you!",
+    "{name} went down like a monolith in a microservices world! Time to decompose, literally!",
 ]
 
 LINES_DELIVERY = [
@@ -52,6 +65,11 @@ LINES_DELIVERY = [
     "{name} with the delivery! That's continuous delivery in action, Morty! The Phoenix Project would be proud!",
     "Oh snap! {name} just completed a value stream delivery! Somebody update the DORA metrics!",
     "{name} drops off a passenger! Lead time to delivery? CHEF'S KISS! That's elite performance!",
+    "{name} flowing work through the system like a BOSS! That's the First Way, Morty! Flow, flow, FLOW!",
+    "BEAUTIFUL delivery by {name}! Short lead time, small batch size, Gene Kim is smiling somewhere!",
+    "{name} with the value stream optimization! Deployment frequency just went through the ROOF!",
+    "That delivery was smoother than a fully automated CI CD pipeline! {name} is an IT Revolution LEGEND!",
+    "{name} just proved that speed and safety are NOT opposites! The DevOps Handbook told you SO!",
 ]
 
 LINES_WAVE = [
@@ -59,24 +77,34 @@ LINES_WAVE = [
     "INCOMING! It's like someone merged to main without running the tests! Enemies EVERYWHERE!",
     "Holy smokes, look at all those floopies! This is worse than a cascading failure in microservices!",
     "More enemies flooding in! This is a full blown SEV 1 incident! All hands on deck!",
+    "It's a SWARM! This is what happens when you ignore your security vulnerabilities, Morty! PATCH YOUR SYSTEMS!",
+    "NEW WAVE of enemies! This is like a DDoS attack but with TEETH! The war room is OPEN!",
+    "Enemies everywhere! Somebody didn't rotate their credentials and now we're getting OWNED!",
+    "WAVE INCOMING! This is worse than the time Bill from The Phoenix Project had to deal with that payroll failure!",
 ]
 
 LINES_MASS_KILL = [
     "Wubba lubba dub dub! That was a MASSACRE! Someone just automated their entire kill chain!",
     "TOTAL DOMINATION! That's what we call infrastructure as CARNAGE! Beautiful!",
     "They just wiped out a whole SQUAD! That's more efficient than a kubernetes auto-scaler on a good day!",
+    "MASS ELIMINATION! That's what happens when you invest in automation! The Third Way, Morty! CONTINUOUS LEARNING!",
+    "ANNIHILATED! Someone just ran terraform destroy on those enemies! No approval, no regrets!",
 ]
 
 LINES_GAME_START = [
-    "Welcome to the THUNDERDOME, you beautiful nerds! I'm Rick Sanchez and this is the greatest bot battle in the multiverse! Let's GOOO!",
+    "Welcome to the THUNDERDOME, you beautiful nerds! IT Revolution presents the greatest bot battle in the multiverse! Let's GOOO!",
     "Alright Morty, the bots are deployed, the arena is HOT, and somebody's about to have a very bad day! Wubba lubba dub dub!",
-    "The change freeze is OVER! The bots are loose in production! No approval needed! LET'S DO THIS!",
+    "The change freeze is OVER! The bots are loose in production! No approval needed! Gene Kim said SHIP IT!",
+    "Ladies and gentlemen, welcome to the Enterprise AI Summit BATTLE ARENA! Where DevOps meets DESTRUCTION! Brought to you by IT Revolution!",
 ]
 
 LINES_RESPAWN = [
     "{name} is BACK! That's some elite disaster recovery right there! Mean time to restore? IMPRESSIVE!",
     "{name} respawns! Auto-healing infrastructure at its finest, Morty! Round TWO!",
     "Oh snap {name} just came back! That's better failover than most Fortune 500 companies!",
+    "{name} just recovered faster than a blue green deployment! The Second Way, Morty! FAST FEEDBACK!",
+    "{name} is back online! That's what we call a self-healing system! The SRE book would be PROUD!",
+    "RESPAWN! {name} just did a rolling update on their LIFE! Back in the game!",
 ]
 
 # =============================================================================
