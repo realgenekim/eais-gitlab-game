@@ -1,53 +1,80 @@
 #!/usr/bin/env python3
 """
-CAB BATTLE COMMENTATOR — AI-powered hype announcer
-===================================================
-Watches the game, generates over-the-top WWE-meets-DevOps commentary,
-and speaks it through ElevenLabs TTS.
+CAB BATTLE COMMENTATOR — Mike Tyson voice via ElevenLabs
+========================================================
+Pre-written hype lines, no LLM needed. Just ElevenLabs TTS.
 
 Usage:
     export ELEVENLABS_API_KEY=sk_...
-    export ANTHROPIC_API_KEY=sk-ant-...
     python commentator.py
 """
 
 import os
 import sys
 import time
-import json
+import random
 import tempfile
 import subprocess
 import threading
 import requests
-from anthropic import Anthropic
 from elevenlabs import ElevenLabs
-
-# =============================================================================
-# Config
-# =============================================================================
 
 SERVER = os.environ.get("GAME_SERVER", "http://localhost:33333")
 ELEVENLABS_KEY = os.environ.get("ELEVENLABS_API_KEY", "")
-ANTHROPIC_KEY = os.environ.get("ANTHROPIC_API_KEY", "")
+VOICE_ID = "SOYHLrjzK2X1ezoPC6cr"  # Harry — Fierce Warrior, rough male
 
-# ElevenLabs voice — "Drew" is energetic, or use any voice ID
-VOICE_ID = "29vD33N1CtxCmqQRPOHJ"  # Drew — energetic male
+# =============================================================================
+# Pre-written Mike Tyson commentary lines
+# =============================================================================
 
-COMMENTARY_SYSTEM = """You are the MOST OVER-THE-TOP hype announcer for Cab Battle, a bot-programming arena.
-You are a cross between a WWE wrestling announcer, an SRE incident commander, and a monster truck rally MC.
+LINES_KILL = [
+    "{killer} just DESTROYED {victim}! That's what happens when you step in the ring with a CHAMPION!",
+    "OH! {victim} just got knocked OUT! {killer} is a BEAST in this arena!",
+    "{killer} sends {victim} to the SHADOW REALM! Everybody has a plan until they get punched in the mouth!",
+    "BOOM! {victim} is DOWN! {killer} showing NO MERCY out there!",
+    "{killer} just eliminated {victim}! That was VICIOUS! I love it!",
+    "Goodnight {victim}! {killer} just put them to SLEEP!",
+    "{victim} just got WRECKED! {killer} is on a RAMPAGE!",
+]
 
-Your style:
-- SHORT punchy lines (1-2 sentences MAX). You're calling live action, not writing essays.
-- DevOps/SRE references woven in naturally: "THAT'S A PRODUCTION OUTAGE!", "ROLLBACK ROLLBACK!",
-  "ZERO DOWNTIME DELIVERY!", "THEY JUST DEPLOYED TO PROD ON A FRIDAY!"
-- Wrestling energy: "BAH GAWD!", "FROM THE TOP ROPE!", "WHAT A SLOBBERKNOCKER!"
-- Genuinely funny and charismatic
-- Reference players BY NAME — make it personal
-- Build narratives: rivalries, underdogs, streaks
-- Sometimes address the crowd: "ARE YOU NOT ENTERTAINED?!"
+LINES_DEATH = [
+    "{name} just got ELIMINATED! That is PATHETIC!",
+    "OH NO! {name} is DOWN! Get up! GET UP! ... they're not getting up!",
+    "{name} just got sent to the SHADOW REALM! Brutal!",
+    "REST IN PIECES, {name}! The arena shows NO mercy!",
+    "{name} is OUT! That was DEVASTATING to watch!",
+]
 
-NEVER say more than 2 sentences. Speed is everything — you're calling LIVE action.
-Keep it under 20 words when possible. Punch hard, move on."""
+LINES_DELIVERY = [
+    "{name} just delivered a passenger! Now THAT is how you make money in this business!",
+    "SPECIAL DELIVERY from {name}! Getting PAID out there!",
+    "{name} with the delivery! Smart AND tough! Respect!",
+    "{name} drops off a passenger! That's a hundred points BABY!",
+]
+
+LINES_WAVE = [
+    "HERE THEY COME! A massive wave of enemies! This is about to get CRAZY!",
+    "INCOMING! The enemies are SWARMING! Nobody is safe!",
+    "Look at all those enemies! This arena is about to become a WARZONE!",
+    "More enemies flooding in! Who will SURVIVE?!",
+]
+
+LINES_MASS_KILL = [
+    "MASSACRE! Someone just wiped out a whole squad of enemies! INCREDIBLE!",
+    "That was a SLAUGHTER! Enemies dropping like flies!",
+    "TOTAL DOMINATION! The enemies didn't stand a CHANCE!",
+]
+
+LINES_GAME_START = [
+    "LADIES AND GENTLEMEN! Welcome to the THUNDERDOME! Let the BATTLE BEGIN!",
+    "The cage is LOCKED! The bots are LOOSE! Let's see who SURVIVES!",
+    "IT'S GO TIME! May the best bot WIN! Or at least survive!",
+]
+
+LINES_RESPAWN = [
+    "{name} is BACK FROM THE DEAD! They want REVENGE!",
+    "{name} respawns! Round two! FIGHT!",
+]
 
 # =============================================================================
 # State tracking
@@ -57,9 +84,6 @@ last_tick = -1
 last_scores = {}
 last_alive = {}
 last_enemy_count = 0
-kill_streaks = {}
-delivery_counts = {}
-audio_queue = []
 is_speaking = False
 
 
@@ -82,10 +106,6 @@ def get_status():
         return None
 
 
-# =============================================================================
-# Event detection — compare frames to find interesting things
-# =============================================================================
-
 def detect_events(state):
     global last_tick, last_scores, last_alive, last_enemy_count
     events = []
@@ -107,92 +127,54 @@ def detect_events(state):
         new_score = p.get("score", 0)
         is_alive = p.get("alive", True)
 
-        # Player got a kill (score jumped by 150+)
         if new_score >= old_score + 150:
-            kills = (new_score - old_score) // 150
-            kill_streaks[name] = kill_streaks.get(name, 0) + kills
-            events.append(("player_kill", name, new_score, kill_streaks[name]))
-
-        # Player delivered a passenger (score jumped by ~100)
+            events.append(("player_kill", name, new_score))
         elif new_score >= old_score + 80:
-            delivery_counts[name] = delivery_counts.get(name, 0) + 1
-            events.append(("delivery", name, new_score, delivery_counts[name]))
+            events.append(("delivery", name))
 
-        # Player died
         if was_alive and not is_alive:
-            events.append(("death", name, p.get("hp", 0)))
-            kill_streaks[name] = 0
+            events.append(("death", name))
 
-        # Player respawned
         if not was_alive and is_alive:
             events.append(("respawn", name))
 
         last_scores[name] = new_score
         last_alive[name] = is_alive
 
-    # Big enemy wave
     if enemy_count >= last_enemy_count + 5:
         events.append(("wave", enemy_count))
 
-    # Mass enemy kill (count dropped a lot)
     if last_enemy_count > 0 and enemy_count <= last_enemy_count - 4:
         events.append(("mass_kill", last_enemy_count - enemy_count))
 
     last_enemy_count = enemy_count
     last_tick = tick
-
     return events
 
 
-# =============================================================================
-# Commentary generation
-# =============================================================================
-
-client = None
-
-def generate_commentary(event_type, *args):
-    global client
-    if not client:
-        client = Anthropic(api_key=ANTHROPIC_KEY)
-
-    prompts = {
-        "player_kill": lambda name, score, streak:
-            f"{name} just killed another player! Score: {score}. Kill streak: {streak}. Hype it up!",
-        "delivery": lambda name, score, count:
-            f"{name} delivered a passenger! Score: {score}. That's delivery #{count}. Celebrate the hustle!",
-        "death": lambda name, hp:
-            f"{name} just got ELIMINATED! Call it like a wrestling announcer!",
-        "respawn": lambda name:
-            f"{name} is BACK FROM THE DEAD! They just respawned. Welcome them back!",
-        "wave": lambda count:
-            f"A MASSIVE wave of {count} enemies just spawned! Warn the contestants!",
-        "mass_kill": lambda count:
-            f"Someone just wiped out {count} enemies at once! That's a team wipe!",
-        "game_start": lambda player_count:
-            f"The game just started with {player_count} contestants! Do the opening announcement! Names: {', '.join(last_scores.keys())}",
-        "game_intro": lambda names:
-            f"Introduce these contestants entering the arena: {names}. Give each one a wrestling-style intro!",
-    }
-
-    prompt_fn = prompts.get(event_type)
-    if not prompt_fn:
-        return None
-
-    try:
-        response = client.messages.create(
-            model="claude-sonnet-4-20250514",
-            max_tokens=80,
-            system=COMMENTARY_SYSTEM,
-            messages=[{"role": "user", "content": prompt_fn(*args)}]
-        )
-        return response.content[0].text.strip()
-    except Exception as e:
-        print(f"  Claude error: {e}")
-        return None
+def pick_line(event_type, *args):
+    if event_type == "player_kill":
+        name = args[0]
+        # We don't know who the killer is from score alone, use generic
+        line = random.choice(LINES_KILL)
+        return line.format(killer=name, victim="their opponent")
+    elif event_type == "death":
+        return random.choice(LINES_DEATH).format(name=args[0])
+    elif event_type == "delivery":
+        return random.choice(LINES_DELIVERY).format(name=args[0])
+    elif event_type == "wave":
+        return random.choice(LINES_WAVE)
+    elif event_type == "mass_kill":
+        return random.choice(LINES_MASS_KILL)
+    elif event_type == "respawn":
+        return random.choice(LINES_RESPAWN).format(name=args[0])
+    elif event_type == "game_start":
+        return random.choice(LINES_GAME_START)
+    return None
 
 
 # =============================================================================
-# Text-to-speech via ElevenLabs
+# Text-to-speech
 # =============================================================================
 
 eleven = None
@@ -214,7 +196,6 @@ def speak(text):
             output_format="mp3_44100_128",
         )
 
-        # Write to temp file and play with afplay (macOS)
         with tempfile.NamedTemporaryFile(suffix=".mp3", delete=False) as f:
             for chunk in audio:
                 f.write(chunk)
@@ -232,7 +213,6 @@ def speak(text):
 
 
 def speak_async(text):
-    """Speak in background thread so we don't block event detection."""
     t = threading.Thread(target=speak, args=(text,), daemon=True)
     t.start()
 
@@ -245,48 +225,33 @@ def main():
     if not ELEVENLABS_KEY:
         print("  Set ELEVENLABS_API_KEY env var!")
         sys.exit(1)
-    if not ANTHROPIC_KEY:
-        print("  Set ANTHROPIC_API_KEY env var!")
-        sys.exit(1)
 
     print("\n  ====================================")
     print("  CAB BATTLE COMMENTATOR")
-    print("  ====================================")
+    print("  Voice: Mike Tyson mode")
     print(f"  Server: {SERVER}")
-    print(f"  Voice: {VOICE_ID}")
-    print()
+    print("  ====================================\n")
 
     # Wait for game to start
     print("  Waiting for game to start...")
-    announced_lobby = False
     while True:
         status = get_status()
         if not status:
             time.sleep(1)
             continue
-
-        if status.get("phase") == "lobby" and not announced_lobby:
-            names = status.get("player-names", [])
-            if names:
-                print(f"  Lobby: {', '.join(names)}")
-                announced_lobby = True
-
         if status.get("phase") == "playing":
-            player_count = status.get("players", 0)
             names = status.get("player-names", [])
             for n in names:
                 last_scores[n] = 0
                 last_alive[n] = True
-            print(f"  GAME ON! {player_count} players")
+            print(f"  GAME ON! {len(names)} players: {', '.join(names)}")
             # Opening announcement
-            text = generate_commentary("game_start", player_count)
-            speak(text)  # blocking for the intro
+            speak(random.choice(LINES_GAME_START))
             break
-
         time.sleep(0.5)
 
     # Main commentary loop
-    commentary_cooldown = 0
+    cooldown = 0
     while True:
         try:
             state = get_state()
@@ -296,23 +261,21 @@ def main():
 
             events = detect_events(state)
 
-            # Don't talk over ourselves — skip if still speaking or on cooldown
-            if is_speaking or commentary_cooldown > 0:
-                if commentary_cooldown > 0:
-                    commentary_cooldown -= 1
+            if is_speaking or cooldown > 0:
+                if cooldown > 0:
+                    cooldown -= 1
                 time.sleep(0.5)
                 continue
 
             if events:
-                # Pick the most exciting event
                 priority = ["player_kill", "death", "mass_kill", "wave", "delivery", "respawn"]
                 events.sort(key=lambda e: priority.index(e[0]) if e[0] in priority else 99)
                 best = events[0]
 
-                text = generate_commentary(best[0], *best[1:])
+                text = pick_line(best[0], *best[1:])
                 if text:
                     speak_async(text)
-                    commentary_cooldown = 6  # ~3 seconds before next line
+                    cooldown = 8  # ~4 seconds before next line
 
             time.sleep(0.5)
 

@@ -892,42 +892,92 @@
     (if (or (< tick grace)
             (not (zero? (mod tick wave-interval))))
       state
-      ;; Determine wave composition based on tick
+      ;; Determine wave composition — enemies NEVER stop coming
       (let [wave-num (quot tick wave-interval)
-            floopy-count (min 8 (+ 3 wave-num))
-            squanchy-count (if (>= wave-num 3) (min 4 (- wave-num 1)) 0)
-            scary-count (if (>= wave-num 6) (min 3 (- wave-num 4)) 0)]
+            ;; Always at least 3 floopies, scaling up
+            floopy-count (max 3 (min 10 (+ 3 wave-num)))
+            squanchy-count (if (>= wave-num 2) (min 5 wave-num) 0)
+            scary-count (if (>= wave-num 5) (min 4 (- wave-num 3)) 0)
+            ;; Also spawn more if enemy count is low (keep arena active)
+            current-enemies (count (or (:enemies state) {}))
+            bonus (if (< current-enemies 3) 4 0)]
         (-> state
-            (spawn-enemies :floopy floopy-count)
+            (spawn-enemies :floopy (+ floopy-count bonus))
             (cond-> (pos? squanchy-count) (spawn-enemies :squanchy squanchy-count))
             (cond-> (pos? scary-count) (spawn-enemies :scary scary-count)))))))
+
+(defn nudge-stalled-players
+  "If a player hasn't moved in 5+ ticks, force them to a random adjacent open cell.
+   Prevents bots from standing still and boring the audience."
+  [state]
+  (reduce-kv
+   (fn [s id player]
+     (if (and (:alive? player)
+              (:last-move-tick player)
+              (> (- (:tick state) (:last-move-tick player)) 5))
+       ;; Stuck! Force a random move
+       (let [px (:x player) py (:y player)
+             occupied (disj (occupied-cells s) [px py])
+             candidates (for [[dx dy] [[0 -1] [0 1] [1 0] [-1 0]]
+                              :let [nx (+ px dx) ny (+ py dy)]
+                              :when (and (walkable? s [nx ny])
+                                         (not (contains? occupied [nx ny])))]
+                          [nx ny])]
+         (if (seq candidates)
+           (let [[nx ny] (rand-nth (vec candidates))]
+             (-> s
+                 (assoc-in [:players id :x] nx)
+                 (assoc-in [:players id :y] ny)
+                 (assoc-in [:players id :last-move-tick] (:tick state))
+                 (assoc-in [:players id :last-direction] nil)
+                 (assoc-in [:players id :prev-direction] nil)))
+           s))
+       s))
+   state (:players state)))
+
+(defn track-movement
+  "Track when players last moved (for stall detection)."
+  [old-state new-state]
+  (reduce-kv
+   (fn [s id player]
+     (let [old-p (get-in old-state [:players id])]
+       (if (and old-p
+                (or (not= (:x player) (:x old-p))
+                    (not= (:y player) (:y old-p))))
+         (assoc-in s [:players id :last-move-tick] (:tick new-state))
+         s)))
+   new-state (:players new-state)))
 
 (defn advance-tick
   "Pure function: old state + commands → new state."
   [state commands]
-  (-> state
-      ;; Keep shots for 3 ticks so spectator client always sees them
-      (update :recent-shots (fn [shots]
-                              (vec (filter #(>= (+ (or (:fired-tick %) 0) 3)
-                                                (:tick state))
-                                           shots))))
-      (assoc :recent-effects [])
-      (apply-commands commands)
-      (respawn-dead-players)
-      (maybe-spawn-passengers)
-      (regen-ammo)
-      ;; Enemy system
-      (maybe-spawn-wave)
-      (move-enemies)
-      (enemy-player-collisions)
-      ;; Environment
-      (battle-royale-shrink)
-      (maybe-lightning-strike)
-      (expire-crater-fires)
-      ;; Loot crate system
-      (maybe-spawn-crates)
-      (expire-buffs-debuffs)
-      (update :tick inc)))
+  (let [old-state state
+        new-state (-> state
+                      ;; Keep shots for 3 ticks so spectator client always sees them
+                      (update :recent-shots (fn [shots]
+                                              (vec (filter #(>= (+ (or (:fired-tick %) 0) 3)
+                                                                (:tick state))
+                                                           shots))))
+                      (assoc :recent-effects [])
+                      (apply-commands commands)
+                      (respawn-dead-players)
+                      (maybe-spawn-passengers)
+                      (regen-ammo)
+                      ;; Enemy system
+                      (maybe-spawn-wave)
+                      (move-enemies)
+                      (enemy-player-collisions)
+                      ;; Anti-stall: nudge frozen players
+                      (nudge-stalled-players)
+                      ;; Environment
+                      (battle-royale-shrink)
+                      (maybe-lightning-strike)
+                      (expire-crater-fires)
+                      ;; Loot crate system
+                      (maybe-spawn-crates)
+                      (expire-buffs-debuffs)
+                      (update :tick inc))]
+    (track-movement old-state new-state)))
 
 ;;; ---------------------------------------------------------------------------
 ;;; Initial State
