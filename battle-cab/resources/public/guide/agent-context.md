@@ -212,6 +212,16 @@ Every 3-5 seconds:
   5. POST /game/bot-update with description of what changed
 ```
 
+## Check for Updated Starter Files
+
+The game organizers may push fixes to `bot.py` and `brain.py` during the event. Before each round, check for updates:
+
+- `GET /download/bot` — latest bot runner (check if yours is outdated)
+- `GET /download/brain` — latest starter brain with bug fixes and improved helpers
+- `GET /download/loadout` — latest loadout template
+
+If your bot is stuck, crashing, or behaving unexpectedly, re-download `bot.py` from the server — it may have fixes for known issues like lobby-stuck bugs or edge-death problems.
+
 ## Important: Hot Reload
 
 When you save `brain.py`, the bot runner automatically:
