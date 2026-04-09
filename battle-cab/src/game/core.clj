@@ -892,20 +892,25 @@
     (if (or (< tick grace)
             (not (zero? (mod tick wave-interval))))
       state
-      ;; Determine wave composition — enemies NEVER stop coming
+      ;; Determine wave composition — cap total enemies at 20
       (let [wave-num (inc (or (:wave-number state) 0))
-            ;; Always at least 3 floopies, scaling up
-            floopy-count (max 3 (min 10 (+ 3 wave-num)))
-            squanchy-count (if (>= wave-num 2) (min 5 wave-num) 0)
-            scary-count (if (>= wave-num 5) (min 4 (- wave-num 3)) 0)
-            ;; Also spawn more if enemy count is low (keep arena active)
             current-enemies (count (or (:enemies state) {}))
-            bonus (if (< current-enemies 3) 4 0)]
-        (-> state
-            (assoc :wave-number wave-num)
-            (spawn-enemies :floopy (+ floopy-count bonus))
-            (cond-> (pos? squanchy-count) (spawn-enemies :squanchy squanchy-count))
-            (cond-> (pos? scary-count) (spawn-enemies :scary scary-count)))))))
+            max-enemies 20]
+        (if (>= current-enemies max-enemies)
+          ;; Already at cap — just bump wave number, don't spawn
+          (assoc state :wave-number wave-num)
+          ;; Spawn up to the cap
+          (let [room (- max-enemies current-enemies)
+                floopy-count (min room (max 2 (min 5 (+ 2 (quot wave-num 2)))))
+                room2 (- room floopy-count)
+                squanchy-count (if (>= wave-num 3) (min room2 (min 2 (quot wave-num 3))) 0)
+                room3 (- room2 squanchy-count)
+                scary-count (if (>= wave-num 6) (min room3 1) 0)]
+            (-> state
+                (assoc :wave-number wave-num)
+                (spawn-enemies :floopy floopy-count)
+                (cond-> (pos? squanchy-count) (spawn-enemies :squanchy squanchy-count))
+                (cond-> (pos? scary-count) (spawn-enemies :scary scary-count)))))))))
 
 (defn nudge-stalled-players
   "If a player hasn't moved in 5+ ticks, force them to a random adjacent open cell.
