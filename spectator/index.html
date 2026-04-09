@@ -318,30 +318,39 @@
             };
         }
 
-        // Web Speech API for real-time lines with actual player names
-        const synth = window.speechSynthesis;
-        let speechVoice = null;
-        // Pick a good voice once available
-        function pickVoice() {
-            const voices = synth.getVoices();
-            // Prefer a deep/dramatic English voice
-            speechVoice = voices.find(v => v.name.includes('Daniel')) ||
-                          voices.find(v => v.name.includes('Fred')) ||
-                          voices.find(v => v.lang.startsWith('en') && v.name.includes('Male')) ||
-                          voices.find(v => v.lang.startsWith('en')) ||
-                          voices[0];
-        }
-        synth.onvoiceschanged = pickVoice;
-        pickVoice();
+        // Single unified voice queue — nothing overlaps
+        let voiceBusy = false;
+        let voiceQueue = [];
 
-        function speakText(text) {
-            if (!text || synth.speaking) return;
-            const utter = new SpeechSynthesisUtterance(text);
-            if (speechVoice) utter.voice = speechVoice;
-            utter.rate = 1.1;
-            utter.pitch = 0.9;
-            utter.volume = 1.0;
-            synth.speak(utter);
+        function voiceEnqueue(fn) {
+            if (voiceBusy) {
+                if (voiceQueue.length < 2) voiceQueue.push(fn);
+                return;
+            }
+            voiceRun(fn);
+        }
+
+        function voiceRun(fn) {
+            voiceBusy = true;
+            fn(() => {
+                voiceBusy = false;
+                if (voiceQueue.length > 0) {
+                    voiceRun(voiceQueue.shift());
+                }
+            });
+        }
+
+        // Play a cached ElevenLabs clip, call done() when finished
+        function playCachedClip(category, done) {
+            const hashes = audioManifest[category];
+            if (!hashes || hashes.length === 0) { done(); return; }
+            const hash = hashes[Math.floor(Math.random() * hashes.length)];
+            const audio = audioCache[hash];
+            if (!audio) { done(); return; }
+            const clone = audio.cloneNode();
+            clone.onended = done;
+            clone.onerror = done;
+            clone.play().catch(() => done());
         }
 
         function handleCommentary(state) {
@@ -355,27 +364,17 @@
                 (a.priority || 99) - (b.priority || 99));
             const best = sorted[0];
 
-            // Event-specific lines with real names → Web Speech API (instant)
-            if (best.text) {
-                speakText(best.text);
-            }
-
-            // Also play a cached hype clip for the category (ambient energy)
-            if (!audioPlaying && ['kill', 'death', 'wipeout', 'mass_kill'].includes(best.category)) {
-                playCategory(best.category);
-            }
+            // Play cached ElevenLabs clip — one at a time, no overlap
+            voiceEnqueue((done) => playCachedClip(best.category, done));
         }
 
         function startAmbientTimer() {
             if (ambientTimer) return;
             ambientTimer = setInterval(() => {
-                if (audioPlaying || audioQueue.length > 0) return;
+                if (voiceBusy || voiceQueue.length > 0) return;
                 // 50% ambient, 50% score callout
-                if (Math.random() < 0.5) {
-                    playCategory('ambient');
-                } else {
-                    playCategory('score');
-                }
+                const cat = Math.random() < 0.5 ? 'ambient' : 'score';
+                voiceEnqueue((done) => playCachedClip(cat, done));
             }, 6000);  // every 6 seconds of silence
         }
 
@@ -600,7 +599,7 @@
                     currentPhase = 'playing';
                     document.getElementById('lobby-overlay').classList.remove('active');
                     // Play game start commentary immediately
-                    playCategory('game_start');
+                    voiceEnqueue((done) => playCachedClip('game_start', done));
                 } else {
                     btn.textContent = 'Start Game';
                     btn.disabled = false;
