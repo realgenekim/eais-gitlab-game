@@ -20,39 +20,43 @@
 
 (def gear-catalog
   "All equippable gear items. Each has a slot, cost, and stat effects."
-  {;; Weapons (slot: :weapon, pick one)
-   :standard-blaster {:slot :weapon :cost 0
+  {:standard-blaster {:slot :weapon :cost 0
                       :effects {:shoot-damage 30 :shoot-range 5}}
    :shotgun          {:slot :weapon :cost 15
                       :effects {:shoot-damage 50 :shoot-range 3}}
    :sniper-rifle     {:slot :weapon :cost 20
                       :effects {:shoot-damage 40 :shoot-range 12}}
+   :mod-7a           {:slot :weapon :cost 35
+                      :effects {:shoot-damage 100 :shoot-range 20 :shoot-cooldown 3}}
    :plasma-cannon    {:slot :weapon :cost 25
                       :effects {:shoot-damage 60 :shoot-range 5 :shoot-cooldown 2}}
-
-   ;; Armor (slot: :armor, pick one)
    :light-vest       {:slot :armor :cost 10
                       :effects {:max-hp 600}}
+   :null-frame       {:slot :armor :cost 15
+                      :effects {:max-hp 300 :speed 3}}
    :heavy-armor      {:slot :armor :cost 25
-                      :effects {:max-hp 750 :speed 0}} ;; speed 0 = cannot use speed boost
+                      :effects {:max-hp 750 :speed 0}}
    :energy-shield    {:slot :armor :cost 20
-                      :effects {:shield-hp 50}} ;; absorbs first 50 dmg per life
-
-   ;; Movement (slot: :movement, pick one)
+                      :effects {:shield-hp 50}}
    :speed-boost      {:slot :movement :cost 15
-                      :effects {:speed 2}} ;; move 2 tiles per tick
+                      :effects {:speed 2}}
    :teleporter       {:slot :movement :cost 30
                       :effects {:can-teleport true :teleport-cooldown 20}}
-
-   ;; Utility (slot: :utility, pick multiple)
+   :offset           {:slot :utility :cost 5
+                      :effects {:max-hp 525 :shoot-damage 35 :shoot-range 6
+                                :start-ammo 6 :start-grenades 3 :visibility-radius 6}}
    :radar            {:slot :utility :cost 15
                       :effects {:visibility-radius 8}}
    :extra-ammo       {:slot :utility :cost 10
                       :effects {:start-ammo 10 :max-ammo 15}}
    :grenades-plus    {:slot :utility :cost 10
                       :effects {:start-grenades 5}}
+   :sweep            {:slot :utility :cost 25
+                      :effects {:visibility-radius 50}}
    :trap-mine        {:slot :utility :cost 15
                       :effects {:can-trap true :max-traps 3}}
+   :echo-unit        {:slot :utility :cost 20
+                      :effects {:can-trap true :max-traps 5 :can-decoy true :decoy-cooldown 8}}
    :decoy            {:slot :utility :cost 20
                       :effects {:can-decoy true :decoy-cooldown 15}}})
 
