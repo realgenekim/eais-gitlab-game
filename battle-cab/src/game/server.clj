@@ -865,7 +865,6 @@
                                             :body (slurp (clojure.java.io/resource "public/guide/index.html"))})}}]
          ["/game/brief" {:get {:handler #'handle-bot-brief}}]
          ["/game/bot-update" {:post {:handler #'handle-bot-update}}]
-         ["/game/next-round" {:post {:handler #'handle-next-round}}]
          ["/game/gear" {:get {:handler #'handle-gear-catalog}}]
          ["/game/gear/select" {:post {:handler #'handle-gear-select}}]
          ["/game/start" {:post {:handler #'handle-start}}]
