@@ -214,13 +214,48 @@ def can_shoot_at(my_x, my_y, target_x, target_y):
 
 
 # =============================================================================
+#  GEAR SELECTION — pick your loadout before the battle starts!
+#
+#  Available gear (first come, first served — once someone takes it, it's gone):
+#
+#    plasma-rounds   — 2x shot damage (permanent)
+#    titan-shield    — 50% damage reduction (permanent)
+#    oracle-eye      — Double vision radius (permanent)
+#    sprint-boots    — Move twice per tick (temporary)
+#    vampiric-rounds — Heal 15 HP per hit (permanent)
+#    juggernaut      — +300 bonus HP (instant)
+#    ammo-belt       — Double ammo regen (permanent)
+#    cluster-shot    — Shots hit 3-wide (temporary)
+#
+#  Pick 1-2 items below. If someone else already took it, pick a different one!
+# =============================================================================
+
+MY_GEAR = ["titan-shield"]  # <-- Change this! Pick from the list above
+
+
+# =============================================================================
 #  MAIN — you don't need to change anything below this line
 # =============================================================================
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Cab Battle Bot")
+    parser = argparse.ArgumentParser(description="Bot Battle Arena")
     parser.add_argument("--name", default="MyBot", help="Your bot's name on the scoreboard")
     parser.add_argument("--server", default="http://localhost:33333", help="Game server URL")
     args = parser.parse_args()
+
+    from cab_battle import CabBattleClient
+
+    # Join and select gear before entering the game loop
+    client = CabBattleClient(args.server)
+    client.join(args.name)
+
+    # Equip gear
+    for item in MY_GEAR:
+        result = client.select_gear(item)
+        if result and "error" in result:
+            # Show what's still available
+            gear = result.get("gear-catalog", {})
+            available = [k for k, v in gear.items() if v.get("available")]
+            print(f"  Still available: {', '.join(available)}")
 
     run_bot(name=args.name, decide_fn=decide, server_url=args.server)

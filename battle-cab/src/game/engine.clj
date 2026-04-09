@@ -71,27 +71,33 @@
   [sys player-name]
   (let [state @(:game-state sys)
         max-p (get-in state [:config :max-players] 8)]
-    (when (< (count (:players state)) max-p)
+    (if (>= (count (:players state)) max-p)
+      {:error "Game is full"}
       (let [[new-state creds] (core/add-player state player-name)]
-        (reset! (:game-state sys) new-state)
-        ;; Update recorder's initial state if tick 0
-        (when (zero? (:tick new-state))
-          (swap! (:recorder sys) assoc :initial-state new-state
-                 :snapshots {0 new-state}))
-        ;; Track token → player-id
-        (swap! (:token->player sys) assoc (:token creds) (:id creds))
-        ;; Log event
-        (append-events! sys [{:type :player-joined
-                              :player-id (:id creds)
-                              :name player-name
-                              :tick (:tick new-state)}])
-        ;; In lobby/armory mode, push state to spectators so they see the roster update
-        (when (#{:lobby :armory} @(:phase sys))
-          (when-let [on-tick (:on-tick sys)]
-            (if (var? on-tick)
-              (@on-tick sys new-state)
-              (on-tick sys new-state))))
-        creds))))
+        (if (:error creds)
+          ;; Name already taken
+          creds
+          (do
+            (reset! (:game-state sys) new-state)
+            ;; Update recorder's initial state if tick 0
+            (when (zero? (:tick new-state))
+              (swap! (:recorder sys) assoc :initial-state new-state
+                     :snapshots {0 new-state}))
+            ;; Track token → player-id
+            (swap! (:token->player sys) assoc (:token creds) (:id creds))
+            ;; Log event
+            (append-events! sys [{:type :player-joined
+                                  :player-id (:id creds)
+                                  :name player-name
+                                  :tick (:tick new-state)}])
+            ;; In lobby/armory mode, push state to spectators so they see the roster update
+            (when (#{:lobby :armory} @(:phase sys))
+              (when-let [on-tick (:on-tick sys)]
+                (if (var? on-tick)
+                  (@on-tick sys new-state)
+                  (on-tick sys new-state))))
+            ;; Return creds + available gear catalog
+            (assoc creds :gear-catalog (core/available-gear new-state))))))))
 
 (declare stop-game! pause-game!)
 

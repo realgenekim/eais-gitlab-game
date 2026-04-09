@@ -1191,27 +1191,70 @@
    :crater-fires {}
    :config (config/load-config)})
 
-(defn add-player
-  "Add a player to the game. Returns [updated-state token]."
+(defn name-taken?
+  "Check if a player name is already in use."
   [state player-name]
-  (let [id (str "player-" (subs (str (random-uuid)) 0 8))
-        token (str (random-uuid))
-        spawns (get-in state [:map :spawn-points] [[1 1] [18 1] [1 18] [18 18]])
-        spawn (nth spawns (mod (count (:players state)) (count spawns)))]
-    [(-> state
-         (assoc-in [:players id]
-                   {:name player-name
-                    :x (first spawn)
-                    :y (second spawn)
-                    :hp START-HP
-                    :score 0
-                    :passenger nil
-                    :ammo 5
-                    :grenades 2
-                    :alive? true
-                    :points START-POINTS
-                    :items []
-                    :buffs {}
-                    :debuffs {}
-                    :token token}))
-     {:id id :token token}]))
+  (some (fn [[_ p]] (= (:name p) player-name)) (:players state)))
+
+(defn taken-gear
+  "Set of gear item keys already claimed by any player."
+  [state]
+  (set (mapcat (fn [[_ p]] (or (:gear p) [])) (:players state))))
+
+(defn available-gear
+  "Return the armory catalog with availability. Taken items marked :available false."
+  [state]
+  (let [taken (taken-gear state)]
+    (into {}
+          (map (fn [[k v]]
+                 [k (assoc v :available (not (contains? taken k)))])
+               armory-items))))
+
+(defn select-gear
+  "Player selects a gear item. Returns [updated-state success?].
+   Fails if item doesn't exist, is already taken, or player already has it."
+  [state player-id item-key]
+  (let [taken (taken-gear state)
+        player (get-in state [:players player-id])
+        player-gear (set (or (:gear player) []))]
+    (cond
+      (not (contains? armory-items item-key))
+      [state false "Item does not exist"]
+
+      (contains? taken item-key)
+      [state false "Item already taken by another player"]
+
+      (contains? player-gear item-key)
+      [state false "You already have this item"]
+
+      :else
+      [(update-in state [:players player-id :gear] (fnil conj []) item-key)
+       true "Item equipped"])))
+
+(defn add-player
+  "Add a player to the game. Returns [updated-state {:id :token}] or [state {:error msg}] if name taken."
+  [state player-name]
+  (if (name-taken? state player-name)
+    [state {:error (str "Name '" player-name "' is already taken. Pick a different name.")}]
+    (let [id (str "player-" (subs (str (random-uuid)) 0 8))
+          token (str (random-uuid))
+          spawns (get-in state [:map :spawn-points] [[1 1] [18 1] [1 18] [18 18]])
+          spawn (nth spawns (mod (count (:players state)) (count spawns)))]
+      [(-> state
+           (assoc-in [:players id]
+                     {:name player-name
+                      :x (first spawn)
+                      :y (second spawn)
+                      :hp START-HP
+                      :score 0
+                      :passenger nil
+                      :ammo 5
+                      :grenades 2
+                      :alive? true
+                      :points START-POINTS
+                      :items []
+                      :gear []
+                      :buffs {}
+                      :debuffs {}
+                      :token token}))
+       {:id id :token token}])))

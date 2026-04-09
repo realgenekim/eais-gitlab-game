@@ -116,17 +116,19 @@
 
 (defn handle-join [request]
   (let [body (:body request)
-        player-name (get body "name" "anonymous")]
-    (if-let [creds (engine/add-player! (sys) player-name)]
+        player-name (get body "name" "anonymous")
+        result (engine/add-player! (sys) player-name)]
+    (if (:error result)
+      (json-response 400 result)
       (do
-        ;; Announce new challenger via commentary system
+        ;; Announce new challenger
         (reset! commentary-text
                 {:text (str "A NEW CHALLENGER HAS ENTERED: " (str/upper-case player-name) "!")
                  :timestamp (System/currentTimeMillis)})
-        (json-response 200 {:player-id (:id creds)
-                            :token (:token creds)
-                            :message (str "Welcome, " player-name "!")}))
-      (json-response 400 {:error "Game is full"}))))
+        (json-response 200 {:player-id (:id result)
+                            :token (:token result)
+                            :message (str "Welcome, " player-name "!")
+                            :gear-catalog (:gear-catalog result)})))))
 
 (defn handle-state [request]
   (if-let [player-id (authenticate request)]
@@ -264,6 +266,33 @@
       (json-response 200 {:status "seeked"
                           :tick (:tick result)
                           :max-tick (:max-tick result)}))))
+
+(defn handle-gear-catalog [_request]
+  (let [state (engine/get-state)]
+    (json-response 200 {:gear (core/available-gear state)})))
+
+(defn handle-gear-select [request]
+  (if-let [player-id (authenticate request)]
+    (let [body (:body request)
+          item-key (keyword (get body "item"))
+          state (engine/get-state)
+          [new-state success? msg] (core/select-gear state player-id item-key)]
+      (if success?
+        (do
+          (reset! (:game-state (sys)) new-state)
+          ;; Push updated state to spectators
+          (when (#{:lobby :armory} (engine/get-phase))
+            (when-let [on-tick (:on-tick (sys))]
+              (if (var? on-tick)
+                (@on-tick (sys) new-state)
+                (on-tick (sys) new-state))))
+          (json-response 200 {:status "equipped"
+                              :item (name item-key)
+                              :message msg
+                              :gear-catalog (core/available-gear new-state)}))
+        (json-response 400 {:error msg
+                            :gear-catalog (core/available-gear state)})))
+    (json-response 401 {:error "Invalid token"})))
 
 (defn handle-start [_request]
   (log/info :game-start-requested :phase (engine/get-phase)
@@ -529,6 +558,8 @@
          ["/game/frame" {:get {:handler #'handle-frame}}]
          ["/game/map-swap" {:post {:handler #'handle-map-swap}}]
          ["/game/lightning" {:post {:handler #'handle-lightning}}]
+         ["/game/gear" {:get {:handler #'handle-gear-catalog}}]
+         ["/game/gear/select" {:post {:handler #'handle-gear-select}}]
          ["/game/start" {:post {:handler #'handle-start}}]
          ["/game/armory-open" {:post {:handler #'handle-armory-open}}]
          ["/game/armory" {:get {:handler #'handle-armory-get}}]

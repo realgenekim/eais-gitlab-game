@@ -41,15 +41,48 @@ class CabBattleClient:
         self.player_id = data["player-id"]
         print(f"  Joined as '{name}' (id: {self.player_id})")
 
-        # Verify we're actually registered by checking status
-        status = self.get_status()
-        if status and name in status.get("player-names", []):
-            print(f"  Confirmed: '{name}' is in the lobby ({status['players']} players total)")
-        else:
-            print(f"  WARNING: Join succeeded but '{name}' not found in server status!")
-            print(f"  Server says: {status}")
+        # Show available gear
+        gear = data.get("gear-catalog", {})
+        if gear:
+            print(f"\n  === GEAR SHOP ===")
+            for key, item in gear.items():
+                avail = "AVAILABLE" if item.get("available") else "TAKEN"
+                print(f"    {key:20s} - {item['desc']:40s} [{avail}]")
+            print()
 
         return data
+
+    def get_gear(self):
+        """Get the current gear catalog with availability."""
+        try:
+            resp = requests.get(f"{self.server}/game/gear", timeout=3)
+            return resp.json().get("gear", {})
+        except Exception:
+            return {}
+
+    def select_gear(self, item_key):
+        """Select a gear item. Returns the response dict.
+
+        item_key: one of 'plasma-rounds', 'titan-shield', 'oracle-eye',
+                  'sprint-boots', 'vampiric-rounds', 'juggernaut',
+                  'ammo-belt', 'cluster-shot'
+        """
+        try:
+            resp = requests.post(
+                f"{self.server}/game/gear/select",
+                headers={"Authorization": self.token},
+                json={"item": item_key},
+                timeout=5,
+            )
+            data = resp.json()
+            if "error" in data:
+                print(f"  Gear '{item_key}': {data['error']}")
+            else:
+                print(f"  Equipped: {item_key}!")
+            return data
+        except Exception as e:
+            print(f"  Gear select error: {e}")
+            return None
 
     def get_state(self):
         """Get your fog-of-war view of the game.
