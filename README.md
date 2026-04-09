@@ -36,9 +36,20 @@ Steps 1 and 3 are the essentials. Step 2 (the lobby) is optional but recommended
 
 - Creates a Python virtual environment with dependencies
 - Copies the starter bot template to `bots/my-bot/`
-- You get two files to edit:
+- You get these files:
   - **`loadout.py`** — pick your gear (weapons, armor, gadgets)
-  - **`bot.py`** — code your bot's brain (the `think()` function)
+  - **`brain.py`** — your bot's brain (the `think()` function) — **this is where you spend your time**
+  - **`bot.py`** — the runner framework (handles connection, hot-reload — don't edit this)
+
+### Hot-Reload: Edit While Fighting
+
+Once you `make deploy`, your bot joins the game and starts fighting. **You can keep editing `brain.py` while it runs.** Every time you save, your bot's strategy reloads instantly — same HP, same score, same position, just smarter.
+
+This means you're not building then watching — you're iterating live:
+1. Deploy early with the basic starter brain
+2. Watch your bot fight on the spectator screen
+3. See it make bad decisions? Edit `brain.py`, save, watch it adapt
+4. Keep improving for the entire match
 
 ## The Gear System
 
@@ -136,9 +147,9 @@ GET  /game/gear-catalog                               -> {budget, gear}
 | `trap` | — | Place invisible mine at your position. Requires trap-mine gear |
 | `decoy` | — | Place fake blip that lures enemies. Requires decoy gear |
 
-### Bot Template (`bot.py`)
+### Bot Template (`brain.py`)
 
-The starter bot has a `think(state)` function that returns `(action, direction)`:
+Your `brain.py` has a `think(state)` function that returns `(action, direction)`:
 
 ```python
 def think(state):
