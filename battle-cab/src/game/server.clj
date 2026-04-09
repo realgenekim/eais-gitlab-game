@@ -380,6 +380,85 @@
                                     (sse/subscriber-count)
                                     (ws/ws-client-count))}))
 
+(defn handle-armory-demo
+  "Pure armory demo — no server state, no bots, no mocks.
+   Builds a synthetic game state from pure functions and returns it
+   in the same shape as /game/armory/state.
+
+   Optional ?scenario=N param for different test scenarios:
+     0 = fresh (4 players, 30pts each, no purchases)
+     1 = mid-shopping (some items bought, varied point balances)
+     2 = fully loaded (max items, crates spawned, buffs/debuffs active)"
+  [request]
+  (let [scenario (Integer/parseInt (or (get-in request [:query-params "scenario"]) "0"))
+        ;; Build state from pure functions
+        state (core/make-initial-state maps/arena-map)
+        ;; Add 4 players
+        [state c1] (core/add-player state "Rick-Alpha")
+        [state c2] (core/add-player state "Rick-Beta")
+        [state c3] (core/add-player state "Rick-Gamma")
+        [state c4] (core/add-player state "Rick-Delta")
+        ids [(:id c1) (:id c2) (:id c3) (:id c4)]
+        ;; Give everyone starting points
+        state (reduce (fn [s id] (assoc-in s [:players id :points] core/START-POINTS))
+                      state ids)
+        ;; Apply scenario-specific purchases
+        state (case scenario
+                ;; Scenario 0: fresh — everyone has 30 points, no items
+                0 state
+                ;; Scenario 1: mid-shopping
+                1 (let [[s _] (core/buy-item state (nth ids 0) :plasma-rounds)
+                        [s _] (core/buy-item s (nth ids 0) :ammo-belt)
+                        [s _] (core/buy-item s (nth ids 1) :titan-shield)
+                        [s _] (core/buy-item s (nth ids 2) :sprint-boots)
+                        [s _] (core/buy-item s (nth ids 2) :vampiric-rounds)]
+                    s)
+                ;; Scenario 2: fully loaded + crates + debuffs
+                2 (let [[s _] (core/buy-item state (nth ids 0) :plasma-rounds)
+                        [s _] (core/buy-item s (nth ids 0) :titan-shield)
+                        [s _] (core/buy-item s (nth ids 0) :ammo-belt)
+                        [s _] (core/buy-item s (nth ids 1) :juggernaut)
+                        [s _] (core/buy-item s (nth ids 1) :oracle-eye)
+                        [s _] (core/buy-item s (nth ids 2) :sprint-boots)
+                        [s _] (core/buy-item s (nth ids 2) :cluster-shot)
+                        ;; Add debuffs to player 3
+                        s (assoc-in s [:players (nth ids 3) :debuffs :drunk-controls]
+                                    {:expires-at 50 :name "Drunk Controls"})
+                        s (assoc-in s [:players (nth ids 3) :debuffs :loud-footsteps]
+                                    {:expires-at 40 :name "Loud Footsteps"})
+                        ;; Spawn some crates
+                        s (core/spawn-crate s :gold)
+                        s (core/spawn-crate s :silver)
+                        s (core/spawn-crate s :purple)]
+                    s)
+                ;; Default to scenario 0
+                state)
+        ;; Build response in same shape as /game/armory/state
+        players (->> (:players state)
+                     (map (fn [[id p]]
+                            {:id id :name (:name p)
+                             :points (:points p 0)
+                             :items (mapv (fn [k] {:key (name k)
+                                                   :name (:name (get core/armory-items k))
+                                                   :cost (:cost (get core/armory-items k))})
+                                          (or (:items p) []))
+                             :buffs (or (:buffs p) {})
+                             :debuffs (or (:debuffs p) {})
+                             :hp (:hp p) :score (:score p) :alive (:alive? p)}))
+                     vec)
+        shop (->> core/armory-items
+                  (map (fn [[k v]] (assoc v :key (name k))))
+                  vec)
+        crates (->> (or (:crates state) {})
+                    (map (fn [[id c]] (assoc c :id id)))
+                    vec)]
+    (json-response 200 {:phase "armory"
+                        :scenario scenario
+                        :tick (:tick state)
+                        :players players
+                        :shop shop
+                        :crates crates})))
+
 (defn handle-test [request]
   (let [params (:query-params request)
         scenario (Integer/parseInt (or (get params "scenario") "0"))
@@ -433,6 +512,7 @@
          ["/game/buy" {:post {:handler #'handle-buy}}]
          ["/game/loadout" {:get {:handler #'handle-loadout}}]
          ["/armory" {:get {:handler #'handle-armory-page}}]
+         ["/game/armory/demo" {:get {:handler #'handle-armory-demo}}]
          ["/game/commentary" {:get {:handler #'handle-commentary-get}
                               :post {:handler #'handle-commentary-post}}]
          ["/game/seek" {:post {:handler #'handle-seek}}]

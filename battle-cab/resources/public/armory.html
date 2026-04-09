@@ -446,9 +446,17 @@
             }
         }
 
+        // Demo mode: ?demo or ?demo=2 uses pure synthetic state (no server mutation)
+        const urlParams = new URLSearchParams(window.location.search);
+        const demoMode = urlParams.has('demo');
+        const demoScenario = urlParams.get('demo') || '1';
+
         async function poll() {
             try {
-                const resp = await fetch(SERVER + '/game/armory/state');
+                const endpoint = demoMode
+                    ? SERVER + '/game/armory/demo?scenario=' + demoScenario
+                    : SERVER + '/game/armory/state';
+                const resp = await fetch(endpoint);
                 const data = await resp.json();
 
                 const badge = document.getElementById('phase-badge');

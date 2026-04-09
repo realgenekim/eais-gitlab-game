@@ -127,6 +127,35 @@ All game parameters are tunable without code changes:
 | `shrink-interval` | 150 | Ticks between each wall ring |
 | `lightning-chance` | 0.008 | ~0.8% chance per tick of wall-destroying strike |
 
+## Armory (Pre-Game Shop)
+
+Before gameplay starts, bots enter the **Armory Phase** where they spend 30 starting points on items:
+
+| Item | Cost | Effect |
+|------|------|--------|
+| Plasma Rounds | 15 | 2x shot damage (permanent) |
+| Titan Shield | 12 | 50% damage reduction (permanent) |
+| Oracle Eye | 10 | Double vision radius (permanent) |
+| Sprint Boots | 8 | Move twice per tick (80 ticks) |
+| Vampiric Rounds | 8 | Heal 15 HP per hit (permanent) |
+| Juggernaut | 6 | +300 bonus HP (instant) |
+| Ammo Belt | 5 | Double ammo regen (permanent) |
+| Cluster Shot | 5 | Shots hit 3-wide (60 ticks) |
+
+Max 3 items per player. Remaining points can buy in-game crates (gold/silver/purple tiers).
+
+### Testing the Armory in Isolation
+
+No bots needed, no server state mutation — pure function composition, served as JSON:
+
+```
+http://localhost:33333/armory?demo       — mid-shopping scenario (default)
+http://localhost:33333/armory?demo=0     — fresh (4 players, 30pts each)
+http://localhost:33333/armory?demo=2     — fully loaded + crates + debuffs
+```
+
+The demo endpoint (`/game/armory/demo?scenario=N`) builds synthetic game state from pure `game.core` functions — `make-initial-state → add-player → buy-item → spawn-crate` — and returns the same JSON shape as the live endpoint. Zero side effects.
+
 ## What Makes It Fun for an Audience
 
 - **Fog of war** — bots only see what's near them, so the audience knows more than any single player
