@@ -38,8 +38,8 @@ _last_positions = []
 # =====================================================
 
 def think(state):
-    me = state["you"]
-    if not me.get("alive?", True):
+    me = state.get("you")
+    if not me or not me.get("alive?", True):
         return None, None
 
     mx, my = me["x"], me["y"]

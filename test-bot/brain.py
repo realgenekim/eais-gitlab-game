@@ -40,8 +40,8 @@ _dodge_cooldown = 0
 def think(state):
     global _last_positions, _tick_count, _dodge_cooldown
 
-    me = state["you"]
-    if not me.get("alive?", True):
+    me = state.get("you")
+    if not me or not me.get("alive?", True):
         return None, None
 
     mx, my = me["x"], me["y"]
