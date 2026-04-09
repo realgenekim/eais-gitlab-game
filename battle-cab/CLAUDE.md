@@ -2,15 +2,29 @@
 
 ## What This Is
 Multiplayer bot-programming game server for Enterprise AI Summit game night.
-Players write bots (LLM or hand-coded) that control taxis on a grid maze via REST API.
-Pick up passengers, deliver to destinations, shoot rival cabs.
+Players vibe code bots that battle in a grid arena via REST API.
+Pick up passengers, deliver to destinations, shoot rival cabs, use gear abilities.
 
 ## Architecture
 - **Clojure backend** — http-kit + reitit
 - **Phaser spectator** — `spectator/` Vite+TypeScript app, reads game state via WebSocket JSON
+- **Phaser lobby** — `spectator/src/scenes/lobbyScene.ts` gear room preview, connected to Python lobby server
+- **Python lobby server** — `lobby/` watches bot's loadout.py, pushes updates to Phaser, handles deploy
 - **Tick-based game loop** — state advances every 250ms, pure functions
+- **Gear/loadout system** — 14 items across 4 slots, 100-point budget, per-player stats wired through engine
 - **Full replay** — every command and state transition saved
 - **SSE view is ABANDONED** — game.sse, game.views, game.ds are legacy; do not invest in them. Phaser is the spectator UI going forward.
+
+## Gear System (game.core)
+- `gear-catalog` — all 14 items with slots, costs, effects
+- `validate-loadout` — validates budget, slot constraints, unknown items
+- `loadout->player-stats` — converts gear effects to per-player stat overrides
+- `add-player` accepts optional loadout map, stores `:stats` and `:loadout` on player
+- Per-player stats wired through: shoot damage/range/cooldown, HP, speed, ammo, visibility, shield
+- New action types: `:teleport`, `:grenade`, `:trap`, `:decoy` — each gated by gear ownership
+- Traps checked every tick (`check-traps`), decoys expire after 10 ticks (`expire-decoys`)
+- `/game/join` accepts `"loadout"` in request body, validates server-side
+- `/game/gear-catalog` returns full gear catalog for clients
 
 ## Namespace Layout
 ```

@@ -1,5 +1,6 @@
 (ns game.core-test
   (:require [clojure.test :refer [deftest is testing]]
+            [clojure.string]
             [game.core :as core]
             [game.maps :as maps]))
 
@@ -125,6 +126,217 @@
       (is (= (:id c1) (get-in view [:you :id])))
       (is (map? (:visible view)))
       (is (vector? (get-in view [:visible :players]))))))
+
+;;; ---------------------------------------------------------------------------
+;;; Loadout / Gear System Tests
+;;; ---------------------------------------------------------------------------
+
+(deftest loadout-validation-test
+  (testing "nil loadout is valid (defaults)"
+    (let [result (core/validate-loadout nil)]
+      (is (:valid? result))
+      (is (= 0 (:cost result)))))
+
+  (testing "valid loadout with weapon + armor + utility"
+    (let [result (core/validate-loadout {:weapon :sniper-rifle
+                                         :armor :light-vest
+                                         :utility [:radar]})]
+      (is (:valid? result))
+      (is (= 45 (:cost result))) ;; 20 + 10 + 15
+      (is (= 40 (get-in result [:effects :shoot-damage])))
+      (is (= 12 (get-in result [:effects :shoot-range])))
+      (is (= 2500 (get-in result [:effects :max-hp])))
+      (is (= 8 (get-in result [:effects :visibility-radius])))))
+
+  (testing "over budget is rejected"
+    (let [result (core/validate-loadout {:weapon :plasma-cannon     ;; 25
+                                         :armor :heavy-armor        ;; 25
+                                         :movement :teleporter      ;; 30
+                                         :utility [:radar :decoy]})] ;; 15+20 = 35
+      (is (not (:valid? result)))
+      (is (some #(clojure.string/includes? % "Over budget") (:errors result)))))
+
+  (testing "unknown gear is rejected"
+    (let [result (core/validate-loadout {:weapon :laser-sword})]
+      (is (not (:valid? result)))
+      (is (some #(clojure.string/includes? % "Unknown") (:errors result))))))
+
+(deftest add-player-with-loadout-test
+  (testing "player with sniper gets custom damage/range"
+    (let [[state creds] (core/add-player (fresh-state) "Sniper"
+                                          {:weapon :sniper-rifle})
+          player (get-in state [:players (:id creds)])]
+      (is (= 40 (get-in player [:stats :shoot-damage])))
+      (is (= 12 (get-in player [:stats :shoot-range])))
+      (is (= core/START-HP (:hp player))) ;; no armor = default HP
+      (is (= [:sniper-rifle] (get-in player [:loadout :items])))))
+
+  (testing "player with heavy armor gets extra HP"
+    (let [[state creds] (core/add-player (fresh-state) "Tank"
+                                          {:armor :heavy-armor})
+          player (get-in state [:players (:id creds)])]
+      (is (= 3000 (:hp player)))
+      (is (= 3000 (get-in player [:stats :max-hp])))))
+
+  (testing "player with energy shield gets shield-hp"
+    (let [[state creds] (core/add-player (fresh-state) "Shielded"
+                                          {:armor :energy-shield})
+          player (get-in state [:players (:id creds)])]
+      (is (= 200 (:shield-hp player)))))
+
+  (testing "player with extra-ammo starts with more"
+    (let [[state creds] (core/add-player (fresh-state) "Ammo"
+                                          {:utility [:extra-ammo]})
+          player (get-in state [:players (:id creds)])]
+      (is (= 10 (:ammo player)))
+      (is (= 15 (get-in player [:stats :max-ammo])))))
+
+  (testing "invalid loadout throws"
+    (is (thrown? clojure.lang.ExceptionInfo
+                 (core/add-player (fresh-state) "Cheater"
+                                   {:weapon :laser-sword})))))
+
+(deftest per-player-shoot-stats-test
+  (testing "sniper does 40 damage with range 12"
+    (let [[state c1] (core/add-player (fresh-state) "Sniper"
+                                       {:weapon :sniper-rifle})
+          [state c2] (core/add-player state "Target")
+          id1 (:id c1) id2 (:id c2)
+          ;; Place them on same row, within sniper range
+          state (-> state
+                    (assoc-in [:players id1 :x] 1)
+                    (assoc-in [:players id1 :y] 3)
+                    (assoc-in [:players id2 :x] 3)
+                    (assoc-in [:players id2 :y] 3))
+          state (core/apply-action state id1 {:type :shoot :direction :east})
+          target-hp (get-in state [:players id2 :hp])]
+      ;; Target should take 40 damage (sniper), not 30 (default)
+      (is (= (- core/START-HP 40) target-hp))))
+
+  (testing "shotgun does 50 damage"
+    (let [[state c1] (core/add-player (fresh-state) "Shotgunner"
+                                       {:weapon :shotgun})
+          [state c2] (core/add-player state "Target")
+          id1 (:id c1) id2 (:id c2)
+          state (-> state
+                    (assoc-in [:players id1 :x] 1)
+                    (assoc-in [:players id1 :y] 3)
+                    (assoc-in [:players id2 :x] 2)
+                    (assoc-in [:players id2 :y] 3))
+          state (core/apply-action state id1 {:type :shoot :direction :east})
+          target-hp (get-in state [:players id2 :hp])]
+      (is (= (- core/START-HP 50) target-hp)))))
+
+(deftest shield-absorbs-damage-test
+  (testing "energy shield absorbs first 200 damage"
+    (let [[state c1] (core/add-player (fresh-state) "Attacker")
+          [state c2] (core/add-player state "Shielded"
+                                       {:armor :energy-shield})
+          id1 (:id c1) id2 (:id c2)
+          state (-> state
+                    (assoc-in [:players id1 :x] 1)
+                    (assoc-in [:players id1 :y] 3)
+                    (assoc-in [:players id2 :x] 2)
+                    (assoc-in [:players id2 :y] 3))
+          ;; First shot: 30 damage, shield absorbs all
+          state (core/apply-action state id1 {:type :shoot :direction :east})]
+      (is (= core/START-HP (get-in state [:players id2 :hp])))
+      (is (= 170 (get-in state [:players id2 :shield-hp]))))))
+
+(deftest speed-boost-movement-test
+  (testing "speed boost moves 2 tiles per move action"
+    (let [[state creds] (core/add-player (fresh-state) "Speedy"
+                                          {:movement :speed-boost})
+          id (:id creds)
+          state (-> state
+                    (assoc-in [:players id :x] 1)
+                    (assoc-in [:players id :y] 3))
+          state (core/apply-action state id {:type :move :direction :east})
+          new-x (get-in state [:players id :x])]
+      (is (= 3 new-x))))) ;; moved 2 tiles east: 1 → 3
+
+(deftest grenade-action-test
+  (testing "grenade deals area damage and consumes a grenade"
+    (let [[state c1] (core/add-player (fresh-state) "Bomber")
+          [state c2] (core/add-player state "Victim")
+          id1 (:id c1) id2 (:id c2)
+          ;; Place bomber at [1,3], victim at [3,3] (within grenade range+radius)
+          state (-> state
+                    (assoc-in [:players id1 :x] 1)
+                    (assoc-in [:players id1 :y] 3)
+                    (assoc-in [:players id2 :x] 3)
+                    (assoc-in [:players id2 :y] 3))
+          grenades-before (get-in state [:players id1 :grenades])
+          state (core/apply-action state id1 {:type :grenade :direction :east})
+          grenades-after (get-in state [:players id1 :grenades])]
+      (is (= (dec grenades-before) grenades-after))
+      ;; Victim should have taken 40 grenade damage
+      (is (= (- core/START-HP 40) (get-in state [:players id2 :hp]))))))
+
+(deftest trap-action-test
+  (testing "trap requires can-trap gear"
+    (let [[state creds] (core/add-player (fresh-state) "NoTrap")
+          id (:id creds)
+          state-after (core/apply-action state id {:type :trap})]
+      ;; No trap placed (player doesn't have trap gear)
+      (is (empty? (:traps state-after)))))
+
+  (testing "trap is placed and triggers on enemy step"
+    (let [[state creds] (core/add-player (fresh-state) "Trapper"
+                                          {:utility [:trap-mine]})
+          id (:id creds)
+          ;; Place trap at player's position
+          state (core/apply-action state id {:type :trap})
+          trap-pos [(:x (get-in state [:players id]))
+                    (:y (get-in state [:players id]))]
+          _ (is (= 1 (count (:traps state))))
+          ;; Add an enemy at the trap position
+          state (assoc-in state [:enemies "e1"]
+                          {:x (first trap-pos) :y (second trap-pos)
+                           :hp 100 :max-hp 100 :damage 10 :score 25 :type :floopy})
+          ;; Check traps should trigger
+          state (core/check-traps state)]
+      ;; Trap consumed
+      (is (empty? (:traps state)))
+      ;; Enemy took 60 damage
+      (is (= 40 (get-in state [:enemies "e1" :hp]))))))
+
+(deftest teleport-action-test
+  (testing "teleport requires teleporter gear"
+    (let [[state creds] (core/add-player (fresh-state) "NoTP")
+          id (:id creds)
+          old-x (get-in state [:players id :x])
+          old-y (get-in state [:players id :y])
+          state (core/apply-action state id {:type :teleport})]
+      ;; Position unchanged (no teleporter)
+      (is (= old-x (get-in state [:players id :x])))
+      (is (= old-y (get-in state [:players id :y])))))
+
+  (testing "teleport works with teleporter gear"
+    (let [[state creds] (core/add-player (fresh-state) "TPer"
+                                          {:movement :teleporter})
+          id (:id creds)
+          state (assoc state :tick 25) ;; past cooldown
+          state (core/apply-action state id {:type :teleport})]
+      ;; Should have teleported (position changed or tracked)
+      (is (some? (get-in state [:players id :last-teleport-tick]))))))
+
+(deftest respawn-with-loadout-test
+  (testing "respawned player gets loadout HP and ammo back"
+    (let [[state creds] (core/add-player (fresh-state) "Tank"
+                                          {:armor :heavy-armor
+                                           :utility [:extra-ammo]})
+          id (:id creds)
+          state (-> state
+                    (assoc-in [:players id :hp] 0)
+                    (assoc-in [:players id :alive?] false)
+                    (assoc-in [:players id :respawn-at] 5)
+                    (assoc :tick 5))
+          state (core/respawn-dead-players state)
+          player (get-in state [:players id])]
+      (is (:alive? player))
+      (is (= 3000 (:hp player)))    ;; heavy armor HP
+      (is (= 10 (:ammo player)))))) ;; extra ammo start
 
 (deftest spawn-enemies-empty-edges-test
   (testing "spawn-enemies handles fully-walled edges without crashing"

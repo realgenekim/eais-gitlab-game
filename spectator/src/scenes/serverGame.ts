@@ -13,6 +13,10 @@ interface ServerPlayer {
     alive: boolean;
     score: number;
     ammo: number;
+    grenades?: number;
+    'max-hp'?: number;
+    'shield-hp'?: number;
+    loadout?: { items: string[]; cost: number };
 }
 
 interface ServerEnemy {
@@ -50,6 +54,7 @@ export class ServerGame extends Phaser.Scene {
     playerSprites   : Map<string, Phaser.GameObjects.Sprite> = new Map();
     playerLabels    : Map<string, Phaser.GameObjects.Text> = new Map();
     playerHpBars    : Map<string, Phaser.GameObjects.Graphics> = new Map();
+    playerMaxHp     : Map<string, number> = new Map();
     enemySprites    : Map<string, Phaser.GameObjects.Sprite> = new Map();
     renderedShots   : Set<string> = new Set();  // track rendered shots by fired-tick+shooter
     shrinkGraphics  : Phaser.GameObjects.Graphics | null = null;
@@ -222,38 +227,43 @@ export class ServerGame extends Phaser.Scene {
             const lastCell = path[path.length - 1];
             const [tx, ty] = this.gridToPixel(lastCell[0], lastCell[1]);
 
-            // Draw tracer line
-            const line = this.add.graphics();
-            line.lineStyle(2, 0xff4400, 0.8);
-            line.beginPath();
-            line.moveTo(ox, oy);
-            line.lineTo(tx, ty);
-            line.strokePath();
+            // Draw tracer as a Phaser line (no Graphics object = no black rect)
+            const line = this.add.line(0, 0, ox, oy, tx, ty, 0xff4400, 0.8);
+            line.setOrigin(0, 0);
+            line.setLineWidth(1.5);
             line.setDepth(15);
 
             // Bright tip at impact point
-            const tip = this.add.circle(tx, ty, 4, 0xffcc00, 1);
+            const tip = this.add.circle(tx, ty, 3, 0xffcc00, 1);
             tip.setDepth(16);
 
-            // Fade out and destroy quickly
+            // Fade out and destroy
             this.tweens.add({
-                targets: [line, tip],
+                targets: line,
                 alpha: 0,
-                duration: 300,
-                onComplete: () => { line.destroy(); tip.destroy(); }
+                duration: 250,
+                onComplete: () => line.destroy()
+            });
+            this.tweens.add({
+                targets: tip,
+                alpha: 0,
+                scaleX: 2,
+                scaleY: 2,
+                duration: 250,
+                onComplete: () => tip.destroy()
             });
 
             // Floating damage text at impact
             if (shot['hit-id']) {
                 const dmgText = this.add.text(tx, ty - 10, '-30', {
-                    fontSize: '16px', color: '#ff4400', fontFamily: 'monospace',
+                    fontSize: '14px', color: '#ff4400', fontFamily: 'monospace',
                     stroke: '#000', strokeThickness: 3
                 }).setOrigin(0.5).setDepth(100);
                 this.tweens.add({
                     targets: dmgText,
                     y: ty - 50,
                     alpha: 0,
-                    duration: 600,
+                    duration: 500,
                     ease: 'Power2',
                     onComplete: () => dmgText.destroy()
                 });
@@ -287,7 +297,8 @@ export class ServerGame extends Phaser.Scene {
             const x = sprite.x - w / 2;
             const y = sprite.y - 45;
             const hp = this.playerHpValues.get(id) || 500;
-            const pct = Math.max(0, hp / 500);
+            const maxHp = this.playerMaxHp.get(id) || 500;
+            const pct = Math.max(0, hp / maxHp);
             // Background
             bar.fillStyle(0x333333, 0.8);
             bar.fillRect(x, y, w, h);
@@ -373,6 +384,7 @@ export class ServerGame extends Phaser.Scene {
                     }
                     label.setText(p.name);
                     this.playerHpValues.set(p.id, p.hp);
+                    if (p['max-hp']) this.playerMaxHp.set(p.id, p['max-hp']);
                 } else {
                     sprite.setVisible(false);
                     label.setVisible(false);
@@ -391,6 +403,7 @@ export class ServerGame extends Phaser.Scene {
                 }).setOrigin(0.5).setDepth(50);
                 this.playerLabels.set(p.id, label);
                 this.playerHpValues.set(p.id, p.hp);
+                if (p['max-hp']) this.playerMaxHp.set(p.id, p['max-hp']);
 
                 if (!p.alive) { sprite.setVisible(false); label.setVisible(false); }
             }

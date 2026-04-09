@@ -287,9 +287,11 @@
   (reset! active-bots {}))
 
 (defn add-vs-bot!
-  "Create a VS-mode bot: joins the game, starts thinking. Returns creds or nil."
-  [bot-name]
-  (when-let [creds (engine/add-player! @engine/system bot-name)]
-    (let [f (start-bot! creds vs-hunter-think)]
-      (swap! active-bots assoc bot-name {:creds creds :future f})
-      creds)))
+  "Create a VS-mode bot: joins the game, starts thinking. Returns creds or nil.
+   Accepts optional loadout map for gear customization."
+  ([bot-name] (add-vs-bot! bot-name nil))
+  ([bot-name loadout]
+   (when-let [creds (engine/add-player! @engine/system bot-name loadout)]
+     (let [f (start-bot! creds vs-hunter-think)]
+       (swap! active-bots assoc bot-name {:creds creds :future f})
+       creds))))

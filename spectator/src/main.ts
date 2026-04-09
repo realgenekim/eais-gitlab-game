@@ -9,6 +9,7 @@ import Phaser from 'phaser';
 import { PreloadAssets } from './scenes/preloadAssets';
 import { PlayGame } from './scenes/playGame';
 import { ServerGame } from './scenes/serverGame';
+import { LobbyScene } from './scenes/lobbyScene';
 import { GameOptions } from './gameOptions';
 
 const configObject: Phaser.Types.Core.GameConfig = {
@@ -21,8 +22,8 @@ const configObject: Phaser.Types.Core.GameConfig = {
         width: GameOptions.gameSize.width,
         height: GameOptions.gameSize.height
     },
-    scene: [PreloadAssets, PlayGame, ServerGame],
-    physics: { default: 'arcade' }
+    scene: [PreloadAssets, PlayGame, ServerGame, LobbyScene],
+    physics: { default: 'arcade' },
 }
 
 new Phaser.Game(configObject);
