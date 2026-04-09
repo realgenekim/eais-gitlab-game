@@ -3,61 +3,78 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Bot Battle Arena — Sign Up</title>
+    <title>Vibe Battle — Sign Up</title>
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; }
         body { font-family: 'Courier New', monospace; background: #0a0a14; color: #ccc; min-height: 100vh; display: flex; flex-direction: column; align-items: center; }
-        .container { max-width: 600px; width: 100%; padding: 40px 20px; }
-        h1 { color: #ff6b6b; font-size: 42px; letter-spacing: 0.2em; text-align: center; text-transform: uppercase; margin-bottom: 4px; text-shadow: 0 0 20px rgba(255,107,107,0.3); }
-        .subtitle { color: #888; text-align: center; font-size: 14px; margin-bottom: 40px; }
-        .card { background: rgba(20,20,35,0.9); border: 1px solid #333; border-radius: 10px; padding: 30px; margin-bottom: 24px; }
-        .card h2 { color: #4ecdc4; font-size: 18px; letter-spacing: 0.1em; margin-bottom: 16px; text-transform: uppercase; }
-        .form-group { margin-bottom: 20px; }
-        label { display: block; color: #888; font-size: 12px; letter-spacing: 0.1em; text-transform: uppercase; margin-bottom: 6px; }
+        .container { max-width: 600px; width: 100%; padding: 30px 20px; }
+        h1 { color: #ff6b6b; font-size: 36px; letter-spacing: 0.2em; text-align: center; text-transform: uppercase; margin-bottom: 4px; text-shadow: 0 0 20px rgba(255,107,107,0.3); }
+        .subtitle { color: #888; text-align: center; font-size: 14px; margin-bottom: 30px; }
+        .card { background: rgba(20,20,35,0.9); border: 1px solid #333; border-radius: 10px; padding: 24px; margin-bottom: 20px; }
+        .card h2 { color: #4ecdc4; font-size: 16px; letter-spacing: 0.1em; margin-bottom: 14px; text-transform: uppercase; }
+        label { display: block; color: #888; font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase; margin-bottom: 4px; }
         input[type="text"] {
-            width: 100%; padding: 14px 16px; background: #111; border: 2px solid #333;
+            width: 100%; padding: 12px 14px; background: #111; border: 2px solid #333;
             border-radius: 6px; color: #fff; font-family: 'Courier New', monospace;
-            font-size: 20px; font-weight: bold; letter-spacing: 0.05em;
-            transition: border-color 0.2s;
+            font-size: 18px; font-weight: bold; letter-spacing: 0.05em;
+            transition: border-color 0.2s; margin-bottom: 12px;
         }
         input[type="text"]:focus { outline: none; border-color: #4ecdc4; }
         input[type="text"]::placeholder { color: #444; }
+        .name-row { display: flex; gap: 12px; }
+        .name-row .field { flex: 1; }
         .btn-join {
-            width: 100%; padding: 16px; background: rgba(78,205,196,0.1);
+            width: 100%; padding: 14px; background: rgba(78,205,196,0.1);
             border: 2px solid #4ecdc4; border-radius: 6px; color: #4ecdc4;
-            font-family: 'Courier New', monospace; font-size: 20px; font-weight: bold;
+            font-family: 'Courier New', monospace; font-size: 18px; font-weight: bold;
             letter-spacing: 0.15em; text-transform: uppercase; cursor: pointer;
             transition: all 0.2s;
         }
         .btn-join:hover { background: rgba(78,205,196,0.25); box-shadow: 0 0 20px rgba(78,205,196,0.3); }
         .btn-join:disabled { opacity: 0.3; cursor: not-allowed; }
-        .msg { text-align: center; padding: 12px; border-radius: 6px; margin-top: 16px; font-size: 14px; display: none; }
+        .msg { text-align: center; padding: 10px; border-radius: 6px; margin-top: 12px; font-size: 14px; display: none; }
         .msg.success { display: block; background: rgba(78,205,196,0.1); border: 1px solid #4ecdc4; color: #4ecdc4; }
         .msg.error { display: block; background: rgba(255,107,107,0.1); border: 1px solid #ff6b6b; color: #ff6b6b; }
         .roster { list-style: none; }
         .roster li {
             display: flex; align-items: center;
-            padding: 12px 14px; margin: 6px 0; background: rgba(40,40,60,0.8);
+            padding: 10px 14px; margin: 5px 0; background: rgba(40,40,60,0.8);
             border: 1px solid #333; border-radius: 6px;
         }
-        .roster-num { color: #ffe66d; font-size: 22px; font-weight: bold; margin-right: 16px; min-width: 30px; }
-        .roster-name { color: #fff; font-size: 20px; font-weight: bold; }
-        .empty-roster { color: #555; text-align: center; padding: 30px; font-size: 16px; }
-        .count-badge { text-align: center; color: #ffe66d; font-size: 14px; margin-bottom: 12px; }
+        .roster-num { color: #ffe66d; font-size: 20px; font-weight: bold; margin-right: 14px; min-width: 26px; }
+        .roster-name { color: #fff; font-size: 18px; font-weight: bold; }
+        .empty-roster { color: #555; text-align: center; padding: 20px; font-size: 14px; }
+        .spots { text-align: center; margin-bottom: 10px; font-size: 14px; color: #888; }
+        .spots-num { color: #ffe66d; font-weight: bold; font-size: 20px; }
+        .spots-full { color: #ff6b6b; }
+        .qr-section { text-align: center; padding: 12px; }
+        .qr-section canvas { border-radius: 8px; background: #fff; padding: 8px; }
+        .qr-label { color: #666; font-size: 11px; margin-top: 6px; }
+        .full-banner { background: rgba(255,107,107,0.15); border: 1px solid #ff6b6b; border-radius: 6px; padding: 14px; text-align: center; color: #ff6b6b; font-size: 16px; font-weight: bold; margin-bottom: 14px; }
         @keyframes slideIn { from { opacity: 0; transform: translateX(-20px); } to { opacity: 1; transform: translateX(0); } }
         .roster li { animation: slideIn 0.3s ease-out; }
     </style>
+    <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.4/build/qrcode.min.js"></script>
 </head>
 <body>
 <div class="container">
 
-    <h1>Bot Battle</h1>
-    <p class="subtitle">Enterprise AI Summit — Sign Up to Compete</p>
+    <h1>Vibe Battle</h1>
+    <p class="subtitle">Enterprise AI Summit — Bot Battle Arena</p>
 
     <div class="card">
-        <h2>Your Name</h2>
-        <div class="form-group">
-            <input type="text" id="contestant-name" placeholder="Enter your name..." maxlength="30" autofocus>
+        <h2>Sign Up to Compete</h2>
+        <div class="spots" id="spots-info"></div>
+        <div class="full-banner" id="full-banner" style="display:none;">All 6 spots are taken!</div>
+        <div class="name-row">
+            <div class="field">
+                <label>First Name</label>
+                <input type="text" id="first-name" placeholder="First" maxlength="20" autofocus>
+            </div>
+            <div class="field">
+                <label>Last Name</label>
+                <input type="text" id="last-name" placeholder="Last" maxlength="20">
+            </div>
         </div>
         <button class="btn-join" id="join-btn" onclick="signup()">I'm In!</button>
         <div class="msg" id="msg"></div>
@@ -65,21 +82,41 @@
 
     <div class="card">
         <h2>Contestants</h2>
-        <div class="count-badge" id="count-badge"></div>
         <ul class="roster" id="roster">
             <li class="empty-roster">No one has signed up yet</li>
         </ul>
+    </div>
+
+    <div class="card">
+        <div class="qr-section">
+            <h2 style="color:#ffe66d;">Scan to Sign Up</h2>
+            <canvas id="qr-canvas"></canvas>
+            <div class="qr-label" id="qr-url"></div>
+        </div>
     </div>
 
 </div>
 
 <script>
     var SERVER = window.location.origin;
+    var pageUrl = window.location.href.split('?')[0];
+    document.getElementById('qr-url').textContent = pageUrl;
+    if (typeof QRCode !== 'undefined') {
+        QRCode.toCanvas(document.getElementById('qr-canvas'), pageUrl, {
+            width: 200, margin: 1, color: { dark: '#000000', light: '#ffffff' }
+        });
+    }
 
     function signup() {
-        var name = document.getElementById('contestant-name').value.trim();
-        if (!name) return;
-
+        var first = document.getElementById('first-name').value.trim();
+        var last = document.getElementById('last-name').value.trim();
+        if (!first || !last) {
+            var msg = document.getElementById('msg');
+            msg.className = 'msg error';
+            msg.textContent = 'Please enter your first and last name.';
+            return;
+        }
+        var fullName = first + ' ' + last;
         var btn = document.getElementById('join-btn');
         btn.disabled = true;
         btn.textContent = 'Signing up...';
@@ -87,7 +124,7 @@
         fetch(SERVER + '/signup', {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({name: name})
+            body: JSON.stringify({name: fullName})
         })
         .then(function(r) { return r.json(); })
         .then(function(data) {
@@ -97,8 +134,11 @@
                 msg.textContent = data.error;
             } else {
                 msg.className = 'msg success';
-                msg.textContent = "You're in, " + name + "! #" + data.position + " in the queue.";
-                document.getElementById('contestant-name').value = '';
+                var remaining = data['spots-remaining'];
+                msg.textContent = "You're in, " + first + "! #" + data.position +
+                    (remaining > 0 ? ' (' + remaining + ' spots left)' : ' (LAST SPOT!)');
+                document.getElementById('first-name').value = '';
+                document.getElementById('last-name').value = '';
             }
             btn.disabled = false;
             btn.textContent = "I'm In!";
@@ -113,7 +153,7 @@
         });
     }
 
-    document.getElementById('contestant-name').addEventListener('keydown', function(e) {
+    document.getElementById('last-name').addEventListener('keydown', function(e) {
         if (e.key === 'Enter') signup();
     });
 
@@ -123,8 +163,30 @@
         .then(function(data) {
             var el = document.getElementById('roster');
             var names = data.queue || [];
-            var badge = document.getElementById('count-badge');
-            badge.textContent = names.length > 0 ? names.length + ' contestant' + (names.length !== 1 ? 's' : '') + ' ready to battle' : '';
+            var max = data.max || 6;
+            var remaining = data['spots-remaining'];
+
+            var spotsEl = document.getElementById('spots-info');
+            spotsEl.textContent = '';
+            var numSpan = document.createElement('span');
+            numSpan.className = remaining > 0 ? 'spots-num' : 'spots-num spots-full';
+            numSpan.textContent = String(remaining);
+            spotsEl.appendChild(numSpan);
+            spotsEl.appendChild(document.createTextNode(' of ' + max + ' spots remaining'));
+
+            var banner = document.getElementById('full-banner');
+            var btn = document.getElementById('join-btn');
+            var input1 = document.getElementById('first-name');
+            var input2 = document.getElementById('last-name');
+            if (remaining <= 0 && names.length >= max) {
+                banner.style.display = 'block';
+                btn.disabled = true;
+                input1.disabled = true;
+                input2.disabled = true;
+            } else {
+                banner.style.display = 'none';
+            }
+
             if (names.length === 0) {
                 el.textContent = '';
                 var empty = document.createElement('li');
@@ -139,11 +201,11 @@
                 var num = document.createElement('span');
                 num.className = 'roster-num';
                 num.textContent = String(i + 1);
-                var name = document.createElement('span');
-                name.className = 'roster-name';
-                name.textContent = names[i];
+                var nameEl = document.createElement('span');
+                nameEl.className = 'roster-name';
+                nameEl.textContent = names[i];
                 li.appendChild(num);
-                li.appendChild(name);
+                li.appendChild(nameEl);
                 el.appendChild(li);
             }
         })

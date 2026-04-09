@@ -103,32 +103,58 @@
 
 (defonce commentary-text (atom {:text "" :timestamp 0}))
 
-;; Signup queue — separate from game lobby. People register interest before game starts.
-(defonce signup-queue (atom []))
+;; Signup queue — persistent to file, max 6 contestants for first battle.
+(def signup-file "signups.edn")
+(def max-signups 6)
+
+(defn load-signups []
+  (try
+    (if (.exists (clojure.java.io/file signup-file))
+      (clojure.edn/read-string (slurp signup-file))
+      [])
+    (catch Exception _ [])))
+
+(defn save-signups! [queue]
+  (spit signup-file (pr-str queue)))
+
+(defonce signup-queue (atom (load-signups)))
 
 (defn handle-signup [request]
   (let [body (:body request)
         contestant-name (get body "name" "")]
-    (if (or (empty? contestant-name) (> (count contestant-name) 30))
+    (cond
+      (or (empty? contestant-name) (> (count contestant-name) 30))
       (json-response 400 {:error "Name must be 1-30 characters"})
-      (if (some #(= (:name %) contestant-name) @signup-queue)
-        (json-response 400 {:error (str "'" contestant-name "' is already signed up!")})
-        (do
-          (swap! signup-queue conj {:name contestant-name
-                                    :timestamp (System/currentTimeMillis)})
-          (log/info :contestant-signup :name contestant-name
-                    :queue-size (count @signup-queue))
-          (json-response 200 {:status "registered"
-                              :name contestant-name
-                              :position (count @signup-queue)
-                              :queue (mapv :name @signup-queue)}))))))
+
+      (some #(= (:name %) contestant-name) @signup-queue)
+      (json-response 400 {:error (str "'" contestant-name "' is already signed up!")})
+
+      (>= (count @signup-queue) max-signups)
+      (json-response 400 {:error (str "Battle is full! Only " max-signups " spots available.")
+                          :queue (mapv :name @signup-queue)})
+
+      :else
+      (let [entry {:name contestant-name
+                   :timestamp (System/currentTimeMillis)}
+            new-queue (swap! signup-queue conj entry)]
+        (save-signups! new-queue)
+        (log/info :contestant-signup :name contestant-name
+                  :queue-size (count new-queue))
+        (json-response 200 {:status "registered"
+                            :name contestant-name
+                            :position (count new-queue)
+                            :spots-remaining (- max-signups (count new-queue))
+                            :queue (mapv :name new-queue)})))))
 
 (defn handle-signup-list [_request]
   (json-response 200 {:queue (mapv :name @signup-queue)
-                       :count (count @signup-queue)}))
+                       :count (count @signup-queue)
+                       :max max-signups
+                       :spots-remaining (- max-signups (count @signup-queue))}))
 
 (defn handle-signup-clear [_request]
   (reset! signup-queue [])
+  (save-signups! [])
   (json-response 200 {:status "cleared"}))
 
 (defn authenticate [request]
