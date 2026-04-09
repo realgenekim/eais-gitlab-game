@@ -38,9 +38,9 @@ Base URL: `https://vibebattle.testwhatever.xyz`
 | `/game/state` | GET | Fog-of-war view (needs auth token) |
 | `/game/gear/select` | POST | Equip gear `{"item": "titan-shield"}` (needs auth token) |
 | `/game/bot-update` | POST | Announce brain.py was updated (needs auth token) — shows on spectator |
-| `/guide/bot.py` | GET | Download bot runner |
-| `/guide/brain.py` | GET | Download starter brain |
-| `/guide/loadout.py` | GET | Download loadout template |
+| `/download/bot` | GET | Download bot runner (bot.py) |
+| `/download/brain` | GET | Download starter brain (brain.py) |
+| `/download/loadout` | GET | Download loadout template (loadout.py) |
 
 ## Bot Brief Response (poll this for live intel)
 

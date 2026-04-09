@@ -775,13 +775,13 @@
                     :get {:handler #'handle-signup-list}}]
          ["/signup/clear" {:post {:handler #'handle-signup-clear}}]
          ["/agent-context" {:get {:handler #'handle-agent-context}}]
-         ["/guide/bot.py" {:get {:handler (fn [_] {:status 200
+         ["/download/bot" {:get {:handler (fn [_] {:status 200
                                                     :headers {"Content-Type" "text/plain; charset=utf-8"}
                                                     :body (slurp (clojure.java.io/resource "public/guide/bot.py"))})}}]
-         ["/guide/brain.py" {:get {:handler (fn [_] {:status 200
+         ["/download/brain" {:get {:handler (fn [_] {:status 200
                                                       :headers {"Content-Type" "text/plain; charset=utf-8"}
                                                       :body (slurp (clojure.java.io/resource "public/guide/brain.py"))})}}]
-         ["/guide/loadout.py" {:get {:handler (fn [_] {:status 200
+         ["/download/loadout" {:get {:handler (fn [_] {:status 200
                                                         :headers {"Content-Type" "text/plain; charset=utf-8"}
                                                         :body (slurp (clojure.java.io/resource "public/guide/loadout.py"))})}}]
          ["/guide.html" {:get {:handler (fn [_]
