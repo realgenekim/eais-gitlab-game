@@ -192,9 +192,14 @@
 
     <div class="container">
         <div class="header">
-            <h1>The Armory</h1>
-            <div class="subtitle">Independent Test View &mdash; localhost:33333/armory</div>
-            <div class="phase-badge phase-lobby" id="phase-badge">LOBBY</div>
+            <div style="display:flex; justify-content:space-between; align-items:center;">
+                <a href="/" style="text-decoration:none; color:#4ecdc4; font-size:14px; border:1px solid #4ecdc4; padding:6px 14px; border-radius:4px;">&larr; Back to Arena</a>
+                <div>
+                    <h1 style="display:inline;">The Armory</h1>
+                </div>
+                <div class="phase-badge phase-lobby" id="phase-badge">LOBBY</div>
+            </div>
+            <div class="subtitle" style="margin-top:10px;">Gear up before battle &mdash; first come, first served</div>
         </div>
 
         <div class="main-grid">
@@ -355,11 +360,12 @@
                 bar.appendChild(fill);
                 card.appendChild(bar);
 
-                // Items
+                // Gear (from new gear system) + legacy items
                 const itemsDiv = document.createElement('div');
                 itemsDiv.className = 'player-items';
-                if (p.items && p.items.length > 0) {
-                    for (const item of p.items) {
+                const allGear = (p.gear || []).concat(p.items || []);
+                if (allGear.length > 0) {
+                    for (const item of allGear) {
                         const badge = document.createElement('span');
                         badge.className = 'item-badge ' + (ITEM_TYPES[item] || 'utility');
                         badge.textContent = item.replace(/-/g, ' ');
@@ -368,7 +374,7 @@
                 } else {
                     const empty = document.createElement('span');
                     empty.style.cssText = 'color:#555;font-size:11px';
-                    empty.textContent = 'No items yet';
+                    empty.textContent = 'No gear selected';
                     itemsDiv.appendChild(empty);
                 }
                 card.appendChild(itemsDiv);
@@ -398,29 +404,52 @@
             for (const p of players) previousPlayers[p.id] = p;
         }
 
-        function renderShop(shop) {
+        // Track which player owns which gear
+        let gearOwners = {};  // {item-key: playerName}
+
+        function buildGearOwners(players) {
+            gearOwners = {};
+            if (!players) return;
+            for (const p of players) {
+                for (const item of (p.gear || p.items || [])) {
+                    gearOwners[item] = p.name;
+                }
+            }
+        }
+
+        function renderShop(shop, players) {
             const el = document.getElementById('shop-list');
             if (!shop) return;
             el.textContent = '';
+            buildGearOwners(players);
 
             const items = Object.entries(shop).sort(function(a, b) { return b[1].cost - a[1].cost; });
             for (const [key, item] of items) {
+                const owner = gearOwners[key];
+                const taken = !!owner;
+
                 const row = document.createElement('div');
                 row.className = 'shop-item';
+                if (taken) row.style.opacity = '0.4';
 
                 const info = document.createElement('div');
                 const nameEl = document.createElement('div');
                 nameEl.className = 'shop-item-name';
                 nameEl.textContent = item.name;
+                if (taken) nameEl.style.textDecoration = 'line-through';
                 const descEl = document.createElement('div');
                 descEl.className = 'shop-item-desc';
-                descEl.textContent = item.desc;
+                descEl.textContent = taken
+                    ? 'Equipped by ' + owner
+                    : item.desc;
+                if (taken) descEl.style.color = '#ff6b6b';
                 info.appendChild(nameEl);
                 info.appendChild(descEl);
 
                 const costEl = document.createElement('div');
                 costEl.className = 'shop-item-cost';
-                costEl.textContent = item.cost + ' pts';
+                costEl.textContent = taken ? 'TAKEN' : item.cost + ' pts';
+                if (taken) costEl.style.color = '#ff6b6b';
 
                 row.appendChild(info);
                 row.appendChild(costEl);
@@ -464,7 +493,7 @@
                 badge.className = 'phase-badge phase-' + data.phase;
 
                 renderPlayers(data.players);
-                renderShop(data.shop);
+                renderShop(data.shop, data.players);
                 renderCrates(data.crates);
             } catch (e) {
                 // Server down, keep polling

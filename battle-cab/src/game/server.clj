@@ -385,6 +385,7 @@
                              :name (:name p)
                              :points (:points p 0)
                              :items (vec (map name (or (:items p) [])))
+                             :gear (vec (map name (or (:gear p) [])))
                              :buffs (or (:buffs p) {})
                              :debuffs (or (:debuffs p) {})
                              :hp (:hp p)
