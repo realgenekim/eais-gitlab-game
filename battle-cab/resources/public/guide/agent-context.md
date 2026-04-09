@@ -126,13 +126,55 @@ Check `GET /game/gear` for live availability. Available gear:
 
 **Priority: SURVIVE. Dead = out for the entire round.**
 
+### Priority Order (this is critical — follow this exact order):
+
 1. **Dodge bullets** — check `state["visible"]["shots"]` for incoming fire, move perpendicular
-2. **Stay near center** — the arena shrinks from the edges, don't get caught
-3. **Shoot rivals** — line up on the same row or column, fire for +150 pts and to eliminate them
-4. **Manage HP** — if below 200, flee and play defensive until you find an opening
-5. **Use knockback** — hitting a rival pushes them toward the shrinking edge
-6. **Do missions opportunistically** — +100 pts when safe, but survival comes first
-7. **Pick gear wisely** — `titan-shield` for survival, `plasma-rounds` for aggression
+2. **ESCAPE EDGES** — if within 5 tiles of ANY edge (x<5, x>15, y<5, y>14), DROP EVERYTHING and move toward center (10,9). The arena shrinks and WILL kill you on edges. This overrides shooting, missions, everything.
+3. **Flee when HP < 200** — run from nearest threat, but NEVER toward an edge
+4. **Shoot rivals** — only if lined up on same row/column AND not near an edge
+5. **Do missions** — only when safe and not near edges
+6. **Patrol near center** — with random jitter to avoid being predictable
+
+### CRITICAL: Edge Death Prevention
+
+The #1 cause of bot death is the arena shrink catching bots on edges. Your brain.py MUST:
+
+- **Never move toward an edge** when within 5 tiles of one. Check: `min(x, y, map_width-1-x, map_height-1-y) < 5`
+- **Use `best_toward_center()`** that ranks ALL 4 directions by distance-to-center reduction
+- **Anti-stuck detection** — if same position for 3+ ticks, force a random direction change
+- **Knockback awareness** — getting hit pushes you 2 tiles. If you're near an edge, getting hit can push you into the shrink zone
+
+### Helper: `best_toward_center(mx, my, map_w, map_h)`
+```python
+def best_toward_center(mx, my, map_w, map_h):
+    cx, cy = 10, 9
+    DIRS = {"north":(0,-1),"south":(0,1),"east":(1,0),"west":(-1,0)}
+    ranked = []
+    for d, (ddx, ddy) in DIRS.items():
+        nx, ny = mx + ddx, my + ddy
+        if 0 <= nx < map_w and 0 <= ny < map_h:
+            ranked.append((abs(nx-cx)+abs(ny-cy), d))
+    ranked.sort()
+    return ranked[0][1] if ranked else "south"
+```
+
+### Helper: `moves_toward_edge(mx, my, direction, map_w, map_h)`
+```python
+def moves_toward_edge(mx, my, direction, map_w, map_h):
+    DIRS = {"north":(0,-1),"south":(0,1),"east":(1,0),"west":(-1,0)}
+    ddx, ddy = DIRS.get(direction, (0,0))
+    nx, ny = mx + ddx, my + ddy
+    edge_now = min(mx, my, map_w-1-mx, map_h-1-my)
+    edge_new = min(nx, ny, map_w-1-nx, map_h-1-ny)
+    return edge_new < edge_now and edge_new < 5
+```
+
+Use these in your brain.py. Before ANY move, check `moves_toward_edge()` — if True, use `best_toward_center()` instead.
+
+### Gear Strategy
+- **`titan-shield`** for survival (half damage = survive twice as long)
+- **`plasma-rounds`** for aggression (2x damage = kill in 5 hits instead of 10)
+- **`juggernaut`** for tankiness (+300 HP = 800 total)
 
 ## Workflow
 

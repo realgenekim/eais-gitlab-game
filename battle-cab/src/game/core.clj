@@ -926,24 +926,30 @@
                 (spawn-enemies enemy-type to-spawn))))))))
 
 (defn nudge-stalled-players
-  "If a player hasn't moved in 5+ ticks, force them to move.
-   If completely trapped (no adjacent open cell), teleport to center area."
+  "If a player hasn't moved in 3+ ticks, force them toward center.
+   If near an edge, aggressively push center. If trapped, teleport."
   [state]
-  (reduce-kv
-   (fn [s id player]
-     (if (and (:alive? player)
-              (:last-move-tick player)
-              (> (- (:tick state) (:last-move-tick player)) 5))
-       ;; Stuck! Try adjacent first
-       (let [px (:x player) py (:y player)
-             occupied (disj (occupied-cells s) [px py])
-             candidates (for [[dx dy] [[0 -1] [0 1] [1 0] [-1 0]]
-                              :let [nx (+ px dx) ny (+ py dy)]
-                              :when (and (walkable? s [nx ny])
-                                         (not (contains? occupied [nx ny])))]
-                          [nx ny])]
-         (if (seq candidates)
-           (let [[nx ny] (rand-nth (vec candidates))]
+  (let [{:keys [width height]} (:map state)
+        cx (quot width 2) cy (quot height 2)]
+    (reduce-kv
+     (fn [s id player]
+       (if (and (:alive? player)
+                (:last-move-tick player)
+                (> (- (:tick state) (:last-move-tick player)) 3))
+         ;; Stuck! Prefer moves toward center
+         (let [px (:x player) py (:y player)
+               occupied (disj (occupied-cells s) [px py])
+               candidates (for [[dx dy] [[0 -1] [0 1] [1 0] [-1 0]]
+                                :let [nx (+ px dx) ny (+ py dy)]
+                                :when (and (walkable? s [nx ny])
+                                           (not (contains? occupied [nx ny])))]
+                            [nx ny])
+               ;; Sort by distance to center — prefer moving toward center
+               sorted-candidates (sort-by (fn [[x y]]
+                                            (manhattan-distance [x y] [cx cy]))
+                                          candidates)]
+           (if (seq sorted-candidates)
+             (let [[nx ny] (first sorted-candidates)]
              (-> s
                  (assoc-in [:players id :x] nx)
                  (assoc-in [:players id :y] ny)
@@ -969,7 +975,7 @@
                      (assoc-in [:players id :prev-direction] nil)))
                s))))
        s))
-   state (:players state)))
+   state (:players state))))
 
 (defn track-movement
   "Track when players last moved (for stall detection)."
