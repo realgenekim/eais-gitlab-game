@@ -769,6 +769,10 @@
          ["/signup" {:post {:handler #'handle-signup}
                     :get {:handler #'handle-signup-list}}]
          ["/signup/clear" {:post {:handler #'handle-signup-clear}}]
+         ["/guide/agent-context.md" {:get {:handler (fn [_]
+                                                      {:status 200
+                                                       :headers {"Content-Type" "text/plain; charset=utf-8"}
+                                                       :body (slurp (clojure.java.io/resource "public/guide/agent-context.md"))})}}]
          ["/guide.html" {:get {:handler (fn [_]
                                            {:status 200
                                             :headers {"Content-Type" "text/html"}
