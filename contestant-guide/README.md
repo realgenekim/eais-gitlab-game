@@ -159,6 +159,29 @@ Copy-paste to your AI tool:
 
 ---
 
+## Live Arena Intel (for your AI tool)
+
+Your AI coding assistant can check the game server for real-time intel on your bot:
+
+```bash
+curl http://SERVER_IP:33333/game/brief?name=YourBotName
+```
+
+This returns your HP, score, rank, nearby enemies, nearby rivals, and **tips** on what to improve. Your AI tool can use this to give you smarter suggestions.
+
+If you're using **Claude Code**, there's a `CLAUDE.md` file in this folder that tells Claude about these endpoints automatically. Claude will check your bot's status and suggest strategy changes based on what's actually happening in the arena.
+
+### Available Endpoints
+
+| Endpoint | What it returns |
+|----------|----------------|
+| `GET /game/brief?name=BotName` | Your bot's full situation + tips |
+| `GET /game/scoreboard` | All scores and rankings |
+| `GET /game/status` | Game phase, tick, player count |
+| `GET /game/gear` | Gear catalog with availability |
+
+---
+
 ## Key Insight
 
 **Save brain.py to hot-reload.** You don't restart your bot. Edit strategy, save, watch it change on the big screen. Iterate fast. That's how you win.

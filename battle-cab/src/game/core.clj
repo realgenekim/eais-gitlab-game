@@ -778,10 +778,10 @@
 ;;; ---------------------------------------------------------------------------
 
 (def enemy-types
-  "Enemy type definitions: {type {:hp :speed :damage :score}}"
-  {:floopy {:hp 20 :speed 1 :damage 10 :score 10}
-   :squanchy {:hp 50 :speed 1 :damage 20 :score 25}
-   :scary {:hp 80 :speed 2 :damage 30 :score 50}})
+  "Enemy type definitions — weak enough to be fun, not frustrating."
+  {:floopy {:hp 10 :speed 1 :damage 5 :score 10}
+   :squanchy {:hp 25 :speed 1 :damage 8 :score 25}
+   :scary {:hp 40 :speed 1 :damage 12 :score 50}})
 
 (defn spawn-enemies
   "Spawn a wave of enemies at random edge cells. No cell sharing."
@@ -898,7 +898,7 @@
       ;; Determine wave composition — cap total enemies at 20
       (let [wave-num (inc (or (:wave-number state) 0))
             current-enemies (count (or (:enemies state) {}))
-            max-enemies 20]
+            max-enemies 15]
         (if (>= current-enemies max-enemies)
           ;; Already at cap — just bump wave number, don't spawn
           (assoc state :wave-number wave-num)

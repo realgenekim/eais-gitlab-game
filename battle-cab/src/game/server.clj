@@ -136,6 +136,99 @@
       (json-response 200 (assoc view :phase (name (engine/get-phase)))))
     (json-response 401 {:error "Invalid token"})))
 
+(defn handle-bot-brief [request]
+  "Rich status for a bot's AI coding tool — what's happening, what to improve.
+   No auth needed — just pass ?name=BotName. Returns tactical advice."
+  (let [params (:query-params request)
+        bot-name (get params "name")
+        state (engine/get-state)
+        phase (name (engine/get-phase))
+        players (:players state)
+        player-entry (first (filter (fn [[_ p]] (= (:name p) bot-name)) players))
+        enemies (or (:enemies state) {})
+        scoreboard (->> players
+                        (map (fn [[id p]] {:name (:name p) :score (:score p)
+                                           :alive (:alive? p) :hp (:hp p)}))
+                        (sort-by :score >)
+                        vec)]
+    (if-not player-entry
+      (json-response 404 {:error (str "Bot '" bot-name "' not found")
+                          :available-players (vec (map :name (vals players)))})
+      (let [[pid player] player-entry
+            px (:x player) py (:y player)
+            nearby-enemies (->> enemies
+                                (filter (fn [[_ e]]
+                                          (<= (core/manhattan-distance
+                                               [px py] [(:x e) (:y e)]) 6)))
+                                (map (fn [[id e]]
+                                       {:type (name (:type e)) :hp (:hp e)
+                                        :distance (core/manhattan-distance
+                                                   [px py] [(:x e) (:y e)])
+                                        :direction (cond
+                                                     (< (:x e) px) "west"
+                                                     (> (:x e) px) "east"
+                                                     (< (:y e) py) "north"
+                                                     :else "south")}))
+                                vec)
+            nearby-players (->> players
+                                (remove (fn [[id _]] (= id pid)))
+                                (filter (fn [[_ p]]
+                                          (and (:alive? p)
+                                               (<= (core/manhattan-distance
+                                                    [px py] [(:x p) (:y p)]) 8))))
+                                (map (fn [[_ p]]
+                                       {:name (:name p) :score (:score p)
+                                        :hp (:hp p)
+                                        :distance (core/manhattan-distance
+                                                   [px py] [(:x p) (:y p)])
+                                        :direction (cond
+                                                     (< (:x p) px) "west"
+                                                     (> (:x p) px) "east"
+                                                     (< (:y p) py) "north"
+                                                     :else "south")}))
+                                vec)
+            rank (inc (.indexOf (mapv :name scoreboard) bot-name))
+            {:keys [width height]} (:map state)
+            edge-danger (or (< px 3) (> px (- width 4))
+                            (< py 3) (> py (- height 4)))]
+        (json-response 200
+                       {:bot bot-name
+                        :phase phase
+                        :tick (:tick state)
+                        :wave (or (:wave-number state) 0)
+                        :rank rank
+                        :rank-of (count players)
+                        :you {:x px :y py
+                              :hp (:hp player)
+                              :alive (:alive? player)
+                              :score (:score player)
+                              :ammo (:ammo player)
+                              :gear (vec (map name (or (:gear player) [])))}
+                        :scoreboard scoreboard
+                        :nearby-enemies nearby-enemies
+                        :nearby-rivals nearby-players
+                        :total-enemies (count enemies)
+                        :arena-shrinking (>= (:tick state)
+                                             (get-in state [:config :shrink-start] 200))
+                        :near-edge edge-danger
+                        :tips (cond-> []
+                                (< (:hp player) 200)
+                                (conj "HP is low! Add flee logic when hp < 200")
+                                (zero? (:ammo player))
+                                (conj "Out of ammo! Move away from threats until it regens")
+                                edge-danger
+                                (conj "Near the edge! The arena shrinks — move toward center")
+                                (> (count nearby-enemies) 3)
+                                (conj "Surrounded by enemies! Consider adding dodge/flee behavior")
+                                (empty? nearby-enemies)
+                                (conj "No enemies nearby — good time to do missions for +100 pts")
+                                (seq nearby-players)
+                                (conj (str "Rival nearby: " (:name (first nearby-players))
+                                           " — kill for +150 pts!"))
+                                (> rank 1)
+                                (conj (str "You're rank " rank " — leader has "
+                                           (:score (first scoreboard)) " pts")))})))))
+
 (defn handle-action [request]
   (if-let [player-id (authenticate request)]
     (let [body (:body request)
@@ -559,6 +652,7 @@
          ["/game/frame" {:get {:handler #'handle-frame}}]
          ["/game/map-swap" {:post {:handler #'handle-map-swap}}]
          ["/game/lightning" {:post {:handler #'handle-lightning}}]
+         ["/game/brief" {:get {:handler #'handle-bot-brief}}]
          ["/game/gear" {:get {:handler #'handle-gear-catalog}}]
          ["/game/gear/select" {:post {:handler #'handle-gear-select}}]
          ["/game/start" {:post {:handler #'handle-start}}]
