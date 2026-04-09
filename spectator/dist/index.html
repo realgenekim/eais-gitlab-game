@@ -444,43 +444,56 @@
             setInterval(pollLobby, 2000);
         }
 
+        var GEAR_COLORS = {
+            'plasma-rounds':'#ff4400','titan-shield':'#0096ff','oracle-eye':'#00ff88',
+            'sprint-boots':'#ffe66d','vampiric-rounds':'#ff44aa','juggernaut':'#0096ff',
+            'ammo-belt':'#00ff88','cluster-shot':'#ff4400'
+        };
         function updateScoreboard(players) {
-            const el = document.getElementById('sb-players');
+            var el = document.getElementById('sb-players');
             if (!el || !players) return;
-            const sorted = [...players].sort((a,b) => b.score - a.score);
+            var sorted = players.slice().sort(function(a,b){return b.score-a.score;});
             el.textContent = '';
-            sorted.forEach(p => {
-                const row = document.createElement('div');
+            sorted.forEach(function(p) {
+                var row = document.createElement('div');
                 row.className = 'sb-player' + (p.alive ? '' : ' sb-dead');
+                row.style.cssText = 'display:block;padding:8px 10px;margin:4px 0;border-bottom:1px solid #222;';
 
-                const left = document.createElement('div');
-                const nameEl = document.createElement('div');
-                nameEl.className = 'sb-name';
+                var topLine = document.createElement('div');
+                topLine.style.cssText = 'display:flex;justify-content:space-between;align-items:center;';
+
+                var nameEl = document.createElement('span');
+                nameEl.style.cssText = 'color:#fff;font-size:15px;font-weight:bold;';
                 nameEl.textContent = p.name;
-                const statsEl = document.createElement('div');
-                statsEl.className = 'sb-stats';
-                const items = p.items || [];
-                const buffs = Object.keys(p.buffs || {});
-                const debuffs = Object.keys(p.debuffs || {});
-                let statsText = 'Ammo:' + (p.ammo || '?') + ' HP:' + (p.alive ? p.hp : 0);
-                if (items.length > 0) statsText += ' | ' + items.length + ' items';
-                if (debuffs.length > 0) statsText += ' | CURSED';
-                statsEl.textContent = statsText;
-                left.appendChild(nameEl);
-                left.appendChild(statsEl);
 
-                const right = document.createElement('div');
-                const scoreEl = document.createElement('div');
-                scoreEl.className = 'sb-score';
+                var scoreEl = document.createElement('span');
+                scoreEl.style.cssText = 'color:#ffe66d;font-size:15px;font-weight:bold;';
                 scoreEl.textContent = p.score + ' pts';
-                const hpEl = document.createElement('div');
-                hpEl.className = 'sb-hp';
-                hpEl.textContent = p.alive ? (p.points || 0) + ' gold' : 'DEAD';
-                right.appendChild(scoreEl);
-                right.appendChild(hpEl);
 
-                row.appendChild(left);
-                row.appendChild(right);
+                topLine.appendChild(nameEl);
+                topLine.appendChild(scoreEl);
+                row.appendChild(topLine);
+
+                var statsLine = document.createElement('div');
+                statsLine.style.cssText = 'color:#888;font-size:11px;margin-top:2px;';
+                statsLine.textContent = (p.alive ? 'HP:' + p.hp : 'ELIMINATED') + ' | Ammo:' + (p.ammo || 0);
+                row.appendChild(statsLine);
+
+                // Gear loadout
+                var gear = p.gear || p.items || [];
+                if (gear.length > 0) {
+                    var gearLine = document.createElement('div');
+                    gearLine.style.cssText = 'margin-top:4px;display:flex;flex-wrap:wrap;gap:3px;';
+                    gear.forEach(function(g) {
+                        var badge = document.createElement('span');
+                        var color = GEAR_COLORS[g] || '#888';
+                        badge.style.cssText = 'font-size:9px;padding:1px 5px;border-radius:3px;border:1px solid ' + color + ';color:' + color + ';';
+                        badge.textContent = g.replace(/-/g,' ');
+                        gearLine.appendChild(badge);
+                    });
+                    row.appendChild(gearLine);
+                }
+
                 el.appendChild(row);
             });
         }

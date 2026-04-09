@@ -164,6 +164,9 @@
 (defn has-debuff? [player debuff-key]
   (contains? (or (:debuffs player) {}) debuff-key))
 
+(defn has-gear? [player gear-key]
+  (some #(= % gear-key) (or (:gear player) [])))
+
 ;; Forward declarations for armory/crate functions defined later in file
 (declare expire-buffs-debuffs apply-buff-effects buy-item
          pickup-crate maybe-spawn-crates find-nearest-open)
@@ -377,7 +380,9 @@
   (let [player (get-in state [:players player-id])
         [dx dy] (get directions (keyword direction) [0 0])
         range- (get-in state [:config :shoot-range] 5)
-        damage (get-in state [:config :shoot-damage] 30)
+        base-damage (get-in state [:config :shoot-damage] 30)
+        ;; Gear: plasma-rounds = 2x damage
+        damage (if (has-gear? player :plasma-rounds) (* 2 base-damage) base-damage)
         kill-bonus (get-in state [:config :kill-bonus] 150)
         enemies (or (:enemies state) {})]
     (if (or (not (:alive? player))
@@ -445,6 +450,7 @@
                   ;; Target damage reduction
                   target (get-in state [:players hit-id])
                   effective-damage (cond-> effective-damage
+                                    (has-gear? target :titan-shield) (quot 2)
                                     (has-buff? target :damage-halved) (quot 2)
                                     (has-debuff? target :glass-cannon) (* 3))
                   new-hp (- (get-in state [:players hit-id :hp]) effective-damage)]
@@ -1261,8 +1267,16 @@
       [state false "You already have this item"]
 
       :else
-      [(update-in state [:players player-id :gear] (fnil conj []) item-key)
-       true "Item equipped"])))
+      (let [state (update-in state [:players player-id :gear] (fnil conj []) item-key)
+            ;; Apply instant gear effects
+            state (case item-key
+                    :juggernaut (update-in state [:players player-id :hp] + 300)
+                    :ammo-belt (-> state
+                                   (update-in [:players player-id :ammo] + 5)
+                                   (assoc-in [:players player-id :max-ammo] 15))
+                    :oracle-eye (assoc-in state [:players player-id :vision-radius] 16)
+                    state)]
+        [state true "Item equipped"]))))
 
 (defn find-player-by-name
   "Find existing player entry by name. Returns [id player] or nil."
