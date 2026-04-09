@@ -103,6 +103,34 @@
 
 (defonce commentary-text (atom {:text "" :timestamp 0}))
 
+;; Signup queue — separate from game lobby. People register interest before game starts.
+(defonce signup-queue (atom []))
+
+(defn handle-signup [request]
+  (let [body (:body request)
+        contestant-name (get body "name" "")]
+    (if (or (empty? contestant-name) (> (count contestant-name) 30))
+      (json-response 400 {:error "Name must be 1-30 characters"})
+      (if (some #(= (:name %) contestant-name) @signup-queue)
+        (json-response 400 {:error (str "'" contestant-name "' is already signed up!")})
+        (do
+          (swap! signup-queue conj {:name contestant-name
+                                    :timestamp (System/currentTimeMillis)})
+          (log/info :contestant-signup :name contestant-name
+                    :queue-size (count @signup-queue))
+          (json-response 200 {:status "registered"
+                              :name contestant-name
+                              :position (count @signup-queue)
+                              :queue (mapv :name @signup-queue)}))))))
+
+(defn handle-signup-list [_request]
+  (json-response 200 {:queue (mapv :name @signup-queue)
+                       :count (count @signup-queue)}))
+
+(defn handle-signup-clear [_request]
+  (reset! signup-queue [])
+  (json-response 200 {:status "cleared"}))
+
 (defn authenticate [request]
   (let [token (or (get-in request [:headers "authorization"])
                   (get-in request [:query-params "token"])
@@ -652,6 +680,9 @@
          ["/game/frame" {:get {:handler #'handle-frame}}]
          ["/game/map-swap" {:post {:handler #'handle-map-swap}}]
          ["/game/lightning" {:post {:handler #'handle-lightning}}]
+         ["/signup" {:post {:handler #'handle-signup}
+                    :get {:handler #'handle-signup-list}}]
+         ["/signup/clear" {:post {:handler #'handle-signup-clear}}]
          ["/guide.html" {:get {:handler (fn [_]
                                            {:status 200
                                             :headers {"Content-Type" "text/html"}

@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bot Battle Arena — Enter the Arena</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: 'Courier New', monospace; background: #0a0a14; color: #ccc; min-height: 100vh; display: flex; flex-direction: column; align-items: center; }
+        .container { max-width: 700px; width: 100%; padding: 40px 20px; }
+        h1 { color: #ff6b6b; font-size: 42px; letter-spacing: 0.2em; text-align: center; text-transform: uppercase; margin-bottom: 4px; text-shadow: 0 0 20px rgba(255,107,107,0.3); }
+        .subtitle { color: #888; text-align: center; font-size: 14px; margin-bottom: 40px; }
+        .card { background: rgba(20,20,35,0.9); border: 1px solid #333; border-radius: 10px; padding: 30px; margin-bottom: 24px; }
+        .card h2 { color: #4ecdc4; font-size: 18px; letter-spacing: 0.1em; margin-bottom: 16px; text-transform: uppercase; }
+        .form-group { margin-bottom: 20px; }
+        label { display: block; color: #888; font-size: 12px; letter-spacing: 0.1em; text-transform: uppercase; margin-bottom: 6px; }
+        input[type="text"] {
+            width: 100%; padding: 14px 16px; background: #111; border: 2px solid #333;
+            border-radius: 6px; color: #fff; font-family: 'Courier New', monospace;
+            font-size: 20px; font-weight: bold; letter-spacing: 0.05em;
+            transition: border-color 0.2s;
+        }
+        input[type="text"]:focus { outline: none; border-color: #4ecdc4; }
+        input[type="text"]::placeholder { color: #444; }
+        .btn-join {
+            width: 100%; padding: 16px; background: rgba(78,205,196,0.1);
+            border: 2px solid #4ecdc4; border-radius: 6px; color: #4ecdc4;
+            font-family: 'Courier New', monospace; font-size: 20px; font-weight: bold;
+            letter-spacing: 0.15em; text-transform: uppercase; cursor: pointer;
+            transition: all 0.2s;
+        }
+        .btn-join:hover { background: rgba(78,205,196,0.25); box-shadow: 0 0 20px rgba(78,205,196,0.3); }
+        .btn-join:disabled { opacity: 0.3; cursor: not-allowed; }
+        .msg { text-align: center; padding: 12px; border-radius: 6px; margin-top: 16px; font-size: 14px; display: none; }
+        .msg.success { display: block; background: rgba(78,205,196,0.1); border: 1px solid #4ecdc4; color: #4ecdc4; }
+        .msg.error { display: block; background: rgba(255,107,107,0.1); border: 1px solid #ff6b6b; color: #ff6b6b; }
+
+        .roster { list-style: none; }
+        .roster li {
+            display: flex; justify-content: space-between; align-items: center;
+            padding: 10px 14px; margin: 6px 0; background: rgba(40,40,60,0.8);
+            border: 1px solid #333; border-radius: 6px;
+        }
+        .roster-num { color: #ffe66d; font-size: 20px; font-weight: bold; margin-right: 14px; }
+        .roster-name { color: #fff; font-size: 18px; font-weight: bold; }
+        .roster-status { color: #4ecdc4; font-size: 12px; }
+        .empty-roster { color: #555; text-align: center; padding: 20px; font-size: 14px; }
+
+        .next-steps { color: #888; font-size: 13px; line-height: 1.8; }
+        .next-steps code { background: #1a1a2e; color: #4ecdc4; padding: 2px 6px; border-radius: 3px; }
+        .next-steps a { color: #ffe66d; }
+
+        @keyframes slideIn { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: translateY(0); } }
+        .roster li { animation: slideIn 0.3s ease-out; }
+    </style>
+</head>
+<body>
+<div class="container">
+
+    <h1>Bot Battle</h1>
+    <p class="subtitle">Enterprise AI Summit — Enter the Arena</p>
+
+    <div class="card">
+        <h2>Register Your Bot</h2>
+        <div class="form-group">
+            <label>Bot Name</label>
+            <input type="text" id="bot-name" placeholder="e.g. DESTROYER, PHOENIX, SKYNET..." maxlength="20" autofocus>
+        </div>
+        <button class="btn-join" id="join-btn" onclick="joinArena()">Enter the Arena</button>
+        <div class="msg" id="msg"></div>
+    </div>
+
+    <div class="card">
+        <h2>Contestants</h2>
+        <ul class="roster" id="roster">
+            <li class="empty-roster">No contestants yet — be the first!</li>
+        </ul>
+    </div>
+
+    <div class="card">
+        <h2>Next Steps</h2>
+        <div class="next-steps">
+            <p>1. Download the bot files from the <a href="/guide/index.html">Contestant Guide</a></p>
+            <p>2. Run: <code>pip install requests</code></p>
+            <p>3. Run: <code>python bot.py --name "YourBotName" --server https://vibebattle.testwhatever.xyz</code></p>
+            <p>4. Open <code>brain.py</code> in your AI coding tool and vibecode your strategy!</p>
+            <p>5. Save <code>brain.py</code> — your bot reloads live. No restart needed.</p>
+        </div>
+    </div>
+
+</div>
+
+<script>
+    var SERVER = window.location.origin;
+
+    function joinArena() {
+        var name = document.getElementById('bot-name').value.trim();
+        if (!name) return;
+
+        var btn = document.getElementById('join-btn');
+        btn.disabled = true;
+        btn.textContent = 'Signing up...';
+
+        fetch(SERVER + '/signup', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({name: name})
+        })
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            var msg = document.getElementById('msg');
+            if (data.error) {
+                msg.className = 'msg error';
+                msg.textContent = data.error;
+            } else {
+                msg.className = 'msg success';
+                msg.textContent = 'You are #' + data.position + ' in the queue, ' + name + '! Get your bot ready.';
+                document.getElementById('bot-name').value = '';
+            }
+            btn.disabled = false;
+            btn.textContent = 'Enter the Arena';
+            pollRoster();
+        })
+        .catch(function() {
+            var msg = document.getElementById('msg');
+            msg.className = 'msg error';
+            msg.textContent = 'Could not reach the server.';
+            btn.disabled = false;
+            btn.textContent = 'Enter the Arena';
+        });
+    }
+
+    // Enter key submits
+    document.getElementById('bot-name').addEventListener('keydown', function(e) {
+        if (e.key === 'Enter') joinArena();
+    });
+
+    function pollRoster() {
+        fetch(SERVER + '/signup')
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            var el = document.getElementById('roster');
+            var names = data.queue || [];
+            if (names.length === 0) {
+                el.textContent = '';
+                var empty = document.createElement('li');
+                empty.className = 'empty-roster';
+                empty.textContent = 'No contestants yet \u2014 be the first!';
+                el.appendChild(empty);
+                return;
+            }
+            el.textContent = '';
+            for (var i = 0; i < names.length; i++) {
+                var li = document.createElement('li');
+                var num = document.createElement('span');
+                num.className = 'roster-num';
+                num.textContent = String(i + 1);
+                var name = document.createElement('span');
+                name.className = 'roster-name';
+                name.textContent = names[i];
+                var status = document.createElement('span');
+                status.className = 'roster-status';
+                status.textContent = 'REGISTERED';
+                li.appendChild(num);
+                li.appendChild(name);
+                li.appendChild(status);
+                el.appendChild(li);
+            }
+        })
+        .catch(function() {});
+    }
+
+    // Poll roster every 3 seconds
+    setInterval(pollRoster, 3000);
+    pollRoster();
+</script>
+</body>
+</html>
