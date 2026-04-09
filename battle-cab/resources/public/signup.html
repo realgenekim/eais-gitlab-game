@@ -54,7 +54,6 @@
         @keyframes slideIn { from { opacity: 0; transform: translateX(-20px); } to { opacity: 1; transform: translateX(0); } }
         .roster li { animation: slideIn 0.3s ease-out; }
     </style>
-    <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.4/build/qrcode.min.js"></script>
 </head>
 <body>
 <div class="container">
@@ -90,7 +89,7 @@
     <div class="card">
         <div class="qr-section">
             <h2 style="color:#ffe66d;">Scan to Sign Up</h2>
-            <canvas id="qr-canvas"></canvas>
+            <img id="qr-img" style="border-radius:8px;" alt="QR Code">
             <div class="qr-label" id="qr-url"></div>
         </div>
     </div>
@@ -101,11 +100,10 @@
     var SERVER = window.location.origin;
     var pageUrl = window.location.href.split('?')[0];
     document.getElementById('qr-url').textContent = pageUrl;
-    if (typeof QRCode !== 'undefined') {
-        QRCode.toCanvas(document.getElementById('qr-canvas'), pageUrl, {
-            width: 200, margin: 1, color: { dark: '#000000', light: '#ffffff' }
-        });
-    }
+    var qrImg = document.getElementById('qr-img');
+    qrImg.src = 'https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=' + encodeURIComponent(pageUrl);
+    qrImg.width = 200;
+    qrImg.height = 200;
 
     function signup() {
         var first = document.getElementById('first-name').value.trim();
