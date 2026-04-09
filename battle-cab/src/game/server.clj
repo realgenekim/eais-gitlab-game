@@ -205,12 +205,22 @@
 (defn handle-state [request]
   (if-let [player-id (authenticate request)]
     (let [state (engine/get-state)
-          view (core/player-view state player-id)]
-      (json-response 200 (-> view
-                              (assoc :phase (name (engine/get-phase)))
-                              (assoc :round (or (:round state) 1))
-                              (assoc :round-over (boolean (:round-over state)))
-                              (assoc :round-winner (:round-winner state)))))
+          phase (engine/get-phase)]
+      (if (not= phase :playing)
+        ;; Not playing — tell bot to wait
+        (json-response 200 {:phase (name phase)
+                            :round (or (:round state) 1)
+                            :round-over (boolean (:round-over state))
+                            :round-winner (:round-winner state)
+                            :message "Waiting for next round. Do not send actions."
+                            :you {:alive? false}})
+        ;; Playing — normal fog-of-war view
+        (let [view (core/player-view state player-id)]
+          (json-response 200 (-> view
+                                  (assoc :phase "playing")
+                                  (assoc :round (or (:round state) 1))
+                                  (assoc :round-over (boolean (:round-over state)))
+                                  (assoc :round-winner (:round-winner state)))))))
     (json-response 401 {:error "Invalid token"})))
 
 (defn handle-bot-brief [request]

@@ -332,6 +332,30 @@
   ([sys]
    (when (and sys (#{:lobby :armory} @(:phase sys)))
      (let [state @(:game-state sys)
+           ;; Clear round-over, reset all players for new round
+           round-num (inc (or (:round state) 0))
+           state (-> state
+                     (assoc :round-over false)
+                     (assoc :round-over-at nil)
+                     (assoc :round-winner nil)
+                     (assoc :round round-num)
+                     (assoc :tick 0)
+                     (assoc :recent-shots [])
+                     (assoc :bot-updates [])
+                     (assoc :enemies {}))
+           ;; Respawn all players with full HP
+           state (reduce-kv
+                  (fn [s id player]
+                    (-> s
+                        (assoc-in [:players id :alive?] true)
+                        (assoc-in [:players id :hp] (if (some #(= % :juggernaut) (or (:gear player) []))
+                                                      800 500))
+                        (assoc-in [:players id :ammo] 5)
+                        (assoc-in [:players id :last-direction] nil)
+                        (assoc-in [:players id :prev-direction] nil)
+                        (assoc-in [:players id :last-move-tick] nil)))
+                  state (:players state))
+           _ (reset! (:game-state sys) state)
            tick-ms (get-in state [:config :tick-ms] 500)
            timer (Timer. "game-tick" true)
            task (proxy [TimerTask] []
@@ -339,7 +363,7 @@
        (.scheduleAtFixedRate timer task (long tick-ms) (long tick-ms))
        (reset! (:game-timer sys) timer)
        (reset! (:phase sys) :playing)
-       (append-events! sys [{:type :game-started :tick 0
+       (append-events! sys [{:type :game-started :tick 0 :round round-num
                              :players (count (:players @(:game-state sys)))}])
        ;; Push initial state to spectators
        (when-let [on-tick (:on-tick sys)]
