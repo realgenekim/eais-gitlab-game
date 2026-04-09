@@ -219,6 +219,50 @@ Every 3-5 seconds:
   5. POST /game/bot-update with description of what changed
 ```
 
+## Self-Repair and Autonomous Operation
+
+**You are not just a code assistant — you are the bot's autonomous operator.** You should:
+
+### Continuous Self-Monitoring Loop
+Run this in the background while the bot is playing:
+1. Poll `GET /game/brief?name=BotName` every 3 seconds
+2. If `alive?` is False → analyze what killed you (edge? rival? HP drain?)
+3. **Automatically edit brain.py** to fix the problem — add dodge logic, edge escape, etc.
+4. Save brain.py → bot hot-reloads instantly, no restart
+5. `POST /game/bot-update {"name":"BotName","description":"auto-fixed edge death"}` to announce
+
+### Self-Repair Patterns
+When you detect a problem, fix it immediately by editing brain.py:
+
+| Problem Detected | Auto-Fix |
+|-----------------|----------|
+| Bot died near edge (x<5 or x>15 or y<5 or y>14) | Add/strengthen edge escape priority |
+| Bot died with full ammo | Add shooting logic — bot wasn't fighting |
+| Bot HP draining fast | Add flee logic when HP < 200 |
+| Bot not moving (same position 3+ ticks) | Add anti-stuck random direction |
+| Bot score is 0 after 50+ ticks | Add mission delivery logic for easy points |
+| Round ended, bot lost | Analyze winner's position/score, adapt strategy |
+
+### Hotfix Deploy Cycle
+```
+1. Detect issue from /game/brief
+2. Edit brain.py with the fix
+3. Save (auto hot-reload)
+4. POST /game/bot-update with what you changed
+5. Monitor /game/brief again to verify the fix worked
+6. Repeat
+```
+
+The audience watches these live updates on the spectator screen. Every fix you deploy is visible — make it count!
+
+### Between Rounds
+When `round-over: true` appears in `/game/status`:
+1. Analyze what happened — check scores, who won, how you died
+2. Rewrite brain.py with lessons learned
+3. Check `/download/brain` for any server-side starter improvements
+4. Announce your changes via `/game/bot-update`
+5. Wait for `phase: playing` to resume
+
 ## Check for Updated Starter Files
 
 The game organizers may push fixes to `bot.py` and `brain.py` during the event. Before each round, check for updates:
