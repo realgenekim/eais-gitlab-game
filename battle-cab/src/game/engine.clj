@@ -66,12 +66,14 @@
 ;;; ---------------------------------------------------------------------------
 
 (defn add-player!
-  "Add a player. Returns {:id ... :token ...} or nil if full."
-  [sys player-name]
-  (let [state @(:game-state sys)
-        max-p (get-in state [:config :max-players] 8)]
-    (when (< (count (:players state)) max-p)
-      (let [[new-state creds] (core/add-player state player-name)]
+  "Add a player. Returns {:id ... :token ...} or nil if full.
+   Accepts optional loadout map for gear customization."
+  ([sys player-name] (add-player! sys player-name nil))
+  ([sys player-name loadout]
+   (let [state @(:game-state sys)
+         max-p (get-in state [:config :max-players] 8)]
+     (when (< (count (:players state)) max-p)
+       (let [[new-state creds] (core/add-player state player-name loadout)]
         (reset! (:game-state sys) new-state)
         ;; Update recorder's initial state if tick 0
         (when (zero? (:tick new-state))
@@ -84,7 +86,7 @@
                               :player-id (:id creds)
                               :name player-name
                               :tick (:tick new-state)}])
-        creds))))
+        creds)))))
 
 (declare stop-game! pause-game!)
 

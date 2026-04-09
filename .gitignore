@@ -1,0 +1,3 @@
+lobby/.venv/
+__pycache__/
+*.pyc

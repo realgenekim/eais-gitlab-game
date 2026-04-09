@@ -123,7 +123,13 @@ export class PreloadAssets extends Phaser.Scene {
         }
 
         // Route to correct scene based on URL
-        const useServer = window.location.search.includes('server');
-        this.scene.start(useServer ? 'ServerGame' : 'PlayGame');
+        const search = window.location.search;
+        if (search.includes('lobby')) {
+            this.scene.start('LobbyScene');
+        } else if (search.includes('server')) {
+            this.scene.start('ServerGame');
+        } else {
+            this.scene.start('PlayGame');
+        }
     }
 }

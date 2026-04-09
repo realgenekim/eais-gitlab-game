@@ -12,6 +12,118 @@
 
 (def START-HP "Starting and respawn hit points for players." 500)
 
+;;; ---------------------------------------------------------------------------
+;;; Gear Catalog & Loadout System
+;;; ---------------------------------------------------------------------------
+
+(def LOADOUT-BUDGET 100)
+
+(def gear-catalog
+  "All equippable gear items. Each has a slot, cost, and stat effects."
+  {;; Weapons (slot: :weapon, pick one)
+   :standard-blaster {:slot :weapon :cost 0
+                      :effects {:shoot-damage 30 :shoot-range 5}}
+   :shotgun          {:slot :weapon :cost 15
+                      :effects {:shoot-damage 50 :shoot-range 3}}
+   :sniper-rifle     {:slot :weapon :cost 20
+                      :effects {:shoot-damage 40 :shoot-range 12}}
+   :plasma-cannon    {:slot :weapon :cost 25
+                      :effects {:shoot-damage 60 :shoot-range 5 :shoot-cooldown 2}}
+
+   ;; Armor (slot: :armor, pick one)
+   :light-vest       {:slot :armor :cost 10
+                      :effects {:max-hp 600}}
+   :heavy-armor      {:slot :armor :cost 25
+                      :effects {:max-hp 750 :speed 0}} ;; speed 0 = cannot use speed boost
+   :energy-shield    {:slot :armor :cost 20
+                      :effects {:shield-hp 50}} ;; absorbs first 50 dmg per life
+
+   ;; Movement (slot: :movement, pick one)
+   :speed-boost      {:slot :movement :cost 15
+                      :effects {:speed 2}} ;; move 2 tiles per tick
+   :teleporter       {:slot :movement :cost 30
+                      :effects {:can-teleport true :teleport-cooldown 20}}
+
+   ;; Utility (slot: :utility, pick multiple)
+   :radar            {:slot :utility :cost 15
+                      :effects {:visibility-radius 8}}
+   :extra-ammo       {:slot :utility :cost 10
+                      :effects {:start-ammo 10 :max-ammo 15}}
+   :grenades-plus    {:slot :utility :cost 10
+                      :effects {:start-grenades 5}}
+   :trap-mine        {:slot :utility :cost 15
+                      :effects {:can-trap true :max-traps 3}}
+   :decoy            {:slot :utility :cost 20
+                      :effects {:can-decoy true :decoy-cooldown 15}}})
+
+(defn validate-loadout
+  "Validate a loadout map. Returns {:valid? bool :errors [...] :cost int :effects {...}}.
+   Loadout format: {:weapon :sniper-rifle :armor :light-vest :utility [:radar :extra-ammo]}"
+  [loadout]
+  (if (nil? loadout)
+    {:valid? true :errors [] :cost 0 :effects {} :items []}
+    (let [weapon (or (:weapon loadout) :standard-blaster)
+          armor (:armor loadout)
+          movement (:movement loadout)
+          utilities (vec (or (:utility loadout) []))
+          all-items (cond-> [weapon]
+                      armor (conj armor)
+                      movement (conj movement)
+                      true (into utilities))
+          ;; Check all items exist
+          unknown (remove #(contains? gear-catalog %) all-items)
+          ;; Check slot constraints (only 1 weapon, 1 armor, 1 movement)
+          weapon-items (filter #(= :weapon (:slot (gear-catalog %))) all-items)
+          armor-items (filter #(= :armor (:slot (gear-catalog %))) all-items)
+          movement-items (filter #(= :movement (:slot (gear-catalog %))) all-items)
+          errors (cond-> []
+                   (seq unknown)
+                   (conj (str "Unknown gear: " (pr-str (vec unknown))))
+                   (> (count weapon-items) 1)
+                   (conj "Can only equip one weapon")
+                   (> (count armor-items) 1)
+                   (conj "Can only equip one armor")
+                   (> (count movement-items) 1)
+                   (conj "Can only equip one movement item"))
+          total-cost (reduce + 0 (map #(:cost (gear-catalog %) 0) all-items))
+          errors (cond-> errors
+                   (> total-cost LOADOUT-BUDGET)
+                   (conj (str "Over budget: " total-cost "/" LOADOUT-BUDGET)))
+          ;; Merge all effects (later items override earlier for same key)
+          effects (reduce (fn [acc item]
+                            (merge acc (:effects (gear-catalog item) {})))
+                          {} all-items)
+          ;; Heavy armor blocks speed boost
+          effects (if (and (= 0 (:speed effects 1)) (= :heavy-armor armor))
+                    (assoc effects :speed 1) ;; heavy armor = normal speed, no boost allowed
+                    effects)]
+      {:valid? (empty? errors)
+       :errors errors
+       :cost total-cost
+       :effects effects
+       :items all-items})))
+
+(defn loadout->player-stats
+  "Convert a validated loadout's effects into player stat overrides."
+  [effects]
+  {:max-hp           (get effects :max-hp START-HP)
+   :shoot-damage     (get effects :shoot-damage 30)
+   :shoot-range      (get effects :shoot-range 5)
+   :shoot-cooldown   (get effects :shoot-cooldown 0)
+   :speed            (get effects :speed 1)
+   :visibility-radius (get effects :visibility-radius 5)
+   :start-ammo       (get effects :start-ammo 5)
+   :max-ammo         (get effects :max-ammo 10)
+   :start-grenades   (get effects :start-grenades 2)
+   :shield-hp        (get effects :shield-hp 0)
+   :can-teleport     (get effects :can-teleport false)
+   :teleport-cooldown (get effects :teleport-cooldown 0)
+   :can-trap         (get effects :can-trap false)
+   :max-traps        (get effects :max-traps 0)
+   :can-decoy        (get effects :can-decoy false)
+   :decoy-cooldown   (get effects :decoy-cooldown 0)})
+
+
 (defn in-bounds? [{:keys [width height]} [x y]]
   (and (>= x 0) (< x width) (>= y 0) (< y height)))
 
@@ -38,10 +150,12 @@
 ;;; ---------------------------------------------------------------------------
 
 (defn visible-positions
-  "Returns set of positions visible to a player (manhattan radius)."
+  "Returns set of positions visible to a player (manhattan radius).
+   Uses per-player visibility-radius from loadout if present, else config default."
   [game-state player-id]
   (let [player (get-in game-state [:players player-id])
-        radius (get-in game-state [:config :visibility-radius] 5)]
+        radius (or (get-in player [:stats :visibility-radius])
+                   (get-in game-state [:config :visibility-radius] 5))]
     (set (positions-in-radius [(:x player) (:y player)] radius (:map game-state)))))
 
 (defn player-view
@@ -74,13 +188,19 @@
                            :direction (:direction shot)
                            :path (vec (filter visible (:path shot)))})))]
     {:tick (:tick game-state)
-     :you (-> me
-              (select-keys [:x :y :hp :score :passenger :ammo :grenades :alive?])
-              (assoc :id player-id))
+     :you (cond-> (-> me
+                      (select-keys [:x :y :hp :score :passenger :ammo :grenades :alive? :shield-hp])
+                      (assoc :id player-id))
+             (:loadout me) (assoc :loadout (:loadout me))
+             (:stats me) (assoc :stats (select-keys (:stats me)
+                                                     [:max-hp :shoot-damage :shoot-range :speed
+                                                      :visibility-radius :can-teleport :can-trap :can-decoy])))
      :visible {:players (vec others)
                :enemies (vec enemies)
                :passengers (vec passengers)
                :shots (vec shots)}
+     ;; Show player's own traps
+     :traps (vec (filter #(= (:owner-id %) player-id) (or (:traps game-state) [])))
      :map {:width (get-in game-state [:map :width])
            :height (get-in game-state [:map :height])}}))
 
@@ -145,12 +265,21 @@
   [state player-id {:keys [direction]}]
   (let [player (get-in state [:players player-id])
         [dx dy] (get directions (keyword direction) [0 0])
-        new-pos [(+ (:x player) dx) (+ (:y player) dy)]]
-    (if (and (:alive? player) (walkable? state new-pos))
-      (-> state
-          (assoc-in [:players player-id :x] (first new-pos))
-          (assoc-in [:players player-id :y] (second new-pos)))
-      state)))
+        speed (get-in player [:stats :speed] 1)]
+    (if (not (:alive? player))
+      state
+      ;; Move up to `speed` tiles in the given direction, stopping at walls
+      (loop [s state steps 0]
+        (if (>= steps speed)
+          s
+          (let [p (get-in s [:players player-id])
+                new-pos [(+ (:x p) dx) (+ (:y p) dy)]]
+            (if (walkable? s new-pos)
+              (recur (-> s
+                         (assoc-in [:players player-id :x] (first new-pos))
+                         (assoc-in [:players player-id :y] (second new-pos)))
+                     (inc steps))
+              s)))))))
 
 (defmethod apply-action :pickup
   [state player-id _action]
@@ -192,13 +321,22 @@
   [state player-id {:keys [direction]}]
   (let [player (get-in state [:players player-id])
         [dx dy] (get directions (keyword direction) [0 0])
-        range- (get-in state [:config :shoot-range] 5)
-        damage (get-in state [:config :shoot-damage] 30)
+        ;; Per-player stats from loadout, falling back to config defaults
+        range- (or (get-in player [:stats :shoot-range])
+                   (get-in state [:config :shoot-range] 5))
+        damage (or (get-in player [:stats :shoot-damage])
+                   (get-in state [:config :shoot-damage] 30))
         kill-bonus (get-in state [:config :kill-bonus] 150)
+        ;; Shoot cooldown — plasma cannon has 2-tick cooldown
+        cooldown (get-in player [:stats :shoot-cooldown] 0)
+        last-shot-tick (get player :last-shot-tick -999)
         enemies (or (:enemies state) {})]
     (if (or (not (:alive? player))
             (< (:ammo player) 1)
-            (= [dx dy] [0 0]))
+            (= [dx dy] [0 0])
+            ;; Enforce shoot cooldown (e.g. plasma cannon)
+            (and (pos? cooldown)
+                 (< (- (:tick state) last-shot-tick) cooldown)))
       state
       (let [;; Build lookup of enemy positions
             enemy-at (into {} (for [[eid e] enemies] [[(:x e) (:y e)] eid]))
@@ -248,11 +386,19 @@
                   :fired-tick (:tick state)}
             state (-> state
                       (update-in [:players player-id :ammo] dec)
+                      (assoc-in [:players player-id :last-shot-tick] (:tick state))
                       (update :recent-shots conj shot))]
         (cond
           ;; Hit a player
           hit-id
-          (let [new-hp (- (get-in state [:players hit-id :hp]) damage)]
+          (let [;; Shield absorbs damage first
+                shield (get-in state [:players hit-id :shield-hp] 0)
+                shield-absorb (min shield damage)
+                actual-damage (- damage shield-absorb)
+                state (if (pos? shield-absorb)
+                        (update-in state [:players hit-id :shield-hp] - shield-absorb)
+                        state)
+                new-hp (- (get-in state [:players hit-id :hp]) actual-damage)]
             (if (<= new-hp 0)
               (-> state
                   (assoc-in [:players hit-id :hp] 0)
@@ -285,6 +431,131 @@
               (assoc-in state [:enemies hit-enemy-id :hp] new-hp)))
 
           :else state)))))
+
+(defmethod apply-action :teleport
+  [state player-id _action]
+  (let [player (get-in state [:players player-id])
+        can-tp (get-in player [:stats :can-teleport] false)
+        cooldown (get-in player [:stats :teleport-cooldown] 20)
+        last-tp (get player :last-teleport-tick -999)]
+    (if (or (not (:alive? player))
+            (not can-tp)
+            (< (- (:tick state) last-tp) cooldown))
+      state
+      ;; Teleport to a random open cell
+      (let [{:keys [width height walls]} (:map state)
+            open-cells (for [x (range width) y (range height)
+                             :when (not (contains? walls [x y]))]
+                         [x y])
+            open-vec (vec open-cells)
+            [nx ny] (nth open-vec (rand-int (count open-vec)))]
+        (-> state
+            (assoc-in [:players player-id :x] nx)
+            (assoc-in [:players player-id :y] ny)
+            (assoc-in [:players player-id :last-teleport-tick] (:tick state)))))))
+
+(defmethod apply-action :grenade
+  [state player-id {:keys [direction]}]
+  (let [player (get-in state [:players player-id])
+        [dx dy] (get directions (keyword direction) [0 0])
+        grenade-range 4
+        grenade-radius 2
+        grenade-damage 40]
+    (if (or (not (:alive? player))
+            (< (:grenades player 0) 1)
+            (= [dx dy] [0 0]))
+      state
+      ;; Grenade lands `grenade-range` tiles in the given direction (stops at walls)
+      (let [;; Trace to find landing spot
+            [lx ly] (loop [x (:x player) y (:y player) dist 0]
+                      (let [nx (+ x dx) ny (+ y dy)]
+                        (if (or (>= dist grenade-range)
+                                (not (in-bounds? (:map state) [nx ny]))
+                                (wall? state [nx ny]))
+                          [x y]
+                          (recur nx ny (inc dist)))))
+            ;; All cells in blast radius
+            blast-cells (set (positions-in-radius [lx ly] grenade-radius (:map state)))
+            enemies (or (:enemies state) {})
+            ;; Damage/kill players in blast
+            state (reduce-kv
+                   (fn [s id p]
+                     (if (and (:alive? p)
+                              (not= id player-id)
+                              (contains? blast-cells [(:x p) (:y p)]))
+                       (let [new-hp (- (:hp p) grenade-damage)]
+                         (if (<= new-hp 0)
+                           (-> s
+                               (assoc-in [:players id :hp] 0)
+                               (assoc-in [:players id :alive?] false)
+                               (assoc-in [:players id :respawn-at]
+                                         (+ (:tick state) (get-in state [:config :respawn-ticks] 10)))
+                               (assoc-in [:players id :passenger] nil)
+                               (update-in [:players player-id :score] + (get-in state [:config :kill-bonus] 150)))
+                           (assoc-in s [:players id :hp] new-hp)))
+                       s))
+                   state (:players state))
+            ;; Damage/kill enemies in blast
+            state (reduce-kv
+                   (fn [s eid e]
+                     (if (contains? blast-cells [(:x e) (:y e)])
+                       (let [new-hp (- (:hp e) grenade-damage)]
+                         (if (<= new-hp 0)
+                           (-> s
+                               (update :enemies dissoc eid)
+                               (update-in [:players player-id :score] + (:score e 10)))
+                           (assoc-in s [:enemies eid :hp] new-hp)))
+                       s))
+                   state enemies)
+            ;; Record effect for spectator rendering
+            effect {:type :grenade
+                    :x lx :y ly
+                    :radius grenade-radius
+                    :cells blast-cells
+                    :shooter-id player-id}]
+        (-> state
+            (update-in [:players player-id :grenades] dec)
+            (update :recent-effects (fnil conj []) effect))))))
+
+(defmethod apply-action :trap
+  [state player-id _action]
+  (let [player (get-in state [:players player-id])
+        can-trap (get-in player [:stats :can-trap] false)
+        max-traps (get-in player [:stats :max-traps] 3)
+        current-traps (count (filter #(= (:owner-id %) player-id)
+                                     (or (:traps state) [])))]
+    (if (or (not (:alive? player))
+            (not can-trap)
+            (>= current-traps max-traps))
+      state
+      ;; Place invisible trap at player's current position
+      (update state :traps (fnil conj [])
+              {:id (str "trap-" (:tick state) "-" player-id)
+               :owner-id player-id
+               :x (:x player)
+               :y (:y player)
+               :damage 60
+               :placed-tick (:tick state)}))))
+
+(defmethod apply-action :decoy
+  [state player-id _action]
+  (let [player (get-in state [:players player-id])
+        can-decoy (get-in player [:stats :can-decoy] false)
+        cooldown (get-in player [:stats :decoy-cooldown] 15)
+        last-decoy (get player :last-decoy-tick -999)]
+    (if (or (not (:alive? player))
+            (not can-decoy)
+            (< (- (:tick state) last-decoy) cooldown))
+      state
+      ;; Place a decoy that looks like a player to enemies for 10 ticks
+      (-> state
+          (update :decoys (fnil conj [])
+                  {:id (str "decoy-" (:tick state) "-" player-id)
+                   :owner-id player-id
+                   :x (:x player) :y (:y player)
+                   :expires-tick (+ (:tick state) 10)
+                   :name (get-in state [:players player-id :name])})
+          (assoc-in [:players player-id :last-decoy-tick] (:tick state))))))
 
 (defmethod apply-action :default
   [state _player-id _action]
@@ -341,13 +612,19 @@
                [sx sy] (if (contains? (get-in s [:map :walls]) spawn)
                          (find-nearest-open s (first spawn) (second spawn))
                          spawn)]
-           (-> s
-               (assoc-in [:players id :alive?] true)
-               (assoc-in [:players id :hp] 500)
-               (assoc-in [:players id :x] sx)
-               (assoc-in [:players id :y] sy)
-               (assoc-in [:players id :ammo] 5)
-               (assoc-in [:players id :respawn-at] nil)))
+           (let [max-hp (get-in player [:stats :max-hp] START-HP)
+                 start-ammo (get-in player [:stats :start-ammo] 5)
+                 shield (get-in player [:stats :shield-hp] 0)]
+             (-> s
+                 (assoc-in [:players id :alive?] true)
+                 (assoc-in [:players id :hp] max-hp)
+                 (assoc-in [:players id :x] sx)
+                 (assoc-in [:players id :y] sy)
+                 (assoc-in [:players id :ammo] start-ammo)
+                 (assoc-in [:players id :respawn-at] nil)
+                 ;; Restore shield on respawn
+                 (cond-> (pos? shield)
+                   (assoc-in [:players id :shield-hp] shield)))))
          s))
      state (:players state))))
 
@@ -378,13 +655,14 @@
   "Regenerate ammo for alive players every N ticks."
   [state]
   (let [regen-every (get-in state [:config :ammo-regen-ticks] 5)
-        max-ammo (get-in state [:config :max-ammo] 10)]
+        default-max (get-in state [:config :max-ammo] 10)]
     (if (zero? (mod (:tick state) regen-every))
       (reduce-kv
        (fn [s id player]
-         (if (and (:alive? player) (< (:ammo player) max-ammo))
-           (update-in s [:players id :ammo] inc)
-           s))
+         (let [max-ammo (get-in player [:stats :max-ammo] default-max)]
+           (if (and (:alive? player) (< (:ammo player) max-ammo))
+             (update-in s [:players id :ammo] inc)
+             s)))
        state (:players state))
       state)))
 
@@ -601,11 +879,14 @@
               state (range count-to-spawn)))))
 
 (defn move-enemies
-  "Move each enemy one cell toward the nearest alive player."
+  "Move each enemy one cell toward the nearest alive player (or decoy)."
   [state]
   (let [alive-players (->> (:players state)
                            (filter (fn [[_ p]] (:alive? p)))
                            (map (fn [[_ p]] [(:x p) (:y p)])))
+        ;; Decoys look like players to enemies
+        decoy-positions (map (fn [d] [(:x d) (:y d)]) (or (:decoys state) []))
+        alive-players (concat alive-players decoy-positions)
         walls (get-in state [:map :walls])]
     (if (empty? alive-players)
       state
@@ -680,6 +961,65 @@
             (cond-> (pos? squanchy-count) (spawn-enemies :squanchy squanchy-count))
             (cond-> (pos? scary-count) (spawn-enemies :scary scary-count)))))))
 
+(defn check-traps
+  "Check if any player or enemy stepped on a trap. Traps deal damage and are consumed."
+  [state]
+  (let [traps (or (:traps state) [])]
+    (if (empty? traps)
+      state
+      (reduce
+       (fn [s trap]
+         (let [tx (:x trap) ty (:y trap)
+               ;; Check players (not the owner)
+               hit-player (first (keep (fn [[id p]]
+                                         (when (and (:alive? p)
+                                                    (not= id (:owner-id trap))
+                                                    (= (:x p) tx) (= (:y p) ty))
+                                           id))
+                                       (:players s)))
+               ;; Check enemies
+               hit-enemy (first (keep (fn [[eid e]]
+                                        (when (and (= (:x e) tx) (= (:y e) ty))
+                                          eid))
+                                      (or (:enemies s) {})))]
+           (cond
+             hit-player
+             (let [damage (:damage trap 60)
+                   new-hp (- (get-in s [:players hit-player :hp]) damage)
+                   s (update s :traps (fn [ts] (vec (remove #(= (:id %) (:id trap)) ts))))
+                   s (update s :recent-effects (fnil conj [])
+                             {:type :trap-triggered :x tx :y ty :hit-id hit-player})]
+               (if (<= new-hp 0)
+                 (-> s
+                     (assoc-in [:players hit-player :hp] 0)
+                     (assoc-in [:players hit-player :alive?] false)
+                     (assoc-in [:players hit-player :respawn-at]
+                               (+ (:tick state) (get-in state [:config :respawn-ticks] 10)))
+                     (update-in [:players (:owner-id trap) :score] + (get-in state [:config :kill-bonus] 150)))
+                 (assoc-in s [:players hit-player :hp] new-hp)))
+
+             hit-enemy
+             (let [damage (:damage trap 60)
+                   enemy (get-in s [:enemies hit-enemy])
+                   new-hp (- (:hp enemy) damage)
+                   s (update s :traps (fn [ts] (vec (remove #(= (:id %) (:id trap)) ts))))]
+               (if (<= new-hp 0)
+                 (-> s
+                     (update :enemies dissoc hit-enemy)
+                     (update-in [:players (:owner-id trap) :score] + (:score enemy 10)))
+                 (assoc-in s [:enemies hit-enemy :hp] new-hp)))
+
+             :else s)))
+       state traps))))
+
+(defn expire-decoys
+  "Remove decoys that have expired."
+  [state]
+  (let [tick (:tick state)]
+    (update state :decoys
+            (fn [decoys]
+              (vec (remove #(>= tick (:expires-tick %)) (or decoys [])))))))
+
 (defn advance-tick
   "Pure function: old state + commands → new state."
   [state commands]
@@ -698,6 +1038,9 @@
       (maybe-spawn-wave)
       (move-enemies)
       (enemy-player-collisions)
+      ;; Gear mechanics
+      (check-traps)
+      (expire-decoys)
       ;; Environment
       (battle-royale-shrink)
       (maybe-lightning-strike)
@@ -719,25 +1062,41 @@
    :recent-shots []
    :recent-effects []
    :crater-fires {}
+   :traps []
+   :decoys []
    :config (config/load-config)})
 
 (defn add-player
-  "Add a player to the game. Returns [updated-state token]."
-  [state player-name]
-  (let [id (str "player-" (subs (str (random-uuid)) 0 8))
-        token (str (random-uuid))
-        spawns (get-in state [:map :spawn-points] [[1 1] [18 1] [1 18] [18 18]])
-        spawn (nth spawns (mod (count (:players state)) (count spawns)))]
-    [(-> state
-         (assoc-in [:players id]
-                   {:name player-name
-                    :x (first spawn)
-                    :y (second spawn)
-                    :hp START-HP
-                    :score 0
-                    :passenger nil
-                    :ammo 5
-                    :grenades 2
-                    :alive? true
-                    :token token}))
-     {:id id :token token}]))
+  "Add a player to the game. Accepts optional loadout map.
+   Returns [updated-state {:id token}] or [state {:error msg}] if invalid."
+  ([state player-name] (add-player state player-name nil))
+  ([state player-name loadout]
+   (let [{:keys [valid? errors effects items cost]} (validate-loadout loadout)
+         _ (when-not valid?
+             (throw (ex-info "Invalid loadout" {:errors errors})))
+         stats (loadout->player-stats effects)
+         id (str "player-" (subs (str (random-uuid)) 0 8))
+         token (str (random-uuid))
+         spawns (get-in state [:map :spawn-points] [[1 1] [18 1] [1 18] [18 18]])
+         spawn (nth spawns (mod (count (:players state)) (count spawns)))]
+     [(-> state
+          (assoc-in [:players id]
+                    (cond->
+                      {:name player-name
+                       :x (first spawn)
+                       :y (second spawn)
+                       :hp (:max-hp stats)
+                       :score 0
+                       :passenger nil
+                       :ammo (:start-ammo stats)
+                       :grenades (:start-grenades stats)
+                       :alive? true
+                       :token token
+                       ;; Per-player gear stats
+                       :loadout {:items (vec (or items []))
+                                 :cost (or cost 0)}
+                       :stats stats}
+                      ;; Set shield-hp if energy shield equipped
+                      (pos? (:shield-hp stats))
+                      (assoc :shield-hp (:shield-hp stats)))))
+      {:id id :token token}])))

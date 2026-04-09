@@ -42,15 +42,26 @@
   [game-state]
   (let [players (->> (:players game-state)
                      (map (fn [[id p]]
-                            {:id id
-                             :name (:name p)
-                             :x (:x p)
-                             :y (:y p)
-                             :hp (:hp p)
-                             :alive (:alive? p)
-                             :score (:score p)
-                             :has-passenger (some? (:passenger p))
-                             :ammo (:ammo p)}))
+                            (cond->
+                              {:id id
+                               :name (:name p)
+                               :x (:x p)
+                               :y (:y p)
+                               :hp (:hp p)
+                               :alive (:alive? p)
+                               :score (:score p)
+                               :has-passenger (some? (:passenger p))
+                               :ammo (:ammo p)
+                               :grenades (:grenades p 0)}
+                              ;; Include loadout items for spectator display
+                              (:loadout p)
+                              (assoc :loadout (:loadout p))
+                              ;; Include shield HP if present
+                              (:shield-hp p)
+                              (assoc :shield-hp (:shield-hp p))
+                              ;; Include max-hp for bar rendering
+                              (get-in p [:stats :max-hp])
+                              (assoc :max-hp (get-in p [:stats :max-hp])))))
                      vec)
         enemies (->> (or (:enemies game-state) {})
                      (map (fn [[id e]]
@@ -77,7 +88,10 @@
             :height (get-in game-state [:map :height])
             :walls walls}
       :recent-shots (:recent-shots game-state)
-      :shrink-warning shrink-warning})))
+      :recent-effects (:recent-effects game-state)
+      :shrink-warning shrink-warning
+      :traps (vec (or (:traps game-state) []))
+      :decoys (vec (or (:decoys game-state) []))})))
 
 (defn broadcast-state!
   "Push game state JSON to all connected WebSocket spectators."

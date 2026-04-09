@@ -114,12 +114,28 @@
 
 (defn handle-join [request]
   (let [body (:body request)
-        player-name (get body "name" "anonymous")]
-    (if-let [creds (engine/add-player! (sys) player-name)]
-      (json-response 200 {:player-id (:id creds)
-                          :token (:token creds)
-                          :message (str "Welcome, " player-name "!")})
-      (json-response 400 {:error "Game is full"}))))
+        player-name (get body "name" "anonymous")
+        ;; Parse loadout if provided: {"weapon": "sniper-rifle", "armor": "light-vest", "utility": ["radar"]}
+        raw-loadout (get body "loadout")
+        loadout (when raw-loadout
+                  (cond-> {}
+                    (get raw-loadout "weapon")
+                    (assoc :weapon (keyword (get raw-loadout "weapon")))
+                    (get raw-loadout "armor")
+                    (assoc :armor (keyword (get raw-loadout "armor")))
+                    (get raw-loadout "movement")
+                    (assoc :movement (keyword (get raw-loadout "movement")))
+                    (get raw-loadout "utility")
+                    (assoc :utility (mapv keyword (get raw-loadout "utility")))))]
+    (try
+      (if-let [creds (engine/add-player! (sys) player-name loadout)]
+        (json-response 200 {:player-id (:id creds)
+                            :token (:token creds)
+                            :message (str "Welcome, " player-name "!")})
+        (json-response 400 {:error "Game is full"}))
+      (catch clojure.lang.ExceptionInfo e
+        (json-response 400 {:error "Invalid loadout"
+                            :details (str (ex-data e))})))))
 
 (defn handle-state [request]
   (if-let [player-id (authenticate request)]
@@ -137,6 +153,15 @@
       (engine/enqueue-command! (sys) player-id action)
       (json-response 200 {:status "queued" :tick (:tick (engine/get-state))}))
     (json-response 401 {:error "Invalid token"})))
+
+(defn handle-gear-catalog [_request]
+  (json-response 200 {:budget core/LOADOUT-BUDGET
+                      :gear (into {}
+                                  (map (fn [[k v]]
+                                         [(name k) {:slot (name (:slot v))
+                                                    :cost (:cost v)
+                                                    :effects (:effects v)}])
+                                       core/gear-catalog))}))
 
 (defn handle-scoreboard [_request]
   (let [state (engine/get-state)
@@ -312,6 +337,7 @@
          ["/game/map" {:get {:handler #'handle-map}}]
          ["/game/status" {:get {:handler #'handle-status}}]
          ["/game/ascii" {:get {:handler #'handle-ascii}}]
+         ["/game/gear-catalog" {:get {:handler #'handle-gear-catalog}}]
          ;; Spectator
          ["/" {:get {:handler #'handle-spectator-page}}]
          ["/spectate" {:get {:handler #'handle-spectate}}]
