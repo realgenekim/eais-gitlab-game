@@ -80,10 +80,15 @@
     </div>
 
     <div class="card">
-        <h2>Contestants</h2>
+        <h2>Battle 1 Contestants</h2>
         <ul class="roster" id="roster">
             <li class="empty-roster">No one has signed up yet</li>
         </ul>
+    </div>
+
+    <div class="card" id="waitlist-card" style="display:none;">
+        <h2 style="color:#ffe66d;">Waitlist</h2>
+        <ul class="roster" id="waitlist"></ul>
     </div>
 
     <div class="card">
@@ -130,6 +135,11 @@
             if (data.error) {
                 msg.className = 'msg error';
                 msg.textContent = data.error;
+            } else if (data.status === 'waitlisted') {
+                msg.className = 'msg success';
+                msg.textContent = data.message;
+                document.getElementById('first-name').value = '';
+                document.getElementById('last-name').value = '';
             } else {
                 msg.className = 'msg success';
                 var remaining = data['spots-remaining'];
@@ -173,38 +183,59 @@
             spotsEl.appendChild(document.createTextNode(' of ' + max + ' spots remaining'));
 
             var banner = document.getElementById('full-banner');
-            var btn = document.getElementById('join-btn');
-            var input1 = document.getElementById('first-name');
-            var input2 = document.getElementById('last-name');
-            if (remaining <= 0 && names.length >= max) {
+            if (remaining <= 0) {
                 banner.style.display = 'block';
-                btn.disabled = true;
-                input1.disabled = true;
-                input2.disabled = true;
+                banner.textContent = 'Battle 1 is full! Sign up for the waitlist.';
             } else {
                 banner.style.display = 'none';
             }
 
+            // Render contestants
             if (names.length === 0) {
                 el.textContent = '';
                 var empty = document.createElement('li');
                 empty.className = 'empty-roster';
                 empty.textContent = 'No one has signed up yet';
                 el.appendChild(empty);
-                return;
+            } else {
+                el.textContent = '';
+                for (var i = 0; i < names.length; i++) {
+                    var li = document.createElement('li');
+                    var num = document.createElement('span');
+                    num.className = 'roster-num';
+                    num.textContent = String(i + 1);
+                    var nameEl = document.createElement('span');
+                    nameEl.className = 'roster-name';
+                    nameEl.textContent = names[i];
+                    li.appendChild(num);
+                    li.appendChild(nameEl);
+                    el.appendChild(li);
+                }
             }
-            el.textContent = '';
-            for (var i = 0; i < names.length; i++) {
-                var li = document.createElement('li');
-                var num = document.createElement('span');
-                num.className = 'roster-num';
-                num.textContent = String(i + 1);
-                var nameEl = document.createElement('span');
-                nameEl.className = 'roster-name';
-                nameEl.textContent = names[i];
-                li.appendChild(num);
-                li.appendChild(nameEl);
-                el.appendChild(li);
+
+            // Render waitlist
+            var waitlist = data.waitlist || [];
+            var wlCard = document.getElementById('waitlist-card');
+            var wlEl = document.getElementById('waitlist');
+            if (waitlist.length > 0) {
+                wlCard.style.display = 'block';
+                wlEl.textContent = '';
+                for (var j = 0; j < waitlist.length; j++) {
+                    var wli = document.createElement('li');
+                    var wnum = document.createElement('span');
+                    wnum.className = 'roster-num';
+                    wnum.style.color = '#888';
+                    wnum.textContent = String(j + 1);
+                    var wname = document.createElement('span');
+                    wname.className = 'roster-name';
+                    wname.style.color = '#888';
+                    wname.textContent = waitlist[j];
+                    wli.appendChild(wnum);
+                    wli.appendChild(wname);
+                    wlEl.appendChild(wli);
+                }
+            } else {
+                wlCard.style.display = 'none';
             }
         })
         .catch(function() {});

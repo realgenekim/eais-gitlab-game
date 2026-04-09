@@ -130,8 +130,18 @@
       (json-response 400 {:error (str "'" contestant-name "' is already signed up!")})
 
       (>= (count @signup-queue) max-signups)
-      (json-response 400 {:error (str "Battle is full! Only " max-signups " spots available.")
-                          :queue (mapv :name @signup-queue)})
+      ;; Waitlist — accept but mark as waitlisted
+      (let [entry {:name contestant-name
+                   :timestamp (System/currentTimeMillis)
+                   :waitlist true}
+            new-queue (swap! signup-queue conj entry)]
+        (save-signups! new-queue)
+        (let [waitlist-pos (count (filter :waitlist new-queue))]
+          (log/info :contestant-waitlist :name contestant-name :waitlist-pos waitlist-pos)
+          (json-response 200 {:status "waitlisted"
+                              :name contestant-name
+                              :waitlist-position waitlist-pos
+                              :message (str "Battle 1 is full! You're #" waitlist-pos " on the waitlist.")})))
 
       :else
       (let [entry {:name contestant-name
@@ -147,10 +157,15 @@
                             :queue (mapv :name new-queue)})))))
 
 (defn handle-signup-list [_request]
-  (json-response 200 {:queue (mapv :name @signup-queue)
-                       :count (count @signup-queue)
-                       :max max-signups
-                       :spots-remaining (- max-signups (count @signup-queue))}))
+  (let [all @signup-queue
+        contestants (vec (remove :waitlist all))
+        waitlist (vec (filter :waitlist all))]
+    (json-response 200 {:queue (mapv :name contestants)
+                         :waitlist (mapv :name waitlist)
+                         :count (count contestants)
+                         :waitlist-count (count waitlist)
+                         :max max-signups
+                         :spots-remaining (max 0 (- max-signups (count contestants)))})))
 
 (defn handle-signup-clear [_request]
   (reset! signup-queue [])
