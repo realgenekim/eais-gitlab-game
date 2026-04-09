@@ -340,6 +340,13 @@ def main():
     ambient_counter = 0
     while True:
         try:
+            # Check if game is still running
+            status = get_status()
+            if status and not status.get("running", True):
+                speak("And that's the GAME, ladies and gentlemen! What a battle! The post-mortem starts NOW!")
+                print("  Game over! Commentator signing off.")
+                break
+
             state = get_state()
             if not state:
                 time.sleep(0.3)
