@@ -1,18 +1,19 @@
 # Bot Battle Arena — AI Agent Context
 
 You are helping a contestant build a bot for a live battle arena at the Enterprise AI Summit.
-The game server is running at the URL this file was fetched from (replace /guide/agent-context.md with the endpoint paths below).
+
+**Game Server: `https://vibebattle.testwhatever.xyz`**
 
 ## Quick Start
 
-1. Create 3 files: `bot.py`, `brain.py`, `loadout.py` (contents below)
+1. Create 3 files: `bot.py`, `brain.py`, `loadout.py` (download from `https://vibebattle.testwhatever.xyz/guide/index.html`)
 2. Run: `pip install requests`
-3. Run: `python bot.py --name "BotName" --server SERVER_URL`
+3. Run: `python bot.py --name "BotName" --server https://vibebattle.testwhatever.xyz`
 4. Edit `brain.py` — it hot-reloads on save. No restart needed.
 
 ## Server Endpoints
 
-Replace SERVER_URL with the base URL (e.g., https://your-host:33333)
+Base URL: `https://vibebattle.testwhatever.xyz`
 
 | Endpoint | Method | What |
 |----------|--------|------|
