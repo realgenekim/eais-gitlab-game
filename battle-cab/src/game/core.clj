@@ -534,20 +534,23 @@
   "Respawn players whose respawn timer has elapsed.
    If spawn point is a wall or occupied, bump to nearest free cell."
   [state]
-  (let [spawn-points (get-in state [:map :spawn-points] [[1 1] [18 1] [1 18] [18 18]])]
+  (let [{:keys [width height walls]} (:map state)
+        cx (quot width 2) cy (quot height 2)]
     (reduce-kv
      (fn [s id player]
        (if (and (not (:alive? player))
                 (:respawn-at player)
                 (>= (:tick state) (:respawn-at player)))
-         (let [spawn (nth spawn-points (mod (hash id) (count spawn-points)))
-               occupied (occupied-cells s)
-               walls (get-in s [:map :walls])
-               ;; If spawn is a wall or occupied, find nearest free cell
-               [sx sy] (if (or (contains? walls spawn)
-                               (contains? occupied spawn))
-                         (find-nearest-open s (first spawn) (second spawn))
-                         spawn)]
+         (let [occupied (occupied-cells s)
+               ;; Respawn near CENTER — never in corners
+               center-cells (vec (for [x (range (max 1 (- cx 3)) (min (dec width) (+ cx 4)))
+                                       y (range (max 1 (- cy 3)) (min (dec height) (+ cy 4)))
+                                       :when (and (not (contains? walls [x y]))
+                                                  (not (contains? occupied [x y])))]
+                                   [x y]))
+               [sx sy] (if (seq center-cells)
+                         (rand-nth center-cells)
+                         (find-nearest-open s cx cy))]
            (-> s
                (assoc-in [:players id :alive?] true)
                (assoc-in [:players id :hp] 500)
@@ -913,15 +916,15 @@
                 (cond-> (pos? scary-count) (spawn-enemies :scary scary-count)))))))))
 
 (defn nudge-stalled-players
-  "If a player hasn't moved in 5+ ticks, force them to a random adjacent open cell.
-   Prevents bots from standing still and boring the audience."
+  "If a player hasn't moved in 5+ ticks, force them to move.
+   If completely trapped (no adjacent open cell), teleport to center area."
   [state]
   (reduce-kv
    (fn [s id player]
      (if (and (:alive? player)
               (:last-move-tick player)
               (> (- (:tick state) (:last-move-tick player)) 5))
-       ;; Stuck! Force a random move
+       ;; Stuck! Try adjacent first
        (let [px (:x player) py (:y player)
              occupied (disj (occupied-cells s) [px py])
              candidates (for [[dx dy] [[0 -1] [0 1] [1 0] [-1 0]]
@@ -937,7 +940,24 @@
                  (assoc-in [:players id :last-move-tick] (:tick state))
                  (assoc-in [:players id :last-direction] nil)
                  (assoc-in [:players id :prev-direction] nil)))
-           s))
+           ;; Completely trapped — teleport to center area
+           (let [{:keys [width height walls]} (:map s)
+                 cx (quot width 2) cy (quot height 2)
+                 ;; Find open cells near center
+                 center-cells (for [x (range (max 1 (- cx 4)) (min (dec width) (+ cx 5)))
+                                    y (range (max 1 (- cy 4)) (min (dec height) (+ cy 5)))
+                                    :when (and (not (contains? walls [x y]))
+                                               (not (contains? occupied [x y])))]
+                                [x y])]
+             (if (seq center-cells)
+               (let [[nx ny] (rand-nth (vec center-cells))]
+                 (-> s
+                     (assoc-in [:players id :x] nx)
+                     (assoc-in [:players id :y] ny)
+                     (assoc-in [:players id :last-move-tick] (:tick state))
+                     (assoc-in [:players id :last-direction] nil)
+                     (assoc-in [:players id :prev-direction] nil)))
+               s))))
        s))
    state (:players state)))
 
