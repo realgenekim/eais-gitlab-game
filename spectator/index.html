@@ -318,22 +318,52 @@
             };
         }
 
+        // Web Speech API for real-time lines with actual player names
+        const synth = window.speechSynthesis;
+        let speechVoice = null;
+        // Pick a good voice once available
+        function pickVoice() {
+            const voices = synth.getVoices();
+            // Prefer a deep/dramatic English voice
+            speechVoice = voices.find(v => v.name.includes('Daniel')) ||
+                          voices.find(v => v.name.includes('Fred')) ||
+                          voices.find(v => v.lang.startsWith('en') && v.name.includes('Male')) ||
+                          voices.find(v => v.lang.startsWith('en')) ||
+                          voices[0];
+        }
+        synth.onvoiceschanged = pickVoice;
+        pickVoice();
+
+        function speakText(text) {
+            if (!text || synth.speaking) return;
+            const utter = new SpeechSynthesisUtterance(text);
+            if (speechVoice) utter.voice = speechVoice;
+            utter.rate = 1.1;
+            utter.pitch = 0.9;
+            utter.volume = 1.0;
+            synth.speak(utter);
+        }
+
         function handleCommentary(state) {
             const commentary = state.commentary || [];
             if (commentary.length === 0) return;
-            // Only process new commentary (not replayed ticks)
             if (state.tick <= lastCommentaryTick) return;
             lastCommentaryTick = state.tick;
 
-            // Priority order — pick the best event
-            const priority = ['wipeout', 'kill', 'death', 'mass_kill', 'wave', 'delivery', 'respawn'];
-            const sorted = [...commentary].sort((a, b) => {
-                const ai = priority.indexOf(a.category);
-                const bi = priority.indexOf(b.category);
-                return (ai === -1 ? 99 : ai) - (bi === -1 ? 99 : bi);
-            });
-            // Play the highest priority event
-            playCategory(sorted[0].category);
+            // Sort by priority (lower = more important)
+            const sorted = [...commentary].sort((a, b) =>
+                (a.priority || 99) - (b.priority || 99));
+            const best = sorted[0];
+
+            // Event-specific lines with real names → Web Speech API (instant)
+            if (best.text) {
+                speakText(best.text);
+            }
+
+            // Also play a cached hype clip for the category (ambient energy)
+            if (!audioPlaying && ['kill', 'death', 'wipeout', 'mass_kill'].includes(best.category)) {
+                playCategory(best.category);
+            }
         }
 
         function startAmbientTimer() {

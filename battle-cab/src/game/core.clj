@@ -893,7 +893,7 @@
             (not (zero? (mod tick wave-interval))))
       state
       ;; Determine wave composition — enemies NEVER stop coming
-      (let [wave-num (quot tick wave-interval)
+      (let [wave-num (inc (or (:wave-number state) 0))
             ;; Always at least 3 floopies, scaling up
             floopy-count (max 3 (min 10 (+ 3 wave-num)))
             squanchy-count (if (>= wave-num 2) (min 5 wave-num) 0)
@@ -902,6 +902,7 @@
             current-enemies (count (or (:enemies state) {}))
             bonus (if (< current-enemies 3) 4 0)]
         (-> state
+            (assoc :wave-number wave-num)
             (spawn-enemies :floopy (+ floopy-count bonus))
             (cond-> (pos? squanchy-count) (spawn-enemies :squanchy squanchy-count))
             (cond-> (pos? scary-count) (spawn-enemies :scary scary-count)))))))

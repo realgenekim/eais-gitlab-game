@@ -100,6 +100,7 @@
             :walls walls}
       :recent-shots (:recent-shots game-state)
       :shrink-warning shrink-warning
+      :wave-number (or (:wave-number game-state) 0)
       :commentary (or (:commentary game-state) [])})))
 
 (defn broadcast-state!

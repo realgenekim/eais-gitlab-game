@@ -187,51 +187,58 @@
     (persistent! events)))
 
 (defn- detect-commentary
-  "Generate commentary events for the browser audio player.
-   Returns a vec of {:category 'kill'|'death'|... :name 'HUNTER'} maps.
-   Only fires on notable state transitions — not every tick."
+  "Generate commentary events with SPOKEN TEXT including real player names.
+   Returns vec of {:category str :text str :priority int}.
+   Browser uses Web Speech API to speak the text in real time."
   [old-state new-state]
-  (let [commentary (transient [])]
-    ;; Deaths
+  (let [commentary (transient [])
+        wave-num (or (:wave-number new-state) 0)]
+    ;; Deaths — who died?
     (doseq [[id player] (:players new-state)]
       (when (and (not (:alive? player))
                  (get-in old-state [:players id :alive?]))
-        (conj! commentary {:category "death"
-                           :name (:name player)})))
-    ;; Kills (score jumped by 150+)
+        (conj! commentary {:category "death" :priority 2
+                           :text (str (:name player) " has been ELIMINATED!")})))
+    ;; Kills — who scored?
     (doseq [[id player] (:players new-state)]
-      (let [old-score (get-in old-state [:players id :score] 0)]
-        (when (>= (- (:score player) old-score) 150)
-          (conj! commentary {:category "kill"
-                             :name (:name player)}))))
-    ;; Deliveries (score jumped by ~100)
+      (let [old-score (get-in old-state [:players id :score] 0)
+            delta (- (:score player) old-score)]
+        (when (>= delta 150)
+          (conj! commentary {:category "kill" :priority 1
+                             :text (str (:name player) " scores a KILL! "
+                                        (:score player) " points total!")}))))
+    ;; Deliveries
     (doseq [[id player] (:players new-state)]
       (let [old-score (get-in old-state [:players id :score] 0)
             delta (- (:score player) old-score)]
         (when (and (>= delta 80) (< delta 150))
-          (conj! commentary {:category "delivery"
-                             :name (:name player)}))))
+          (conj! commentary {:category "delivery" :priority 5
+                             :text (str (:name player) " delivers a passenger! "
+                                        (:score player) " points!")}))))
     ;; Respawns
     (doseq [[id player] (:players new-state)]
       (when (and (:alive? player)
                  (not (get-in old-state [:players id :alive?])))
-        (conj! commentary {:category "respawn"
-                           :name (:name player)})))
-    ;; Enemy wave (count jumped by 5+)
-    (let [old-enemies (count (or (:enemies old-state) {}))
-          new-enemies (count (or (:enemies new-state) {}))]
-      (when (>= (- new-enemies old-enemies) 5)
-        (conj! commentary {:category "wave"})))
-    ;; Mass kill (enemy count dropped by 4+)
+        (conj! commentary {:category "respawn" :priority 6
+                           :text (str (:name player) " is back in the fight!")})))
+    ;; Enemy wave — use server's actual wave number
+    (let [old-wave (or (:wave-number old-state) 0)]
+      (when (> wave-num old-wave)
+        (conj! commentary {:category "wave" :priority 4
+                           :text (str "Wave " wave-num "! Enemies incoming!")})))
+    ;; Mass kill
     (let [old-enemies (count (or (:enemies old-state) {}))
           new-enemies (count (or (:enemies new-state) {}))]
       (when (and (pos? old-enemies) (>= (- old-enemies new-enemies) 4))
-        (conj! commentary {:category "mass_kill"})))
-    ;; Wipeout — ALL players dead at once
+        (conj! commentary {:category "mass_kill" :priority 3
+                           :text (str (- old-enemies new-enemies)
+                                      " enemies wiped out! Total domination!")})))
+    ;; Wipeout — ALL players dead
     (let [any-alive-old? (some (fn [[_ p]] (:alive? p)) (:players old-state))
           any-alive-new? (some (fn [[_ p]] (:alive? p)) (:players new-state))]
       (when (and any-alive-old? (not any-alive-new?) (seq (:players new-state)))
-        (conj! commentary {:category "wipeout"})))
+        (conj! commentary {:category "wipeout" :priority 0
+                           :text "TOTAL WIPEOUT! Every bot is DOWN!"})))
     (persistent! commentary)))
 
 (defn tick!

@@ -428,9 +428,10 @@ export class ServerGame extends Phaser.Scene {
 
     detectWave(state: ServerState): void {
         const currentCount = (state.enemies || []).length;
-        // If enemy count jumped by 3+ in one tick, it's a new wave
-        if (currentCount >= this.lastEnemyCount + 3 && this.lastEnemyCount >= 0) {
-            this.waveNumber++;
+        // Use server's authoritative wave number
+        const serverWave = (state as any)['wave-number'] || 0;
+        if (serverWave > this.waveNumber) {
+            this.waveNumber = serverWave;
             const enemyTypes = [...new Set((state.enemies || []).map(e => e.type))];
             const typeLabel = enemyTypes.length > 1
                 ? enemyTypes.join(' + ').toUpperCase()
