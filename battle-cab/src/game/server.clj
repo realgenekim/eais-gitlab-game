@@ -382,102 +382,102 @@
 
 (defn handle-armory-demo
   "Pure armory demo — no server state, no bots, no mocks.
-   Builds synthetic state from pure functions.
+   Builds a synthetic game state from pure functions and returns it
+   in the same shape as /game/armory/state.
 
    Modes:
-     ?scenario=0  fresh (4 players, 30pts each)
-     ?scenario=1  mid-shopping
-     ?scenario=2  fully loaded + crates + debuffs
-     ?timeline    scripted purchase sequence, ?step=N (0-8)
-                  Each step applies one buy. Auto-play or J/K to step."
+     ?scenario=N  — static snapshots (0=fresh, 1=mid, 2=loaded)
+     ?timeline&step=N — scripted purchase sequence, one buy per step"
   [request]
   (let [params (:query-params request)
         timeline? (contains? params "timeline")
-        scenario (Integer/parseInt (or (get params "scenario") "0"))
-        step (Integer/parseInt (or (get params "step") "0"))
-        ;; Build base state
-        state (core/make-initial-state maps/arena-map)
-        [state c1] (core/add-player state "Rick-Alpha")
-        [state c2] (core/add-player state "Rick-Beta")
-        [state c3] (core/add-player state "Rick-Gamma")
-        [state c4] (core/add-player state "Rick-Delta")
+        ;; Build base state with 4 players
+        base-state (core/make-initial-state maps/arena-map)
+        [base-state c1] (core/add-player base-state "Rick-Alpha")
+        [base-state c2] (core/add-player base-state "Rick-Beta")
+        [base-state c3] (core/add-player base-state "Rick-Gamma")
+        [base-state c4] (core/add-player base-state "Rick-Delta")
         ids [(:id c1) (:id c2) (:id c3) (:id c4)]
-        state (reduce (fn [s id] (assoc-in s [:players id :points] core/START-POINTS))
-                      state ids)
+        base-state (reduce (fn [s id] (assoc-in s [:players id :points] core/START-POINTS))
+                           base-state ids)
         ;; Timeline: scripted purchase sequence
         timeline-steps
-        [{:buyer 0 :item nil :label "Everyone joins with 30 points"}
-         {:buyer 0 :item :plasma-rounds :label "Rick-Alpha buys Plasma Rounds!"}
-         {:buyer 1 :item :titan-shield :label "Rick-Beta buys Titan Shield!"}
-         {:buyer 2 :item :sprint-boots :label "Rick-Gamma buys Sprint Boots!"}
-         {:buyer 0 :item :ammo-belt :label "Rick-Alpha adds Ammo Belt!"}
-         {:buyer 1 :item :juggernaut :label "Rick-Beta goes Juggernaut!"}
-         {:buyer 3 :item :oracle-eye :label "Rick-Delta picks Oracle Eye!"}
-         {:buyer 2 :item :vampiric-rounds :label "Rick-Gamma grabs Vampiric Rounds!"}
-         {:buyer 3 :item :cluster-shot :label "Rick-Delta loads Cluster Shot!"}]
-        ;; Apply state based on mode
-        [state phase event] (if timeline?
-                              ;; Apply steps 1..step (step 0 = no buys)
-                              (let [steps-to-apply (take (inc step) timeline-steps)
-                                    s (reduce (fn [s {:keys [buyer item]}]
-                                                (if item
-                                                  (first (core/buy-item s (nth ids buyer) item))
-                                                  s))
-                                              state steps-to-apply)
-                                    current-step (nth timeline-steps (min step (dec (count timeline-steps))))
-                                    is-reveal (>= step (count timeline-steps))]
-                                [s (if is-reveal "reveal" "armory")
-                                 (:label current-step)])
-                              ;; Static scenario mode
-                              [(case scenario
-                                 0 state
-                                 1 (let [[s _] (core/buy-item state (nth ids 0) :plasma-rounds)
-                                         [s _] (core/buy-item s (nth ids 0) :ammo-belt)
-                                         [s _] (core/buy-item s (nth ids 1) :titan-shield)
-                                         [s _] (core/buy-item s (nth ids 2) :sprint-boots)
-                                         [s _] (core/buy-item s (nth ids 2) :vampiric-rounds)]
-                                     s)
-                                 2 (let [[s _] (core/buy-item state (nth ids 0) :plasma-rounds)
-                                         [s _] (core/buy-item s (nth ids 0) :titan-shield)
-                                         [s _] (core/buy-item s (nth ids 0) :ammo-belt)
-                                         [s _] (core/buy-item s (nth ids 1) :juggernaut)
-                                         [s _] (core/buy-item s (nth ids 1) :oracle-eye)
-                                         [s _] (core/buy-item s (nth ids 2) :sprint-boots)
-                                         [s _] (core/buy-item s (nth ids 2) :cluster-shot)
-                                         s (assoc-in s [:players (nth ids 3) :debuffs :drunk-controls]
-                                                     {:expires-at 50 :name "Drunk Controls"})
-                                         s (core/spawn-crate s :gold)
-                                         s (core/spawn-crate s :silver)
-                                         s (core/spawn-crate s :purple)]
-                                     s)
-                                 state)
-                               "armory" nil])
-        ;; Build response
+        [;; step 0: everyone fresh
+         [nil nil "Everyone joins with 30 points"]
+         ;; step 1-8: purchases
+         [0 :plasma-rounds "Rick-Alpha buys Plasma Rounds!"]
+         [1 :titan-shield "Rick-Beta buys Titan Shield!"]
+         [2 :sprint-boots "Rick-Gamma buys Sprint Boots!"]
+         [0 :ammo-belt "Rick-Alpha buys Ammo Belt!"]
+         [1 :juggernaut "Rick-Beta buys Juggernaut!"]
+         [3 :oracle-eye "Rick-Delta buys Oracle Eye!"]
+         [2 :vampiric-rounds "Rick-Gamma buys Vampiric Rounds!"]
+         [0 :titan-shield "Rick-Alpha buys Titan Shield!"]]
+        ;; Resolve state + event
+        [state phase event]
+        (if timeline?
+          (let [step (min (Integer/parseInt (or (get params "step") "0"))
+                          (count timeline-steps))
+                applied (take (inc step) timeline-steps)
+                state (reduce (fn [s [player-idx item _]]
+                                (if item
+                                  (let [[s' _] (core/buy-item s (nth ids player-idx) item)] s')
+                                  s))
+                              base-state applied)
+                [_ _ evt] (nth timeline-steps (min step (dec (count timeline-steps))))]
+            [state
+             (if (>= step (count timeline-steps)) "reveal" "armory")
+             evt])
+          ;; Static scenario mode
+          (let [scenario (Integer/parseInt (or (get params "scenario") "0"))
+                state (case scenario
+                        0 base-state
+                        1 (let [[s _] (core/buy-item base-state (nth ids 0) :plasma-rounds)
+                                [s _] (core/buy-item s (nth ids 0) :ammo-belt)
+                                [s _] (core/buy-item s (nth ids 1) :titan-shield)
+                                [s _] (core/buy-item s (nth ids 2) :sprint-boots)
+                                [s _] (core/buy-item s (nth ids 2) :vampiric-rounds)]
+                            s)
+                        2 (let [[s _] (core/buy-item base-state (nth ids 0) :plasma-rounds)
+                                [s _] (core/buy-item s (nth ids 0) :titan-shield)
+                                [s _] (core/buy-item s (nth ids 0) :ammo-belt)
+                                [s _] (core/buy-item s (nth ids 1) :juggernaut)
+                                [s _] (core/buy-item s (nth ids 1) :oracle-eye)
+                                [s _] (core/buy-item s (nth ids 2) :sprint-boots)
+                                [s _] (core/buy-item s (nth ids 2) :cluster-shot)
+                                s (assoc-in s [:players (nth ids 3) :debuffs :drunk-controls]
+                                            {:expires-at 50 :name "Drunk Controls"})
+                                s (core/spawn-crate s :gold)
+                                s (core/spawn-crate s :silver)
+                                s (core/spawn-crate s :purple)]
+                            s)
+                        base-state)
+                _ nil]
+            [state "armory" nil]))
+        ;; Build response — SAME SHAPE as handle-armory-state (items as strings!)
         players (->> (:players state)
                      (map (fn [[id p]]
                             {:id id :name (:name p)
                              :points (:points p 0)
-                             :items (mapv (fn [k] {:key (name k)
-                                                   :name (:name (get core/armory-items k))
-                                                   :cost (:cost (get core/armory-items k))})
-                                          (or (:items p) []))
+                             :items (vec (map name (or (:items p) [])))
                              :buffs (or (:buffs p) {})
                              :debuffs (or (:debuffs p) {})
                              :hp (:hp p) :score (:score p) :alive (:alive? p)}))
                      vec)
-        shop (->> core/armory-items
-                  (map (fn [[k v]] (assoc v :key (name k))))
-                  vec)
+        shop (into {}
+                   (map (fn [[k v]] [(name k) (assoc v :id (name k))]))
+                   core/armory-items)
         crates (->> (or (:crates state) {})
-                    (map (fn [[id c]] (assoc c :id id)))
+                    (map (fn [[id c]] {:id id :x (:x c) :y (:y c)
+                                       :tier (name (:tier c)) :cost (:cost c)}))
                     vec)]
     (json-response 200 (cond-> {:phase phase
                                 :tick (:tick state)
                                 :players players
                                 :shop shop
                                 :crates crates}
-                         timeline? (assoc :step step
-                                          :total-steps (count timeline-steps)
+                         timeline? (assoc :step (Integer/parseInt (or (get params "step") "0"))
+                                          :total-steps (dec (count timeline-steps))
                                           :event event)))))
 
 (defn handle-test [request]
