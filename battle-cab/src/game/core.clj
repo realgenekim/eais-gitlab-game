@@ -778,10 +778,10 @@
 ;;; ---------------------------------------------------------------------------
 
 (def enemy-types
-  "Enemy type definitions — weak enough to be fun, not frustrating."
-  {:floopy {:hp 10 :speed 1 :damage 5 :score 10}
-   :squanchy {:hp 25 :speed 1 :damage 8 :score 25}
-   :scary {:hp 40 :speed 1 :damage 12 :score 50}})
+  "Enemy type definitions — cannon fodder, not the main event. PVP is the focus."
+  {:floopy {:hp 5 :speed 1 :damage 3 :score 5}
+   :squanchy {:hp 15 :speed 1 :damage 5 :score 15}
+   :scary {:hp 25 :speed 1 :damage 8 :score 30}})
 
 (defn spawn-enemies
   "Spawn a wave of enemies at random edge cells. No cell sharing."
@@ -895,25 +895,17 @@
     (if (or (< tick grace)
             (not (zero? (mod tick wave-interval))))
       state
-      ;; Determine wave composition — cap total enemies at 20
+      ;; Minimal enemies — PVP is the main event, enemies are atmosphere
       (let [wave-num (inc (or (:wave-number state) 0))
             current-enemies (count (or (:enemies state) {}))
-            max-enemies 15]
+            max-enemies 5]
         (if (>= current-enemies max-enemies)
-          ;; Already at cap — just bump wave number, don't spawn
           (assoc state :wave-number wave-num)
-          ;; Spawn up to the cap
-          (let [room (- max-enemies current-enemies)
-                floopy-count (min room (max 2 (min 5 (+ 2 (quot wave-num 2)))))
-                room2 (- room floopy-count)
-                squanchy-count (if (>= wave-num 3) (min room2 (min 2 (quot wave-num 3))) 0)
-                room3 (- room2 squanchy-count)
-                scary-count (if (>= wave-num 6) (min room3 1) 0)]
+          (let [to-spawn (min 2 (- max-enemies current-enemies))
+                enemy-type (if (>= wave-num 4) :squanchy :floopy)]
             (-> state
                 (assoc :wave-number wave-num)
-                (spawn-enemies :floopy floopy-count)
-                (cond-> (pos? squanchy-count) (spawn-enemies :squanchy squanchy-count))
-                (cond-> (pos? scary-count) (spawn-enemies :scary scary-count)))))))))
+                (spawn-enemies enemy-type to-spawn))))))))
 
 (defn nudge-stalled-players
   "If a player hasn't moved in 5+ ticks, force them to move.
