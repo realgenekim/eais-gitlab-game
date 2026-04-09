@@ -123,7 +123,8 @@
 
 (defn handle-state [request]
   (if-let [player-id (authenticate request)]
-    (json-response 200 (core/player-view (engine/get-state) player-id))
+    (let [view (core/player-view (engine/get-state) player-id)]
+      (json-response 200 (assoc view :phase (name (engine/get-phase)))))
     (json-response 401 {:error "Invalid token"})))
 
 (defn handle-action [request]
@@ -162,7 +163,9 @@
   (let [state (engine/get-state)]
     (json-response 200
                    {:tick (:tick state)
+                    :phase (name (engine/get-phase))
                     :players (count (:players state))
+                    :player-names (vec (map :name (vals (:players state))))
                     :passengers (count (filter #(nil? (:picked-up-by %))
                                                (:passengers state)))
                     :spectators (sse/subscriber-count)
@@ -255,6 +258,12 @@
                           :tick (:tick result)
                           :max-tick (:max-tick result)}))))
 
+(defn handle-start [_request]
+  (if-let [result (engine/begin-game!)]
+    (json-response 200 {:status "started"
+                        :players (:players result)})
+    (json-response 400 {:error "Game is not in lobby phase"})))
+
 (defn handle-resume [_request]
   (engine/resume-game!)
   (json-response 200 {:status "resumed"}))
@@ -321,6 +330,7 @@
          ["/game/frame" {:get {:handler #'handle-frame}}]
          ["/game/map-swap" {:post {:handler #'handle-map-swap}}]
          ["/game/lightning" {:post {:handler #'handle-lightning}}]
+         ["/game/start" {:post {:handler #'handle-start}}]
          ["/game/seek" {:post {:handler #'handle-seek}}]
          ["/game/resume" {:post {:handler #'handle-resume}}]
          ;; Tools

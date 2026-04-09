@@ -22,6 +22,22 @@
   (and (in-bounds? (:map game-state) pos)
        (not (wall? game-state pos))))
 
+(defn occupied-cells
+  "Set of all cells occupied by alive players and enemies."
+  [state]
+  (let [player-cells (set (for [[_ p] (:players state)
+                                :when (:alive? p)]
+                            [(:x p) (:y p)]))
+        enemy-cells  (set (for [[_ e] (or (:enemies state) {})]
+                            [(:x e) (:y e)]))]
+    (into player-cells enemy-cells)))
+
+(defn cell-free?
+  "Is pos walkable AND not occupied by any player or enemy?"
+  [state pos]
+  (and (walkable? state pos)
+       (not (contains? (occupied-cells state) pos))))
+
 (defn manhattan-distance [[x1 y1] [x2 y2]]
   (+ (abs (- x1 x2)) (abs (- y1 y2))))
 
@@ -141,15 +157,28 @@
   "Apply a single player action. Returns updated game-state."
   (fn [_state _player-id action] (:type action)))
 
+(def opposite-dir
+  {:north :south :south :north :east :west :west :east})
+
 (defmethod apply-action :move
   [state player-id {:keys [direction]}]
   (let [player (get-in state [:players player-id])
-        [dx dy] (get directions (keyword direction) [0 0])
-        new-pos [(+ (:x player) dx) (+ (:y player) dy)]]
-    (if (and (:alive? player) (walkable? state new-pos))
+        dir-kw (keyword direction)
+        [dx dy] (get directions dir-kw [0 0])
+        new-pos [(+ (:x player) dx) (+ (:y player) dy)]
+        ;; Block immediate reversals (north→south, east→west) — looks terrible
+        last-dir (:last-direction player)
+        reversing? (and last-dir (= dir-kw (opposite-dir last-dir)))
+        ;; Occupied by anyone OTHER than this player
+        others (disj (occupied-cells state) [(:x player) (:y player)])]
+    (if (and (:alive? player)
+             (not reversing?)
+             (walkable? state new-pos)
+             (not (contains? others new-pos)))
       (-> state
           (assoc-in [:players player-id :x] (first new-pos))
-          (assoc-in [:players player-id :y] (second new-pos)))
+          (assoc-in [:players player-id :y] (second new-pos))
+          (assoc-in [:players player-id :last-direction] dir-kw))
       state)))
 
 (defmethod apply-action :pickup
@@ -328,7 +357,7 @@
 
 (defn respawn-dead-players
   "Respawn players whose respawn timer has elapsed.
-   If spawn point is now a wall (shrink/lightning), bump to nearest open cell."
+   If spawn point is a wall or occupied, bump to nearest free cell."
   [state]
   (let [spawn-points (get-in state [:map :spawn-points] [[1 1] [18 1] [1 18] [18 18]])]
     (reduce-kv
@@ -337,8 +366,11 @@
                 (:respawn-at player)
                 (>= (:tick state) (:respawn-at player)))
          (let [spawn (nth spawn-points (mod (hash id) (count spawn-points)))
-               ;; If spawn is now a wall, find nearest open cell
-               [sx sy] (if (contains? (get-in s [:map :walls]) spawn)
+               occupied (occupied-cells s)
+               walls (get-in s [:map :walls])
+               ;; If spawn is a wall or occupied, find nearest free cell
+               [sx sy] (if (or (contains? walls spawn)
+                               (contains? occupied spawn))
                          (find-nearest-open s (first spawn) (second spawn))
                          spawn)]
            (-> s
@@ -574,7 +606,7 @@
    :scary {:hp 80 :speed 2 :damage 30 :score 50}})
 
 (defn spawn-enemies
-  "Spawn a wave of enemies at random edge cells."
+  "Spawn a wave of enemies at random edge cells. No cell sharing."
   [state enemy-type count-to-spawn]
   (let [{:keys [width height walls]} (:map state)
         edge-cells (concat
@@ -582,26 +614,30 @@
                     (for [x (range 1 (dec width))] [x (- height 2)])
                     (for [y (range 1 (dec height))] [1 y])
                     (for [y (range 1 (dec height))] [(- width 2) y]))
-        open-edges (vec (remove #(contains? walls %) edge-cells))
         type-info (get enemy-types enemy-type {:hp 20 :speed 1 :damage 10 :score 10})]
-    (if (empty? open-edges)
-      state
-      (reduce (fn [s i]
-                (let [pos (nth open-edges (rand-int (count open-edges)))
-                      id (str "enemy-" (:tick state) "-" i)]
-                  (assoc-in s [:enemies id]
-                            {:x (first pos)
-                             :y (second pos)
-                             :hp (:hp type-info)
-                             :max-hp (:hp type-info)
-                             :speed (:speed type-info)
-                             :damage (:damage type-info)
-                             :score (:score type-info)
-                             :type enemy-type})))
-              state (range count-to-spawn)))))
+    (reduce (fn [s i]
+              (let [occupied (occupied-cells s)
+                    open-edges (vec (remove #(or (contains? walls %)
+                                                 (contains? occupied %))
+                                           edge-cells))]
+                (if (empty? open-edges)
+                  s
+                  (let [pos (nth open-edges (rand-int (count open-edges)))
+                        id (str "enemy-" (:tick state) "-" i)]
+                    (assoc-in s [:enemies id]
+                              {:x (first pos)
+                               :y (second pos)
+                               :hp (:hp type-info)
+                               :max-hp (:hp type-info)
+                               :speed (:speed type-info)
+                               :damage (:damage type-info)
+                               :score (:score type-info)
+                               :type enemy-type})))))
+            state (range count-to-spawn))))
 
 (defn move-enemies
-  "Move each enemy one cell toward the nearest alive player."
+  "Move each enemy one cell toward the nearest alive player.
+   Enemies cannot share cells with players or other enemies."
   [state]
   (let [alive-players (->> (:players state)
                            (filter (fn [[_ p]] (:alive? p)))
@@ -609,56 +645,60 @@
         walls (get-in state [:map :walls])]
     (if (empty? alive-players)
       state
+      ;; Process enemies sequentially so each one sees updated positions
       (reduce-kv
        (fn [s id enemy]
          (let [ex (:x enemy) ey (:y enemy)
+               ;; Build occupied set from current state (excluding this enemy)
+               occupied (disj (occupied-cells s) [ex ey])
+               blocked? (fn [[x y]] (or (contains? walls [x y])
+                                        (contains? occupied [x y])
+                                        (not (in-bounds? (:map s) [x y]))))
                ;; Find nearest player
                nearest (apply min-key
                               (fn [[px py]] (manhattan-distance [ex ey] [px py]))
                               alive-players)
                [px py] nearest
-               dx (compare px ex) ;; -1, 0, or 1
+               dx (compare px ex)
                dy (compare py ey)
-               ;; Try to move toward player (prefer axis with larger distance)
                mx (Math/abs (- px ex))
                my (Math/abs (- py ey))
-               [nx ny] (if (>= mx my)
-                         [(+ ex dx) ey]
-                         [ex (+ ey dy)])
-               ;; Fall back if blocked by wall
-               [nx ny] (if (contains? walls [nx ny])
-                         (if (>= mx my)
-                           [ex (+ ey dy)]
-                           [(+ ex dx) ey])
-                         [nx ny])
-               ;; Final check — don't walk into walls
-               [nx ny] (if (contains? walls [nx ny])
-                         [ex ey]
-                         [nx ny])]
+               ;; Try primary direction, then alternate, then stay
+               [nx ny] (let [primary (if (>= mx my) [(+ ex dx) ey] [ex (+ ey dy)])
+                             alt     (if (>= mx my) [ex (+ ey dy)] [(+ ex dx) ey])]
+                          (cond
+                            (not (blocked? primary)) primary
+                            (not (blocked? alt))     alt
+                            :else                    [ex ey]))]
            (-> s
                (assoc-in [:enemies id :x] nx)
                (assoc-in [:enemies id :y] ny))))
        state (or (:enemies state) {})))))
 
 (defn enemy-player-collisions
-  "Enemies on the same cell as a player deal damage."
+  "Enemies adjacent to a player (manhattan distance 1) deal damage.
+   No two entities share a cell, so adjacency is the attack range."
   [state]
-  (let [player-positions (into {}
-                               (for [[id p] (:players state)
-                                     :when (:alive? p)]
-                                 [[(:x p) (:y p)] id]))]
+  (let [alive-players (vec (for [[id p] (:players state) :when (:alive? p)]
+                             [id (:x p) (:y p)]))]
     (reduce-kv
      (fn [s eid enemy]
-       (if-let [pid (get player-positions [(:x enemy) (:y enemy)])]
-         (let [damage (:damage enemy 10)
-               new-hp (max 0 (- (get-in s [:players pid :hp]) damage))]
-           (-> s
-               (assoc-in [:players pid :hp] new-hp)
-               (cond-> (zero? new-hp)
-                 (-> (assoc-in [:players pid :alive?] false)
-                     (assoc-in [:players pid :respawn-at]
-                               (+ (:tick state) (get-in state [:config :respawn-ticks] 10)))))))
-         s))
+       (let [ex (:x enemy) ey (:y enemy)
+             ;; Find any adjacent player
+             adjacent (first (filter (fn [[_id px py]]
+                                       (= 1 (manhattan-distance [ex ey] [px py])))
+                                     alive-players))]
+         (if adjacent
+           (let [[pid _ _] adjacent
+                 damage (:damage enemy 10)
+                 new-hp (max 0 (- (get-in s [:players pid :hp]) damage))]
+             (-> s
+                 (assoc-in [:players pid :hp] new-hp)
+                 (cond-> (zero? new-hp)
+                   (-> (assoc-in [:players pid :alive?] false)
+                       (assoc-in [:players pid :respawn-at]
+                                 (+ (:tick state) (get-in state [:config :respawn-ticks] 10)))))))
+           s)))
      state (or (:enemies state) {}))))
 
 (defn maybe-spawn-wave

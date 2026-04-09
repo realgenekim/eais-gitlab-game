@@ -66,7 +66,8 @@
 ;;; ---------------------------------------------------------------------------
 
 (defn add-player!
-  "Add a player. Returns {:id ... :token ...} or nil if full."
+  "Add a player. Returns {:id ... :token ...} or nil if full.
+   During lobby phase, broadcasts updated state to spectators so they see the roster."
   [sys player-name]
   (let [state @(:game-state sys)
         max-p (get-in state [:config :max-players] 8)]
@@ -84,6 +85,12 @@
                               :player-id (:id creds)
                               :name player-name
                               :tick (:tick new-state)}])
+        ;; In lobby mode, push state to spectators so they see the roster update
+        (when (= :lobby @(:phase sys))
+          (when-let [on-tick (:on-tick sys)]
+            (if (var? on-tick)
+              (@on-tick sys new-state)
+              (on-tick sys new-state))))
         creds))))
 
 (declare stop-game! pause-game!)
@@ -214,7 +221,8 @@
 ;;; ---------------------------------------------------------------------------
 
 (defn start-game!
-  "Start a new game. Returns the system map."
+  "Start a new game in LOBBY mode. No ticks until begin-game! is called.
+   Bots can join and show up in spectator, but nothing moves yet."
   ([] (start-game! {}))
   ([opts]
    (let [game-map (:game-map opts maps/arena-map)
@@ -226,17 +234,36 @@
               :token->player (atom {})
               :event-log (atom [])
               :game-timer (atom nil)
-              :on-tick on-tick}
-         tick-ms (get-in state [:config :tick-ms] 500)
-         timer (Timer. "game-tick" true)
-         task (proxy [TimerTask] []
-                (run [] (tick! sys)))]
-     (.scheduleAtFixedRate timer task (long tick-ms) (long tick-ms))
-     (reset! (:game-timer sys) timer)
+              :phase (atom :lobby)
+              :on-tick on-tick}]
      (reset! system sys)
-     (log/info :game-started :tick-ms tick-ms :map-size
+     (log/info :game-started :phase :lobby :map-size
                (str (get-in state [:map :width]) "x" (get-in state [:map :height])))
      sys)))
+
+(defn begin-game!
+  "Transition from lobby to playing. Starts the tick loop."
+  ([] (begin-game! @system))
+  ([sys]
+   (when (and sys (= :lobby @(:phase sys)))
+     (let [state @(:game-state sys)
+           tick-ms (get-in state [:config :tick-ms] 500)
+           timer (Timer. "game-tick" true)
+           task (proxy [TimerTask] []
+                  (run [] (tick! sys)))]
+       (.scheduleAtFixedRate timer task (long tick-ms) (long tick-ms))
+       (reset! (:game-timer sys) timer)
+       (reset! (:phase sys) :playing)
+       (append-events! sys [{:type :game-started :tick 0
+                             :players (count (:players @(:game-state sys)))}])
+       ;; Push initial state to spectators
+       (when-let [on-tick (:on-tick sys)]
+         (if (var? on-tick)
+           (@on-tick sys @(:game-state sys))
+           (on-tick sys @(:game-state sys))))
+       (log/info :game-begun :tick-ms tick-ms
+                 :players (count (:players @(:game-state sys))))
+       {:status :started :players (count (:players @(:game-state sys)))}))))
 
 (defn pause-game!
   "Pause the tick timer. Game state frozen, server still responds."
@@ -260,6 +287,12 @@
        (reset! (:game-timer sys) timer)
        (log/info :game-resumed :tick (:tick @(:game-state sys)))))))
 
+(defn get-phase
+  "Current game phase: :lobby or :playing."
+  ([] (get-phase @system))
+  ([sys]
+   (if sys @(:phase sys) :lobby)))
+
 (defn stop-game!
   "Stop the current game, save replay."
   ([] (stop-game! @system))
@@ -277,7 +310,7 @@
      (append-events! sys [{:type :game-stopped}]))))
 
 (defn restart-game!
-  "Stop current game and start a new one."
+  "Stop current game and start a new one in lobby mode."
   ([] (restart-game! {}))
   ([opts]
    (stop-game!)

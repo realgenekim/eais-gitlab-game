@@ -62,9 +62,13 @@
             border: 2px solid #333;
             border-radius: 8px;
             padding: 12px 16px;
-            min-width: 220px;
+            min-width: 200px;
+            max-width: 260px;
+            max-height: calc(100vh - 70px);
+            overflow-y: auto;
             font-family: monospace;
             display: none;
+            box-sizing: border-box;
         }
         #scoreboard h2 {
             color: #ff6b6b;
@@ -81,16 +85,126 @@
             border-bottom: 1px solid #222;
         }
         .sb-player:last-child { border-bottom: none; }
-        .sb-name { color: #fff; font-size: 15px; font-weight: bold; }
-        .sb-stats { color: #aaa; font-size: 12px; text-align: right; }
+        .sb-name { color: #fff; font-size: 14px; font-weight: bold; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 120px; }
+        .sb-stats { color: #aaa; font-size: 11px; text-align: right; white-space: nowrap; }
         .sb-hp { color: #4ecdc4; font-size: 14px; }
         .sb-score { color: #ffe66d; font-size: 14px; font-weight: bold; }
         .sb-dead { opacity: 0.4; }
         .sb-dead .sb-name { text-decoration: line-through; }
+
+        /* Lobby overlay */
+        #lobby-overlay {
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            z-index: 2000;
+            background: rgba(10,10,20,0.95);
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            font-family: monospace;
+        }
+        #lobby-overlay.active { display: flex; }
+        #lobby-title {
+            font-size: 48px;
+            color: #ff6b6b;
+            letter-spacing: 0.2em;
+            text-transform: uppercase;
+            margin-bottom: 8px;
+        }
+        #lobby-subtitle {
+            font-size: 18px;
+            color: #888;
+            margin-bottom: 40px;
+        }
+        #lobby-roster {
+            min-width: 360px;
+            max-width: 500px;
+        }
+        #lobby-roster h3 {
+            color: #4ecdc4;
+            font-size: 14px;
+            letter-spacing: 0.15em;
+            text-transform: uppercase;
+            margin: 0 0 12px 0;
+        }
+        .lobby-player {
+            display: flex;
+            align-items: center;
+            padding: 10px 16px;
+            margin: 6px 0;
+            background: rgba(40,40,60,0.8);
+            border: 1px solid #333;
+            border-radius: 6px;
+            animation: fadeSlideIn 0.3s ease-out;
+        }
+        @keyframes fadeSlideIn {
+            from { opacity: 0; transform: translateX(-20px); }
+            to { opacity: 1; transform: translateX(0); }
+        }
+        .lobby-player-num {
+            color: #ffe66d;
+            font-size: 20px;
+            font-weight: bold;
+            margin-right: 16px;
+            min-width: 30px;
+        }
+        .lobby-player-name {
+            color: #fff;
+            font-size: 18px;
+            font-weight: bold;
+        }
+        .lobby-player-status {
+            color: #4ecdc4;
+            font-size: 12px;
+            margin-left: auto;
+        }
+        #lobby-empty {
+            color: #555;
+            font-size: 16px;
+            text-align: center;
+            padding: 30px;
+        }
+        #start-game-btn {
+            margin-top: 40px;
+            font-family: monospace;
+            font-size: 22px;
+            font-weight: bold;
+            padding: 16px 48px;
+            border: 2px solid #4ecdc4;
+            border-radius: 8px;
+            color: #4ecdc4;
+            background: rgba(78,205,196,0.1);
+            cursor: pointer;
+            letter-spacing: 0.15em;
+            text-transform: uppercase;
+            transition: all 0.2s;
+        }
+        #start-game-btn:hover {
+            background: rgba(78,205,196,0.25);
+            box-shadow: 0 0 20px rgba(78,205,196,0.3);
+        }
+        #start-game-btn:disabled {
+            opacity: 0.3;
+            cursor: not-allowed;
+        }
     </style>
 </head>
 <body>
     <div id="thegame"></div>
+
+    <!-- Lobby overlay -->
+    <div id="lobby-overlay">
+        <div id="lobby-title">Cab Battle</div>
+        <div id="lobby-subtitle">Waiting for players to join...</div>
+        <div id="lobby-roster">
+            <h3>Players</h3>
+            <div id="lobby-players">
+                <div id="lobby-empty">No players yet</div>
+            </div>
+        </div>
+        <button id="start-game-btn" onclick="startGame()" disabled>Start Game</button>
+    </div>
 
     <!-- Control panel (only shown in server mode) -->
     <div id="controls" style="display:none;">
@@ -115,6 +229,8 @@
         const names = ['Rick-Alpha','Rick-Beta','Rick-Gamma','Rick-Delta',
                         'Rick-Echo','Rick-Foxtrot','Rick-Golf','Rick-Hotel'];
 
+        let currentPhase = 'lobby';
+
         // Show controls + scoreboard only in server mode
         if (window.location.search.includes('server')) {
             document.getElementById('controls').style.display = 'flex';
@@ -123,8 +239,31 @@
             // Listen for game state from Phaser scene via custom event
             window.addEventListener('gameState', (e) => {
                 const state = e.detail;
-                updateScoreboard(state.players);
+                const phase = state.phase || 'playing';
+
+                if (phase === 'lobby') {
+                    currentPhase = 'lobby';
+                    document.getElementById('lobby-overlay').classList.add('active');
+                    updateLobbyRoster(state.players || []);
+                } else if (currentPhase === 'lobby' && phase === 'playing') {
+                    // Transition from lobby to playing
+                    currentPhase = 'playing';
+                    document.getElementById('lobby-overlay').classList.remove('active');
+                }
+
+                if (phase === 'playing') {
+                    updateScoreboard(state.players);
+                }
             });
+
+            // Check initial phase
+            fetch(SERVER + '/game/status')
+                .then(r => r.json())
+                .then(data => {
+                    if (data.phase === 'lobby') {
+                        document.getElementById('lobby-overlay').classList.add('active');
+                    }
+                }).catch(() => {});
         }
 
         function updateScoreboard(players) {
@@ -182,6 +321,69 @@
                 const el = document.getElementById('status-bar');
                 el.textContent = 'Server error: ' + e.message;
                 el.className = 'status error';
+            }
+        }
+
+        function updateLobbyRoster(players) {
+            const el = document.getElementById('lobby-players');
+            const btn = document.getElementById('start-game-btn');
+            if (!players || players.length === 0) {
+                el.textContent = '';
+                const empty = document.createElement('div');
+                empty.id = 'lobby-empty';
+                empty.textContent = 'No players yet';
+                el.appendChild(empty);
+                btn.disabled = true;
+                return;
+            }
+            btn.disabled = false;
+            el.textContent = '';
+            players.forEach((p, i) => {
+                const row = document.createElement('div');
+                row.className = 'lobby-player';
+
+                const num = document.createElement('div');
+                num.className = 'lobby-player-num';
+                num.textContent = String(i + 1);
+
+                const name = document.createElement('div');
+                name.className = 'lobby-player-name';
+                name.textContent = p.name;
+
+                const status = document.createElement('div');
+                status.className = 'lobby-player-status';
+                status.textContent = 'READY';
+
+                row.appendChild(num);
+                row.appendChild(name);
+                row.appendChild(status);
+                el.appendChild(row);
+            });
+            document.getElementById('lobby-subtitle').textContent =
+                players.length + ' player' + (players.length !== 1 ? 's' : '') + ' in lobby';
+        }
+
+        async function startGame() {
+            const btn = document.getElementById('start-game-btn');
+            btn.disabled = true;
+            btn.textContent = 'Starting...';
+            try {
+                const resp = await fetch(SERVER + '/game/start', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({})
+                });
+                const data = await resp.json();
+                if (data.status === 'started') {
+                    currentPhase = 'playing';
+                    document.getElementById('lobby-overlay').classList.remove('active');
+                } else {
+                    btn.textContent = 'Start Game';
+                    btn.disabled = false;
+                }
+            } catch(e) {
+                btn.textContent = 'Start Game';
+                btn.disabled = false;
             }
         }
 

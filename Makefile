@@ -75,6 +75,41 @@ smart-bot:
 	python3 bots/smart_bot.py --name $(NAME)
 
 # ============================================================
+# Demo — one command to launch everything
+# ============================================================
+
+# Launch all 4 bots in parallel (no stagger needed — lobby holds them)
+bots:
+	@cd sdk && python3 bot_hunter.py &
+	@cd sdk && python3 bot_taxi.py &
+	@cd sdk && python3 bot_berserker.py &
+	@cd sdk && python3 bot_scavenger.py &
+	@sleep 2 && echo "All bots launched. Check:" && curl -s $(SERVER)/game/status | python3 -m json.tool
+
+# Kill all running bots
+kill-bots:
+	@pkill -f 'bot_hunter\|bot_taxi\|bot_berserker\|bot_scavenger' 2>/dev/null || true
+	@echo "All bots killed."
+
+# Full demo: reset game + launch 4 bots (server must be running)
+demo: kill-bots
+	@curl -s -X POST $(SERVER)/game/restart -H 'Content-Type: application/json' -d '{}' > /dev/null
+	@sleep 1
+	@cd sdk && python3 bot_hunter.py &
+	@cd sdk && python3 bot_taxi.py &
+	@cd sdk && python3 bot_berserker.py &
+	@cd sdk && python3 bot_scavenger.py &
+	@sleep 2 && curl -s $(SERVER)/game/status | python3 -m json.tool
+
+# Start game from lobby (after bots have joined)
+start:
+	@curl -s -X POST $(SERVER)/game/start -H 'Content-Type: application/json' -d '{}' | python3 -m json.tool
+
+# Run the AI commentator (requires ELEVENLABS_API_KEY and ANTHROPIC_API_KEY env vars)
+commentator:
+	cd sdk && python3 commentator.py
+
+# ============================================================
 # Setup
 # ============================================================
 install-spectator:

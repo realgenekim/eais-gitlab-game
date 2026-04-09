@@ -2,7 +2,10 @@
   "WebSocket broadcaster. Pushes JSON game state to Phaser spectator clients."
   (:require [org.httpkit.server :as http]
             [clojure.data.json :as json]
+            [game.engine :as engine]
             [taoensso.timbre :as log]))
+
+(declare state->json)
 
 ;;; ---------------------------------------------------------------------------
 ;;; Subscriber Management
@@ -14,13 +17,19 @@
 
 (defn handle-ws-spectate
   "WebSocket endpoint for Phaser spectator clients.
-   Upgrades HTTP to WebSocket, adds to broadcast set."
+   Upgrades HTTP to WebSocket, adds to broadcast set.
+   Immediately sends current state so late-joining spectators see the lobby."
   [request]
   (http/with-channel request channel
     (if (http/websocket? channel)
       (do
         (swap! ws-clients conj channel)
         (log/info :ws-connect :clients (ws-client-count))
+        ;; Immediately send current state (so lobby shows roster)
+        (when-let [state (engine/get-state)]
+          (try
+            (http/send! channel (state->json state))
+            (catch Exception _)))
         (http/on-close channel
                        (fn [_status]
                          (swap! ws-clients disj channel)
@@ -69,6 +78,7 @@
         walls (vec (get-in game-state [:map :walls]))]
     (json/write-str
      {:type "state"
+      :phase (name (engine/get-phase))
       :tick (:tick game-state)
       :players players
       :enemies enemies
