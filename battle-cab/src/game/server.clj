@@ -456,10 +456,29 @@
                             :gear-catalog (core/available-gear state)})))
     (json-response 401 {:error "Invalid token"})))
 
-(defn handle-agent-context [_request]
-  {:status 200
-   :headers {"Content-Type" "text/plain; charset=utf-8"}
-   :body (slurp (clojure.java.io/resource "public/guide/agent-context.md"))})
+(defn handle-agent-context [request]
+  (let [md-content (slurp (clojure.java.io/resource "public/guide/agent-context.md"))
+        accept (or (get-in request [:headers "accept"]) "")]
+    (if (str/includes? accept "text/html")
+      ;; Browser request — serve rendered HTML page that loads marked.js
+      {:status 200
+       :headers {"Content-Type" "text/html; charset=utf-8"}
+       :body (str "<!DOCTYPE html><html><head><meta charset='utf-8'>"
+                  "<meta name='viewport' content='width=device-width,initial-scale=1'>"
+                  "<title>Bot Battle Arena - Agent Context</title>"
+                  "<script src='https://cdn.jsdelivr.net/npm/marked/marked.min.js'></script>"
+                  "<link rel='stylesheet' href='https://cdn.jsdelivr.net/npm/github-markdown-css@5/github-markdown-dark.min.css'>"
+                  "<style>body{background:#0d1117;padding:40px 20px;}"
+                  ".markdown-body{max-width:900px;margin:0 auto;}"
+                  "</style></head><body>"
+                  "<article class='markdown-body' id='c'></article>"
+                  "<script>var t=" (json/write-str md-content) ";"  ; safe: json-escaped
+                  "document.getElementById('c').innerHTML=marked.parse(t);</script>"  ; marked.js sanitizes by default
+                  "</body></html>")}
+      ;; Agent/curl — raw plain text
+      {:status 200
+       :headers {"Content-Type" "text/plain; charset=utf-8"}
+       :body md-content})))
 
 (defn handle-bot-update [request]
   "Bot announces it has been updated (hot-reload). Shows on spectator."
