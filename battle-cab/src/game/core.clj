@@ -11,6 +11,53 @@
   {:north [0 -1] :south [0 1] :east [1 0] :west [-1 0]})
 
 (def START-HP "Starting and respawn hit points for players." 500)
+(def START-POINTS "Starting currency for armory + in-game crates." 30)
+
+;;; ---------------------------------------------------------------------------
+;;; Items & Loot System
+;;; ---------------------------------------------------------------------------
+
+(def armory-items
+  "Items available for purchase in the armory phase."
+  {:plasma-rounds   {:name "Plasma Rounds"   :cost 15 :type :weapon  :effect :damage-2x     :duration nil
+                     :desc "2x shot damage (permanent)"}
+   :titan-shield    {:name "Titan Shield"    :cost 12 :type :defense :effect :damage-halved  :duration nil
+                     :desc "50% damage reduction (permanent)"}
+   :oracle-eye      {:name "Oracle Eye"      :cost 10 :type :utility :effect :vision-2x      :duration nil
+                     :desc "Double vision radius (permanent)"}
+   :sprint-boots    {:name "Sprint Boots"    :cost 8  :type :utility :effect :speed-2x       :duration 80
+                     :desc "Move twice per tick (80 ticks)"}
+   :vampiric-rounds {:name "Vampiric Rounds" :cost 8  :type :weapon  :effect :lifesteal      :duration nil
+                     :desc "Heal 15 HP per hit (permanent)"}
+   :juggernaut      {:name "Juggernaut"      :cost 6  :type :defense :effect :bonus-hp       :duration nil
+                     :desc "+300 bonus HP (instant)"}
+   :ammo-belt       {:name "Ammo Belt"       :cost 5  :type :utility :effect :ammo-regen-2x  :duration nil
+                     :desc "Double ammo regen (permanent)"}
+   :cluster-shot    {:name "Cluster Shot"    :cost 5  :type :weapon  :effect :cluster        :duration 60
+                     :desc "Shots hit 3-wide (60 ticks)"}})
+
+(def crate-loot-table
+  "Possible contents of in-game loot crates by tier."
+  {:gold   {:cost-range [15 20]
+            :items [:plasma-rounds :titan-shield :oracle-eye]}
+   :silver {:cost-range [5 10]
+            :items [:sprint-boots :vampiric-rounds :juggernaut :ammo-belt :cluster-shot
+                    :rapid-fire :regen-field]}
+   :purple {:cost-range [0 3]
+            :buffs  [:sprint-boots :vampiric-rounds :ammo-belt]
+            :debuffs [:drunk-controls :loud-footsteps :butterfingers :pacifist
+                      :magnet :shrink-ray :reverse-controls :glass-cannon]}})
+
+(def debuff-definitions
+  "Debuff effects applied from purple crates."
+  {:drunk-controls    {:name "Drunk Controls"    :duration 50 :desc "30% chance moves go random"}
+   :loud-footsteps    {:name "Loud Footsteps"    :duration 60 :desc "Visible to all players"}
+   :butterfingers     {:name "Butterfingers"     :duration 40 :desc "Drop passenger every 10 ticks"}
+   :pacifist          {:name "Pacifist"          :duration 30 :desc "Can't shoot"}
+   :magnet            {:name "Magnet"            :duration 50 :desc "Enemies target you first"}
+   :shrink-ray        {:name "Shrink Ray"        :duration 40 :desc "Vision radius = 2"}
+   :reverse-controls  {:name "Reverse Controls"  :duration 30 :desc "Directions inverted"}
+   :glass-cannon      {:name "Glass Cannon"      :duration 60 :desc "3x damage dealt AND taken"}})
 
 (defn in-bounds? [{:keys [width height]} [x y]]
   (and (>= x 0) (< x width) (>= y 0) (< y height)))
@@ -38,6 +85,64 @@
   (and (walkable? state pos)
        (not (contains? (occupied-cells state) pos))))
 
+;;; ---------------------------------------------------------------------------
+;;; Knockback — TMNT arcade-style pushback on hit
+;;; ---------------------------------------------------------------------------
+
+(defn knockback-dest
+  "Calculate knockback destination: push [x y] away from [sx sy] by up to `dist` cells.
+   Stops at walls and occupied cells. Returns [final-x final-y cells-moved]."
+  [state x y sx sy dist exclude-pos]
+  (let [;; Push direction: away from source
+        dx (compare x sx)  ;; -1, 0, or 1
+        dy (compare y sy)
+        ;; If same position, pick a random push direction
+        [dx dy] (if (and (zero? dx) (zero? dy))
+                  (rand-nth [[1 0] [-1 0] [0 1] [0 -1]])
+                  [dx dy])
+        occupied (disj (occupied-cells state) exclude-pos)]
+    (loop [cx x cy y moved 0]
+      (if (>= moved dist)
+        [cx cy moved]
+        (let [nx (+ cx dx) ny (+ cy dy)]
+          (if (and (walkable? state [nx ny])
+                   (not (contains? occupied [nx ny])))
+            (recur nx ny (inc moved))
+            ;; Blocked — try perpendicular slide
+            (let [perps (if (zero? dx) [[1 0] [-1 0]] [[0 1] [0 -1]])
+                  open? (fn [[pdx pdy]]
+                          (let [tx2 (+ cx pdx) ty2 (+ cy pdy)]
+                            (and (walkable? state [tx2 ty2])
+                                 (not (contains? occupied [tx2 ty2])))))
+                  slide (first (filter open? perps))]
+              (if (and slide (< moved 1))
+                [(+ cx (first slide)) (+ cy (second slide)) (inc moved)]
+                [cx cy moved]))))))))
+
+(defn apply-knockback-player
+  "Push a player away from [sx sy]. Clears their last-direction to prevent oscillation lock."
+  [state player-id sx sy dist]
+  (let [p (get-in state [:players player-id])
+        [nx ny moved] (knockback-dest state (:x p) (:y p) sx sy dist [(:x p) (:y p)])]
+    (if (pos? moved)
+      (-> state
+          (assoc-in [:players player-id :x] nx)
+          (assoc-in [:players player-id :y] ny)
+          (assoc-in [:players player-id :last-direction] nil)
+          (assoc-in [:players player-id :prev-direction] nil))
+      state)))
+
+(defn apply-knockback-enemy
+  "Push an enemy away from [sx sy]."
+  [state enemy-id sx sy dist]
+  (let [e (get-in state [:enemies enemy-id])]
+    (if e
+      (let [[nx ny _] (knockback-dest state (:x e) (:y e) sx sy dist [(:x e) (:y e)])]
+        (-> state
+            (assoc-in [:enemies enemy-id :x] nx)
+            (assoc-in [:enemies enemy-id :y] ny)))
+      state)))
+
 (defn manhattan-distance [[x1 y1] [x2 y2]]
   (+ (abs (- x1 x2)) (abs (- y1 y2))))
 
@@ -50,6 +155,20 @@
     [x y]))
 
 ;;; ---------------------------------------------------------------------------
+;;; Buff / Debuff helpers
+;;; ---------------------------------------------------------------------------
+
+(defn has-buff? [player buff-key]
+  (contains? (or (:buffs player) {}) buff-key))
+
+(defn has-debuff? [player debuff-key]
+  (contains? (or (:debuffs player) {}) debuff-key))
+
+;; Forward declarations for armory/crate functions defined later in file
+(declare expire-buffs-debuffs apply-buff-effects buy-item
+         pickup-crate maybe-spawn-crates find-nearest-open)
+
+;;; ---------------------------------------------------------------------------
 ;;; Visibility / Fog of War
 ;;; ---------------------------------------------------------------------------
 
@@ -57,7 +176,11 @@
   "Returns set of positions visible to a player (manhattan radius)."
   [game-state player-id]
   (let [player (get-in game-state [:players player-id])
-        radius (get-in game-state [:config :visibility-radius] 5)]
+        base-radius (get-in game-state [:config :visibility-radius] 5)
+        radius (cond
+                 (has-debuff? player :shrink-ray) 2
+                 (has-buff? player :vision-2x) (* 2 base-radius)
+                 :else base-radius)]
     (set (positions-in-radius [(:x player) (:y player)] radius (:map game-state)))))
 
 (defn player-view
@@ -88,15 +211,22 @@
                           {:shooter-id (:shooter-id shot)
                            :origin (:origin shot)
                            :direction (:direction shot)
-                           :path (vec (filter visible (:path shot)))})))]
+                           :path (vec (filter visible (:path shot)))})))
+        crates (->> (or (:crates game-state) {})
+                    (filter (fn [[_ c]] (visible [(:x c) (:y c)])))
+                    (map (fn [[_ c]]
+                           {:id (:id c) :x (:x c) :y (:y c)
+                            :tier (name (:tier c)) :cost (:cost c)})))]
     {:tick (:tick game-state)
      :you (-> me
-              (select-keys [:x :y :hp :score :passenger :ammo :grenades :alive?])
+              (select-keys [:x :y :hp :score :passenger :ammo :grenades :alive?
+                            :points :items :buffs :debuffs])
               (assoc :id player-id))
      :visible {:players (vec others)
                :enemies (vec enemies)
                :passengers (vec passengers)
-               :shots (vec shots)}
+               :shots (vec shots)
+               :crates (vec crates)}
      :map {:width (get-in game-state [:map :width])
            :height (get-in game-state [:map :height])}}))
 
@@ -153,6 +283,8 @@
 ;;; Actions
 ;;; ---------------------------------------------------------------------------
 
+(declare pickup-crate maybe-spawn-crates expire-buffs-debuffs)
+
 (defmulti apply-action
   "Apply a single player action. Returns updated game-state."
   (fn [_state _player-id action] (:type action)))
@@ -164,6 +296,15 @@
   [state player-id {:keys [direction]}]
   (let [player (get-in state [:players player-id])
         dir-kw (keyword direction)
+        ;; Apply debuff modifications to direction
+        dir-kw (cond
+                 ;; Drunk controls: 30% chance of random direction
+                 (and (has-debuff? player :drunk-controls) (< (rand) 0.3))
+                 (rand-nth [:north :south :east :west])
+                 ;; Reverse controls: invert direction
+                 (has-debuff? player :reverse-controls)
+                 (get opposite-dir dir-kw dir-kw)
+                 :else dir-kw)
         [dx dy] (get directions dir-kw [0 0])
         new-pos [(+ (:x player) dx) (+ (:y player) dy)]
         ;; Block rapid oscillation: only reject reversal if last TWO moves
@@ -190,22 +331,31 @@
   [state player-id _action]
   (let [player (get-in state [:players player-id])
         px (:x player) py (:y player)]
-    (if (or (not (:alive? player)) (:passenger player))
+    (if (not (:alive? player))
       state
-      ;; Find first passenger at player's location
-      (let [idx (first (keep-indexed
-                        (fn [i p]
-                          (when (and (nil? (:picked-up-by p))
-                                     (= (:x p) px) (= (:y p) py))
-                            i))
-                        (:passengers state)))]
-        (if idx
-          (let [pax (get-in state [:passengers idx])]
-            (-> state
-                (assoc-in [:passengers idx :picked-up-by] player-id)
-                (assoc-in [:players player-id :passenger]
-                          {:id (:id pax) :dest (:dest pax)})))
-          state)))))
+      ;; Try picking up a crate first
+      (let [crate-entry (first (filter (fn [[_ c]] (and (= (:x c) px) (= (:y c) py)))
+                                       (or (:crates state) {})))]
+        (if crate-entry
+          ;; Crate found — attempt pickup (checks cost)
+          (let [[new-state _result] (pickup-crate state player-id)]
+            new-state)
+          ;; No crate — try passenger pickup
+          (if (:passenger player)
+            state
+            (let [idx (first (keep-indexed
+                              (fn [i p]
+                                (when (and (nil? (:picked-up-by p))
+                                           (= (:x p) px) (= (:y p) py))
+                                  i))
+                              (:passengers state)))]
+              (if idx
+                (let [pax (get-in state [:passengers idx])]
+                  (-> state
+                      (assoc-in [:passengers idx :picked-up-by] player-id)
+                      (assoc-in [:players player-id :passenger]
+                                {:id (:id pax) :dest (:dest pax)})))
+                state))))))))
 
 (defmethod apply-action :dropoff
   [state player-id _action]
@@ -232,7 +382,8 @@
         enemies (or (:enemies state) {})]
     (if (or (not (:alive? player))
             (< (:ammo player) 1)
-            (= [dx dy] [0 0]))
+            (= [dx dy] [0 0])
+            (has-debuff? player :pacifist))
       state
       (let [;; Build lookup of enemy positions
             enemy-at (into {} (for [[eid e] enemies] [[(:x e) (:y e)] eid]))
@@ -283,42 +434,61 @@
             state (-> state
                       (update-in [:players player-id :ammo] dec)
                       (update :recent-shots conj shot))]
-        (cond
-          ;; Hit a player
-          hit-id
-          (let [new-hp (- (get-in state [:players hit-id :hp]) damage)]
-            (if (<= new-hp 0)
-              (-> state
-                  (assoc-in [:players hit-id :hp] 0)
-                  (assoc-in [:players hit-id :alive?] false)
-                  (assoc-in [:players hit-id :respawn-at]
-                            (+ (:tick state) (get-in state [:config :respawn-ticks] 10)))
-                  (cond-> (get-in state [:players hit-id :passenger])
-                    (update :passengers
-                            (fn [ps]
-                              (mapv #(if (= (:id %) (get-in state [:players hit-id :passenger :id]))
-                                       (assoc % :picked-up-by nil
-                                              :x (get-in state [:players hit-id :x])
-                                              :y (get-in state [:players hit-id :y]))
-                                       %)
-                                    ps))))
-                  (assoc-in [:players hit-id :passenger] nil)
-                  (update-in [:players player-id :score] + kill-bonus))
-              (assoc-in state [:players hit-id :hp] new-hp)))
+        (let [shooter-x (:x player) shooter-y (:y player)]
+          (cond
+            ;; Hit a player — damage + KNOCKBACK
+            hit-id
+            (let [;; Apply damage modifiers from buffs/debuffs
+                  effective-damage (cond-> damage
+                                    (has-buff? player :damage-2x) (* 2)
+                                    (has-debuff? player :glass-cannon) (* 3))
+                  ;; Target damage reduction
+                  target (get-in state [:players hit-id])
+                  effective-damage (cond-> effective-damage
+                                    (has-buff? target :damage-halved) (quot 2)
+                                    (has-debuff? target :glass-cannon) (* 3))
+                  new-hp (- (get-in state [:players hit-id :hp]) effective-damage)]
+              (if (<= new-hp 0)
+                (-> state
+                    (assoc-in [:players hit-id :hp] 0)
+                    (assoc-in [:players hit-id :alive?] false)
+                    (assoc-in [:players hit-id :respawn-at]
+                              (+ (:tick state) (get-in state [:config :respawn-ticks] 10)))
+                    (cond-> (get-in state [:players hit-id :passenger])
+                      (update :passengers
+                              (fn [ps]
+                                (mapv #(if (= (:id %) (get-in state [:players hit-id :passenger :id]))
+                                         (assoc % :picked-up-by nil
+                                                :x (get-in state [:players hit-id :x])
+                                                :y (get-in state [:players hit-id :y]))
+                                         %)
+                                      ps))))
+                    (assoc-in [:players hit-id :passenger] nil)
+                    (update-in [:players player-id :score] + kill-bonus))
+                ;; Alive hit — damage + knockback 2 cells away from shooter
+                (-> state
+                    (assoc-in [:players hit-id :hp] new-hp)
+                    (apply-knockback-player hit-id shooter-x shooter-y 2)
+                    ;; Lifesteal: heal shooter 15 HP per hit
+                    (cond-> (has-buff? player :lifesteal)
+                      (update-in [:players player-id :hp]
+                                 #(min (+ % 15) START-HP))))))
 
-          ;; Hit an enemy
-          hit-enemy-id
-          (let [enemy (get-in state [:enemies hit-enemy-id])
-                new-hp (- (:hp enemy) damage)]
-            (if (<= new-hp 0)
-              ;; Kill enemy — remove it, award score
-              (-> state
-                  (update :enemies dissoc hit-enemy-id)
-                  (update-in [:players player-id :score] + (:score enemy 10)))
-              ;; Damage enemy
-              (assoc-in state [:enemies hit-enemy-id :hp] new-hp)))
+            ;; Hit an enemy — damage + KNOCKBACK
+            hit-enemy-id
+            (let [enemy (get-in state [:enemies hit-enemy-id])
+                  new-hp (- (:hp enemy) damage)]
+              (if (<= new-hp 0)
+                ;; Kill enemy — remove it, award score
+                (-> state
+                    (update :enemies dissoc hit-enemy-id)
+                    (update-in [:players player-id :score] + (:score enemy 10)))
+                ;; Alive hit — damage + knockback 3 cells
+                (-> state
+                    (assoc-in [:enemies hit-enemy-id :hp] new-hp)
+                    (apply-knockback-enemy hit-enemy-id shooter-x shooter-y 3))))
 
-          :else state)))))
+            :else state))))))
 
 (defmethod apply-action :default
   [state _player-id _action]
@@ -681,17 +851,21 @@
        state (or (:enemies state) {})))))
 
 (defn enemy-player-collisions
-  "Enemies adjacent to a player (manhattan distance 1) deal damage.
-   No two entities share a cell, so adjacency is the attack range."
+  "Enemies adjacent to a player (manhattan distance 1) deal damage + knockback.
+   TMNT arcade style — getting hit flings you away."
   [state]
   (let [alive-players (vec (for [[id p] (:players state) :when (:alive? p)]
                              [id (:x p) (:y p)]))]
     (reduce-kv
      (fn [s eid enemy]
        (let [ex (:x enemy) ey (:y enemy)
-             ;; Find any adjacent player
-             adjacent (first (filter (fn [[_id px py]]
-                                       (= 1 (manhattan-distance [ex ey] [px py])))
+             ;; Find any adjacent player (use current positions from state s)
+             adjacent (first (filter (fn [[pid _ _]]
+                                       (let [p (get-in s [:players pid])]
+                                         (and (:alive? p)
+                                              (= 1 (manhattan-distance
+                                                     [ex ey]
+                                                     [(:x p) (:y p)])))))
                                      alive-players))]
          (if adjacent
            (let [[pid _ _] adjacent
@@ -702,7 +876,10 @@
                  (cond-> (zero? new-hp)
                    (-> (assoc-in [:players pid :alive?] false)
                        (assoc-in [:players pid :respawn-at]
-                                 (+ (:tick state) (get-in state [:config :respawn-ticks] 10)))))))
+                                 (+ (:tick state) (get-in state [:config :respawn-ticks] 10)))))
+                 ;; KNOCKBACK — push player 1 cell away from the enemy
+                 (cond-> (pos? new-hp)
+                   (apply-knockback-player pid ex ey 1))))
            s)))
      state (or (:enemies state) {}))))
 
@@ -747,11 +924,207 @@
       (battle-royale-shrink)
       (maybe-lightning-strike)
       (expire-crater-fires)
+      ;; Loot crate system
+      (maybe-spawn-crates)
+      (expire-buffs-debuffs)
       (update :tick inc)))
 
 ;;; ---------------------------------------------------------------------------
 ;;; Initial State
 ;;; ---------------------------------------------------------------------------
+
+;;; ---------------------------------------------------------------------------
+;;; Armory & Loot Crate Logic
+;;; ---------------------------------------------------------------------------
+
+(defn buy-item
+  "Attempt to buy an armory item. Returns [updated-state result-map].
+   Result has :success? and :reason."
+  [state player-id item-key]
+  (let [player (get-in state [:players player-id])
+        item (get armory-items item-key)]
+    (cond
+      (nil? player)
+      [state {:success? false :reason "Player not found"}]
+
+      (nil? item)
+      [state {:success? false :reason "Item not found"}]
+
+      (< (:points player 0) (:cost item))
+      [state {:success? false :reason "Not enough points"
+              :have (:points player 0) :need (:cost item)}]
+
+      (>= (count (:items player [])) 3)
+      [state {:success? false :reason "Inventory full (max 3 items)"}]
+
+      (some #{item-key} (:items player []))
+      [state {:success? false :reason "Already own this item"}]
+
+      :else
+      (let [new-state (-> state
+                          (update-in [:players player-id :points] - (:cost item))
+                          (update-in [:players player-id :items] (fnil conj []) item-key)
+                          ;; Apply instant effects
+                          (cond->
+                            (= (:effect item) :bonus-hp)
+                            (update-in [:players player-id :hp] + 300)
+
+                            (= (:effect item) :damage-2x)
+                            (assoc-in [:players player-id :buffs :damage-2x] {:permanent true})
+
+                            (= (:effect item) :damage-halved)
+                            (assoc-in [:players player-id :buffs :damage-halved] {:permanent true})
+
+                            (= (:effect item) :vision-2x)
+                            (assoc-in [:players player-id :buffs :vision-2x] {:permanent true})
+
+                            (= (:effect item) :lifesteal)
+                            (assoc-in [:players player-id :buffs :lifesteal] {:permanent true})
+
+                            (= (:effect item) :ammo-regen-2x)
+                            (assoc-in [:players player-id :buffs :ammo-regen-2x] {:permanent true})
+
+                            (and (:duration item) (:effect item))
+                            (assoc-in [:players player-id :buffs (:effect item)]
+                                      {:expires-at (+ (:tick state) (:duration item))})))]
+        [new-state {:success? true :item item-key :cost (:cost item)
+                    :remaining (:points (get-in new-state [:players player-id]))}]))))
+
+(defn spawn-crate
+  "Spawn a loot crate at a random open cell."
+  [state tier]
+  (let [{:keys [width height walls]} (:map state)
+        occupied (occupied-cells state)
+        crate-cells (set (map (fn [c] [(:x c) (:y c)]) (vals (or (:crates state) {}))))
+        open-cells (vec (for [x (range 1 (dec width))
+                              y (range 1 (dec height))
+                              :when (and (not (contains? walls [x y]))
+                                         (not (contains? occupied [x y]))
+                                         (not (contains? crate-cells [x y])))]
+                          [x y]))]
+    (if (empty? open-cells)
+      state
+      (let [pos (nth open-cells (rand-int (count open-cells)))
+            tier-info (get crate-loot-table tier)
+            [min-cost max-cost] (:cost-range tier-info)
+            cost (+ min-cost (rand-int (max 1 (inc (- max-cost min-cost)))))
+            id (str "crate-" (:tick state) "-" (rand-int 9999))
+            ;; Determine contents (hidden until pickup)
+            contents (case tier
+                       :gold   (rand-nth (:items tier-info))
+                       :silver (rand-nth (:items tier-info))
+                       :purple (if (< (rand) 0.6)
+                                 {:type :buff  :item (rand-nth (:buffs tier-info))}
+                                 {:type :debuff :item (rand-nth (:debuffs tier-info))}))]
+        (assoc-in state [:crates id]
+                  {:id id :x (first pos) :y (second pos)
+                   :tier tier :cost cost :contents contents
+                   :spawned-at (:tick state)})))))
+
+(defn maybe-spawn-crates
+  "Spawn crates during gameplay to maintain desired counts."
+  [state]
+  (let [crates (vals (or (:crates state) {}))
+        gold-count (count (filter #(= :gold (:tier %)) crates))
+        silver-count (count (filter #(= :silver (:tier %)) crates))
+        purple-count (count (filter #(= :purple (:tier %)) crates))
+        tick (:tick state)
+        ;; Only spawn every 30 ticks to avoid flooding
+        spawn-interval 30]
+    (if (not (zero? (mod tick spawn-interval)))
+      state
+      (-> state
+          (cond->
+            (< gold-count 1)   (spawn-crate :gold)
+            (< silver-count 2) (spawn-crate :silver)
+            (< purple-count 2) (spawn-crate :purple))))))
+
+(defn pickup-crate
+  "Player picks up a crate at their position. Returns [state result]."
+  [state player-id]
+  (let [player (get-in state [:players player-id])
+        px (:x player) py (:y player)
+        crate-entry (first (filter (fn [[_ c]] (and (= (:x c) px) (= (:y c) py)))
+                                   (or (:crates state) {})))]
+    (if-not crate-entry
+      [state {:success? false :reason "No crate here"}]
+      (let [[crate-id crate] crate-entry
+            cost (:cost crate)]
+        (if (< (:points player 0) cost)
+          [state {:success? false :reason "Not enough points"
+                  :have (:points player 0) :need cost}]
+          (let [contents (:contents crate)
+                ;; Resolve what the player gets
+                [buff-key is-debuff?]
+                (cond
+                  ;; Gold/silver: contents is just an item keyword
+                  (keyword? contents)
+                  [contents false]
+                  ;; Purple: contents is {:type :buff/:debuff :item keyword}
+                  (= :buff (:type contents))
+                  [(:item contents) false]
+                  :else
+                  [(:item contents) true])
+
+                ;; Apply effect
+                state (-> state
+                          (update-in [:players player-id :points] - cost)
+                          (update :crates dissoc crate-id))
+
+                state (if is-debuff?
+                        ;; Apply debuff
+                        (let [debuff (get debuff-definitions buff-key)
+                              expires (+ (:tick state) (:duration debuff 40))]
+                          (assoc-in state [:players player-id :debuffs buff-key]
+                                    {:expires-at expires}))
+                        ;; Apply buff (same as armory item or from silver extras)
+                        (let [item-def (get armory-items buff-key)
+                              duration (or (:duration item-def) nil)]
+                          (if duration
+                            (assoc-in state [:players player-id :buffs (or (:effect item-def) buff-key)]
+                                      {:expires-at (+ (:tick state) duration)})
+                            (assoc-in state [:players player-id :buffs (or (:effect item-def) buff-key)]
+                                      {:permanent true}))))]
+            [state {:success? true
+                    :crate-id crate-id
+                    :tier (:tier crate)
+                    :cost cost
+                    :item buff-key
+                    :is-debuff is-debuff?
+                    :item-name (if is-debuff?
+                                 (:name (get debuff-definitions buff-key))
+                                 (:name (get armory-items buff-key) (name buff-key)))}]))))))
+
+(defn expire-buffs-debuffs
+  "Remove timed buffs and debuffs that have expired."
+  [state]
+  (let [tick (:tick state)]
+    (reduce-kv
+     (fn [s id player]
+       (let [buffs (reduce-kv
+                    (fn [m k v]
+                      (if (and (:expires-at v) (>= tick (:expires-at v)))
+                        (dissoc m k)
+                        m))
+                    (or (:buffs player) {})
+                    (or (:buffs player) {}))
+             debuffs (reduce-kv
+                      (fn [m k v]
+                        (if (and (:expires-at v) (>= tick (:expires-at v)))
+                          (dissoc m k)
+                          m))
+                      (or (:debuffs player) {})
+                      (or (:debuffs player) {}))]
+         (-> s
+             (assoc-in [:players id :buffs] buffs)
+             (assoc-in [:players id :debuffs] debuffs))))
+     state (:players state))))
+
+(defn has-buff? [player buff-key]
+  (contains? (or (:buffs player) {}) buff-key))
+
+(defn has-debuff? [player debuff-key]
+  (contains? (or (:debuffs player) {}) debuff-key))
 
 (defn make-initial-state
   "Create a fresh game state with the given map."
@@ -761,6 +1134,7 @@
    :players {}
    :enemies {}
    :passengers []
+   :crates {}
    :recent-shots []
    :recent-effects []
    :crater-fires {}
@@ -784,5 +1158,9 @@
                     :ammo 5
                     :grenades 2
                     :alive? true
+                    :points START-POINTS
+                    :items []
+                    :buffs {}
+                    :debuffs {}
                     :token token}))
      {:id id :token token}]))

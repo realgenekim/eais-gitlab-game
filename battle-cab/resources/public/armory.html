@@ -1,0 +1,519 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>The Armory — Test View</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: 'Courier New', monospace;
+            background: #0a0a14;
+            color: #fff;
+            min-height: 100vh;
+        }
+        .container { max-width: 1400px; margin: 0 auto; padding: 20px; }
+
+        .header {
+            text-align: center;
+            padding: 30px 0 20px;
+            border-bottom: 2px solid #333;
+            margin-bottom: 30px;
+        }
+        .header h1 {
+            font-size: 48px;
+            color: #ff6b6b;
+            letter-spacing: 0.2em;
+            text-transform: uppercase;
+            text-shadow: 0 0 20px rgba(255,107,107,0.3);
+        }
+        .header .subtitle { color: #888; font-size: 16px; margin-top: 8px; }
+        .phase-badge {
+            display: inline-block;
+            padding: 4px 16px;
+            border-radius: 4px;
+            font-size: 14px;
+            font-weight: bold;
+            letter-spacing: 0.1em;
+            margin-top: 10px;
+        }
+        .phase-lobby { background: #333; color: #aaa; }
+        .phase-armory { background: rgba(255,215,0,0.2); color: #ffd700; border: 1px solid #ffd700; }
+        .phase-playing { background: rgba(78,205,196,0.2); color: #4ecdc4; border: 1px solid #4ecdc4; }
+
+        .main-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 30px; }
+
+        .panel {
+            background: rgba(20,20,35,0.9);
+            border: 1px solid #333;
+            border-radius: 8px;
+            padding: 20px;
+        }
+        .panel h2 {
+            font-size: 18px;
+            letter-spacing: 0.15em;
+            text-transform: uppercase;
+            margin-bottom: 16px;
+            padding-bottom: 8px;
+            border-bottom: 1px solid #333;
+        }
+        .panel h2.players-title { color: #4ecdc4; }
+        .panel h2.shop-title { color: #ffd700; }
+        .panel h2.log-title { color: #ff6b6b; }
+        .panel h2.controls-title { color: #c084fc; }
+
+        .player-card {
+            background: rgba(40,40,60,0.8);
+            border: 1px solid #444;
+            border-radius: 6px;
+            padding: 14px;
+            margin-bottom: 10px;
+            transition: all 0.3s;
+        }
+        .player-card.new-player {
+            animation: slideIn 0.5s ease-out;
+            border-color: #ffd700;
+            box-shadow: 0 0 15px rgba(255,215,0,0.3);
+        }
+        @keyframes slideIn {
+            from { opacity: 0; transform: translateX(-30px); }
+            to { opacity: 1; transform: translateX(0); }
+        }
+        .player-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 8px;
+        }
+        .player-name { font-size: 18px; font-weight: bold; color: #fff; }
+        .player-points { font-size: 20px; font-weight: bold; color: #ffd700; }
+        .points-bar {
+            height: 8px;
+            background: #222;
+            border-radius: 4px;
+            overflow: hidden;
+            margin-bottom: 8px;
+        }
+        .points-bar-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #ffd700, #ffaa00);
+            border-radius: 4px;
+            transition: width 0.5s ease;
+        }
+        .player-items { display: flex; gap: 6px; flex-wrap: wrap; min-height: 28px; }
+        .item-badge {
+            display: inline-block;
+            padding: 3px 8px;
+            border-radius: 3px;
+            font-size: 11px;
+            font-weight: bold;
+            letter-spacing: 0.05em;
+        }
+        .item-badge.weapon { background: rgba(255,68,0,0.2); color: #ff4400; border: 1px solid #ff4400; }
+        .item-badge.defense { background: rgba(0,150,255,0.2); color: #0096ff; border: 1px solid #0096ff; }
+        .item-badge.utility { background: rgba(0,255,136,0.2); color: #00ff88; border: 1px solid #00ff88; }
+
+        .player-buffs { display: flex; gap: 4px; flex-wrap: wrap; margin-top: 4px; }
+        .buff-icon {
+            font-size: 11px; padding: 2px 6px; border-radius: 3px;
+            background: rgba(78,205,196,0.15); color: #4ecdc4; border: 1px solid #4ecdc4;
+        }
+        .debuff-icon {
+            font-size: 11px; padding: 2px 6px; border-radius: 3px;
+            background: rgba(255,107,107,0.15); color: #ff6b6b; border: 1px solid #ff6b6b;
+        }
+
+        .shop-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px 14px;
+            margin-bottom: 6px;
+            background: rgba(40,40,60,0.6);
+            border: 1px solid #333;
+            border-radius: 4px;
+        }
+        .shop-item-name { font-weight: bold; font-size: 14px; }
+        .shop-item-desc { font-size: 11px; color: #888; margin-top: 2px; }
+        .shop-item-cost { font-size: 18px; font-weight: bold; color: #ffd700; white-space: nowrap; }
+
+        .event-log { max-height: 300px; overflow-y: auto; font-size: 13px; }
+        .event-log .event {
+            padding: 6px 0;
+            border-bottom: 1px solid #222;
+            animation: fadeIn 0.3s;
+        }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        .event .event-time { color: #666; margin-right: 8px; }
+        .event-buy { color: #ffd700; }
+        .event-join { color: #4ecdc4; }
+        .event-debuff { color: #ff6b6b; }
+
+        .controls-row { display: flex; gap: 10px; margin-bottom: 12px; flex-wrap: wrap; }
+        .btn {
+            font-family: 'Courier New', monospace;
+            font-size: 14px; font-weight: bold;
+            padding: 10px 20px;
+            border: 2px solid; border-radius: 6px;
+            cursor: pointer; transition: all 0.2s; letter-spacing: 0.05em;
+        }
+        .btn:hover { transform: translateY(-1px); }
+        .btn-primary { border-color: #4ecdc4; color: #4ecdc4; background: rgba(78,205,196,0.1); }
+        .btn-gold { border-color: #ffd700; color: #ffd700; background: rgba(255,215,0,0.1); }
+        .btn-danger { border-color: #ff6b6b; color: #ff6b6b; background: rgba(255,107,107,0.1); }
+        .btn-green { border-color: #00ff88; color: #00ff88; background: rgba(0,255,136,0.1); }
+
+        .no-players { text-align: center; color: #555; padding: 40px 20px; font-size: 16px; }
+
+        .announcement {
+            position: fixed; top: 0; left: 0; right: 0;
+            background: linear-gradient(90deg, #ffd700, #ff6b6b, #ffd700);
+            color: #000; text-align: center;
+            font-size: 24px; font-weight: bold;
+            padding: 12px; letter-spacing: 0.1em; z-index: 1000;
+            transform: translateY(-100%); transition: transform 0.4s ease;
+        }
+        .announcement.show { transform: translateY(0); }
+
+        .crate-list { display: flex; gap: 8px; flex-wrap: wrap; }
+        .crate-badge {
+            padding: 4px 10px; border-radius: 4px;
+            font-size: 12px; font-weight: bold;
+        }
+        .crate-badge.gold { background: rgba(255,215,0,0.2); color: #ffd700; border: 1px solid #ffd700; }
+        .crate-badge.silver { background: rgba(192,192,192,0.2); color: #c0c0c0; border: 1px solid #c0c0c0; }
+        .crate-badge.purple { background: rgba(200,0,255,0.2); color: #c084fc; border: 1px solid #c084fc; }
+
+        .bottom-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 30px; margin-top: 30px; }
+    </style>
+</head>
+<body>
+    <div class="announcement" id="announcement"></div>
+
+    <div class="container">
+        <div class="header">
+            <h1>The Armory</h1>
+            <div class="subtitle">Independent Test View &mdash; localhost:33333/armory</div>
+            <div class="phase-badge phase-lobby" id="phase-badge">LOBBY</div>
+        </div>
+
+        <div class="main-grid">
+            <div class="panel">
+                <h2 class="players-title">Contestants</h2>
+                <div id="players-list">
+                    <div class="no-players">Waiting for players to join via SDK...</div>
+                </div>
+            </div>
+
+            <div class="panel">
+                <h2 class="shop-title">Shop Inventory</h2>
+                <div id="shop-list"></div>
+            </div>
+        </div>
+
+        <div class="bottom-grid">
+            <div class="panel">
+                <h2 class="log-title">Live Feed</h2>
+                <div class="event-log" id="event-log"></div>
+            </div>
+
+            <div class="panel">
+                <h2 class="controls-title">Controls</h2>
+                <div class="controls-row">
+                    <button class="btn btn-gold" onclick="openArmory()">Open Armory</button>
+                    <button class="btn btn-green" onclick="startGame()">Start Game</button>
+                    <button class="btn btn-danger" onclick="resetGame()">Reset</button>
+                </div>
+                <div class="controls-row">
+                    <button class="btn btn-primary" onclick="addBot()">+ Add Bot</button>
+                    <button class="btn btn-primary" onclick="addBots4()">+ 4 Bots</button>
+                </div>
+                <div style="margin-top: 16px;">
+                    <h3 style="color:#888; font-size:12px; margin-bottom:8px;">IN-GAME CRATES</h3>
+                    <div class="crate-list" id="crate-list"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const SERVER = 'http://localhost:33333';
+        let previousPlayers = {};
+        let eventLog = [];
+        let botCounter = 0;
+        const BOT_NAMES = ['Maverick', 'Phoenix', 'Goose', 'Viper',
+                           'Iceman', 'Merlin', 'Slider', 'Jester'];
+
+        const ITEM_TYPES = {
+            'plasma-rounds': 'weapon', 'titan-shield': 'defense',
+            'oracle-eye': 'utility', 'sprint-boots': 'utility',
+            'vampiric-rounds': 'weapon', 'juggernaut': 'defense',
+            'ammo-belt': 'utility', 'cluster-shot': 'weapon'
+        };
+
+        function escapeHtml(str) {
+            const div = document.createElement('div');
+            div.textContent = str;
+            return div.textContent;
+        }
+
+        function addEvent(type, text) {
+            const now = new Date();
+            const time = now.toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' });
+            eventLog.unshift({ type, text: escapeHtml(text), time });
+            if (eventLog.length > 50) eventLog.pop();
+            renderEventLog();
+        }
+
+        function renderEventLog() {
+            const el = document.getElementById('event-log');
+            // Build DOM safely
+            el.textContent = '';
+            for (const e of eventLog) {
+                const row = document.createElement('div');
+                row.className = 'event';
+                const timeSpan = document.createElement('span');
+                timeSpan.className = 'event-time';
+                timeSpan.textContent = e.time;
+                const textSpan = document.createElement('span');
+                textSpan.className = 'event-' + e.type;
+                textSpan.textContent = e.text;
+                row.appendChild(timeSpan);
+                row.appendChild(textSpan);
+                el.appendChild(row);
+            }
+        }
+
+        function showAnnouncement(text, duration) {
+            duration = duration || 3000;
+            const el = document.getElementById('announcement');
+            el.textContent = text;
+            el.classList.add('show');
+            setTimeout(function() { el.classList.remove('show'); }, duration);
+        }
+
+        function renderPlayers(players) {
+            const el = document.getElementById('players-list');
+            el.textContent = '';
+
+            if (!players || players.length === 0) {
+                const msg = document.createElement('div');
+                msg.className = 'no-players';
+                msg.textContent = 'Waiting for players to join via SDK...';
+                el.appendChild(msg);
+                return;
+            }
+
+            for (let i = 0; i < players.length; i++) {
+                const p = players[i];
+
+                // Detect new players
+                if (!previousPlayers[p.id]) {
+                    showAnnouncement('A NEW CHALLENGER HAS ENTERED: ' + p.name.toUpperCase() + '!');
+                    addEvent('join', p.name + ' joined the game!');
+                }
+
+                // Detect new item purchases
+                const prev = previousPlayers[p.id];
+                if (prev) {
+                    const prevItems = new Set(prev.items || []);
+                    for (const item of (p.items || [])) {
+                        if (!prevItems.has(item)) {
+                            addEvent('buy', p.name + ' bought ' + item.replace(/-/g, ' ').toUpperCase() + ' (' + p.points + ' pts left)');
+                        }
+                    }
+                    const prevDebuffs = new Set(Object.keys(prev.debuffs || {}));
+                    for (const d of Object.keys(p.debuffs || {})) {
+                        if (!prevDebuffs.has(d)) {
+                            addEvent('debuff', p.name + ' got CURSED with ' + d.replace(/-/g, ' ').toUpperCase() + '!');
+                        }
+                    }
+                }
+
+                const card = document.createElement('div');
+                card.className = 'player-card';
+
+                // Header row
+                const header = document.createElement('div');
+                header.className = 'player-header';
+                const nameEl = document.createElement('span');
+                nameEl.className = 'player-name';
+                nameEl.textContent = '#' + (i + 1) + ' ' + p.name;
+                const ptsEl = document.createElement('span');
+                ptsEl.className = 'player-points';
+                ptsEl.textContent = p.points + ' pts';
+                header.appendChild(nameEl);
+                header.appendChild(ptsEl);
+                card.appendChild(header);
+
+                // Points bar
+                const bar = document.createElement('div');
+                bar.className = 'points-bar';
+                const fill = document.createElement('div');
+                fill.className = 'points-bar-fill';
+                fill.style.width = Math.round((p.points / 30) * 100) + '%';
+                bar.appendChild(fill);
+                card.appendChild(bar);
+
+                // Items
+                const itemsDiv = document.createElement('div');
+                itemsDiv.className = 'player-items';
+                if (p.items && p.items.length > 0) {
+                    for (const item of p.items) {
+                        const badge = document.createElement('span');
+                        badge.className = 'item-badge ' + (ITEM_TYPES[item] || 'utility');
+                        badge.textContent = item.replace(/-/g, ' ');
+                        itemsDiv.appendChild(badge);
+                    }
+                } else {
+                    const empty = document.createElement('span');
+                    empty.style.cssText = 'color:#555;font-size:11px';
+                    empty.textContent = 'No items yet';
+                    itemsDiv.appendChild(empty);
+                }
+                card.appendChild(itemsDiv);
+
+                // Buffs & debuffs
+                const buffsDiv = document.createElement('div');
+                buffsDiv.className = 'player-buffs';
+                for (const b of Object.keys(p.buffs || {})) {
+                    const badge = document.createElement('span');
+                    badge.className = 'buff-icon';
+                    badge.textContent = b.replace(/-/g, ' ');
+                    buffsDiv.appendChild(badge);
+                }
+                for (const d of Object.keys(p.debuffs || {})) {
+                    const badge = document.createElement('span');
+                    badge.className = 'debuff-icon';
+                    badge.textContent = d.replace(/-/g, ' ');
+                    buffsDiv.appendChild(badge);
+                }
+                card.appendChild(buffsDiv);
+
+                el.appendChild(card);
+            }
+
+            // Update previous state
+            previousPlayers = {};
+            for (const p of players) previousPlayers[p.id] = p;
+        }
+
+        function renderShop(shop) {
+            const el = document.getElementById('shop-list');
+            if (!shop) return;
+            el.textContent = '';
+
+            const items = Object.entries(shop).sort(function(a, b) { return b[1].cost - a[1].cost; });
+            for (const [key, item] of items) {
+                const row = document.createElement('div');
+                row.className = 'shop-item';
+
+                const info = document.createElement('div');
+                const nameEl = document.createElement('div');
+                nameEl.className = 'shop-item-name';
+                nameEl.textContent = item.name;
+                const descEl = document.createElement('div');
+                descEl.className = 'shop-item-desc';
+                descEl.textContent = item.desc;
+                info.appendChild(nameEl);
+                info.appendChild(descEl);
+
+                const costEl = document.createElement('div');
+                costEl.className = 'shop-item-cost';
+                costEl.textContent = item.cost + ' pts';
+
+                row.appendChild(info);
+                row.appendChild(costEl);
+                el.appendChild(row);
+            }
+        }
+
+        function renderCrates(crates) {
+            const el = document.getElementById('crate-list');
+            el.textContent = '';
+            if (!crates || crates.length === 0) {
+                const msg = document.createElement('span');
+                msg.style.color = '#555';
+                msg.textContent = 'None spawned yet';
+                el.appendChild(msg);
+                return;
+            }
+            for (const c of crates) {
+                const badge = document.createElement('span');
+                badge.className = 'crate-badge ' + c.tier;
+                badge.textContent = c.tier.toUpperCase() + ' (' + c.cost + 'pts) @ ' + c.x + ',' + c.y;
+                el.appendChild(badge);
+            }
+        }
+
+        async function poll() {
+            try {
+                const resp = await fetch(SERVER + '/game/armory/state');
+                const data = await resp.json();
+
+                const badge = document.getElementById('phase-badge');
+                badge.textContent = data.phase.toUpperCase();
+                badge.className = 'phase-badge phase-' + data.phase;
+
+                renderPlayers(data.players);
+                renderShop(data.shop);
+                renderCrates(data.crates);
+            } catch (e) {
+                // Server down, keep polling
+            }
+        }
+
+        async function openArmory() {
+            try {
+                const resp = await fetch(SERVER + '/game/armory-open', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: '{}' });
+                const data = await resp.json();
+                addEvent('buy', 'Armory opened! ' + (data.players || 0) + ' players can now shop.');
+                showAnnouncement('THE ARMORY IS NOW OPEN!', 4000);
+            } catch(e) {
+                addEvent('debuff', 'Failed to open armory');
+            }
+        }
+
+        async function startGame() {
+            try {
+                await fetch(SERVER + '/game/start', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: '{}' });
+                addEvent('join', 'Game started! Battle begins!');
+                showAnnouncement('BATTLE BEGINS!', 4000);
+            } catch(e) {
+                addEvent('debuff', 'Failed to start');
+            }
+        }
+
+        async function resetGame() {
+            try {
+                await fetch(SERVER + '/game/restart', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: '{}' });
+                previousPlayers = {};
+                eventLog = [];
+                botCounter = 0;
+                addEvent('join', 'Game reset. Fresh lobby.');
+            } catch(e) {}
+        }
+
+        async function addBot() {
+            const name = BOT_NAMES[botCounter % BOT_NAMES.length];
+            botCounter++;
+            try {
+                await fetch(SERVER + '/game/add-bot', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ name: name })
+                });
+            } catch(e) {}
+        }
+
+        function addBots4() {
+            addBot(); addBot(); addBot(); addBot();
+        }
+
+        // Init
+        addEvent('join', 'Armory test view loaded. Waiting for action...');
+        setInterval(poll, 500);
+        poll();
+    </script>
+</body>
+</html>

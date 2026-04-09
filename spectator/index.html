@@ -231,7 +231,8 @@
     <div id="controls" style="display:none;">
         <div class="btn-row">
             <button onclick="addBot()">+ Add Bot</button>
-            <button onclick="resetGame()" class="danger">Reset Game</button>
+            <button onclick="openArmory()">Armory</button>
+            <button onclick="resetGame()" class="danger">Reset</button>
         </div>
     </div>
 
@@ -265,12 +266,15 @@
                 const state = e.detail;
                 const phase = state.phase || 'playing';
 
-                if (phase === 'lobby') {
-                    currentPhase = 'lobby';
+                if (phase === 'lobby' || phase === 'armory') {
+                    currentPhase = phase;
                     document.getElementById('lobby-overlay').classList.add('active');
-                    updateLobbyRoster(state.players || []);
-                } else if (currentPhase === 'lobby' && phase === 'playing') {
-                    // Transition from lobby to playing
+                    document.getElementById('lobby-title').textContent =
+                        phase === 'armory' ? 'The Armory' : 'Cab Battle';
+                    document.getElementById('lobby-subtitle').textContent =
+                        phase === 'armory' ? 'Buy your loadout!' : 'Waiting for players to join...';
+                    updateLobbyRoster(state.players || [], phase);
+                } else if ((currentPhase === 'lobby' || currentPhase === 'armory') && phase === 'playing') {
                     currentPhase = 'playing';
                     document.getElementById('lobby-overlay').classList.remove('active');
                 }
@@ -293,22 +297,42 @@
         function updateScoreboard(players) {
             const el = document.getElementById('sb-players');
             if (!el || !players) return;
-            // Sort by score descending
             const sorted = [...players].sort((a,b) => b.score - a.score);
-            el.innerHTML = sorted.map(p => `
-                <div class="sb-player ${p.alive ? '' : 'sb-dead'}">
-                    <div>
-                        <div class="sb-name">${p.name}</div>
-                        <div class="sb-stats">
-                            Ammo: ${p.ammo || '?'} | HP: ${p.alive ? p.hp : 0}
-                        </div>
-                    </div>
-                    <div>
-                        <div class="sb-score">${p.score} pts</div>
-                        <div class="sb-hp">${p.alive ? p.hp + ' HP' : 'DEAD'}</div>
-                    </div>
-                </div>
-            `).join('');
+            el.textContent = '';
+            sorted.forEach(p => {
+                const row = document.createElement('div');
+                row.className = 'sb-player' + (p.alive ? '' : ' sb-dead');
+
+                const left = document.createElement('div');
+                const nameEl = document.createElement('div');
+                nameEl.className = 'sb-name';
+                nameEl.textContent = p.name;
+                const statsEl = document.createElement('div');
+                statsEl.className = 'sb-stats';
+                const items = p.items || [];
+                const buffs = Object.keys(p.buffs || {});
+                const debuffs = Object.keys(p.debuffs || {});
+                let statsText = 'Ammo:' + (p.ammo || '?') + ' HP:' + (p.alive ? p.hp : 0);
+                if (items.length > 0) statsText += ' | ' + items.length + ' items';
+                if (debuffs.length > 0) statsText += ' | CURSED';
+                statsEl.textContent = statsText;
+                left.appendChild(nameEl);
+                left.appendChild(statsEl);
+
+                const right = document.createElement('div');
+                const scoreEl = document.createElement('div');
+                scoreEl.className = 'sb-score';
+                scoreEl.textContent = p.score + ' pts';
+                const hpEl = document.createElement('div');
+                hpEl.className = 'sb-hp';
+                hpEl.textContent = p.alive ? (p.points || 0) + ' gold' : 'DEAD';
+                right.appendChild(scoreEl);
+                right.appendChild(hpEl);
+
+                row.appendChild(left);
+                row.appendChild(right);
+                el.appendChild(row);
+            });
         }
 
         async function addBot() {
@@ -332,6 +356,20 @@
             }
         }
 
+        async function openArmory() {
+            try {
+                await fetch(SERVER + '/game/armory-open', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({})
+                });
+            } catch(e) {
+                const el = document.getElementById('status-bar');
+                el.textContent = 'Error: ' + e.message;
+                el.className = 'status error';
+            }
+        }
+
         async function resetGame() {
             try {
                 await fetch(SERVER + '/game/restart', {
@@ -348,7 +386,7 @@
             }
         }
 
-        function updateLobbyRoster(players) {
+        function updateLobbyRoster(players, phase) {
             const el = document.getElementById('lobby-players');
             const btn = document.getElementById('start-game-btn');
             if (!players || players.length === 0) {
@@ -361,6 +399,7 @@
                 return;
             }
             btn.disabled = false;
+            btn.textContent = phase === 'armory' ? 'Start Battle' : 'Start Game';
             el.textContent = '';
             players.forEach((p, i) => {
                 const row = document.createElement('div');
@@ -376,15 +415,24 @@
 
                 const status = document.createElement('div');
                 status.className = 'lobby-player-status';
-                status.textContent = 'READY';
+                if (phase === 'armory') {
+                    const pts = p.points !== undefined ? p.points : 30;
+                    const items = p.items || [];
+                    status.textContent = pts + ' pts | ' + items.length + ' items';
+                    status.style.color = pts < 10 ? '#ff6b6b' : '#ffd700';
+                } else {
+                    status.textContent = 'READY';
+                }
 
                 row.appendChild(num);
                 row.appendChild(name);
                 row.appendChild(status);
                 el.appendChild(row);
             });
-            document.getElementById('lobby-subtitle').textContent =
-                players.length + ' player' + (players.length !== 1 ? 's' : '') + ' in lobby';
+            if (phase !== 'armory') {
+                document.getElementById('lobby-subtitle').textContent =
+                    players.length + ' player' + (players.length !== 1 ? 's' : '') + ' in lobby';
+            }
         }
 
         async function startGame() {

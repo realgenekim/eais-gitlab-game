@@ -59,7 +59,13 @@
                              :alive (:alive? p)
                              :score (:score p)
                              :has-passenger (some? (:passenger p))
-                             :ammo (:ammo p)}))
+                             :ammo (:ammo p)
+                             :points (:points p 0)
+                             :items (vec (map name (or (:items p) [])))
+                             :buffs (into {} (map (fn [[k v]] [(name k) v])
+                                                  (or (:buffs p) {})))
+                             :debuffs (into {} (map (fn [[k v]] [(name k) v])
+                                                    (or (:debuffs p) {})))}))
                      vec)
         enemies (->> (or (:enemies game-state) {})
                      (map (fn [[id e]]
@@ -75,7 +81,12 @@
                         (map #(select-keys % [:id :x :y :dest]))
                         vec)
         shrink-warning (vec (or (:shrink-warning game-state) #{}))
-        walls (vec (get-in game-state [:map :walls]))]
+        walls (vec (get-in game-state [:map :walls]))
+        crates (->> (or (:crates game-state) {})
+                    (map (fn [[_ c]]
+                           {:id (:id c) :x (:x c) :y (:y c)
+                            :tier (name (:tier c)) :cost (:cost c)}))
+                    vec)]
     (json/write-str
      {:type "state"
       :phase (name (engine/get-phase))
@@ -83,6 +94,7 @@
       :players players
       :enemies enemies
       :passengers passengers
+      :crates crates
       :map {:width (get-in game-state [:map :width])
             :height (get-in game-state [:map :height])
             :walls walls}

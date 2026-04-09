@@ -13,6 +13,10 @@ interface ServerPlayer {
     alive: boolean;
     score: number;
     ammo: number;
+    points: number;
+    items: string[];
+    buffs: Record<string, any>;
+    debuffs: Record<string, any>;
 }
 
 interface ServerEnemy {
@@ -23,11 +27,21 @@ interface ServerEnemy {
     type: string;
 }
 
+interface ServerCrate {
+    id: string;
+    x: number;
+    y: number;
+    tier: string;
+    cost: number;
+}
+
 interface ServerState {
     type: string;
+    phase: string;
     tick: number;
     players: ServerPlayer[];
     enemies: ServerEnemy[];
+    crates?: ServerCrate[];
     map: { width: number; height: number; walls?: number[][] };
     'shrink-warning'?: number[][];
 }
@@ -67,6 +81,9 @@ export class ServerGame extends Phaser.Scene {
     arenaOffsetX    : number = 0;  // pixel offset to center arena with crowd padding
     arenaOffsetY    : number = 0;
     crowdPadding    : number = 160; // pixels reserved for crowd on each side
+
+    crateSprites    : Map<string, Phaser.GameObjects.Graphics> = new Map();
+    crateLabels     : Map<string, Phaser.GameObjects.Text> = new Map();
 
     frameMode       : boolean = false;
     currentFrame    : number = 0;
@@ -234,8 +251,77 @@ export class ServerGame extends Phaser.Scene {
         this.updatePlayers(state);
         this.detectWave(state);
         this.updateEnemies(state);
+        this.renderCrates(state);
         this.renderShots(state);
         this.renderShrinkWarning(state);
+    }
+
+    renderCrates(state: ServerState): void {
+        const crates = state.crates || [];
+        const crateIds = new Set(crates.map(c => c.id));
+
+        // Remove sprites for crates that no longer exist
+        for (const [id, gfx] of this.crateSprites) {
+            if (!crateIds.has(id)) {
+                gfx.destroy();
+                this.crateSprites.delete(id);
+                const label = this.crateLabels.get(id);
+                if (label) { label.destroy(); this.crateLabels.delete(id); }
+            }
+        }
+
+        for (const crate of crates) {
+            const [px, py] = this.gridToPixel(crate.x, crate.y);
+            const size = this.tileSize * 0.4;
+
+            if (!this.crateSprites.has(crate.id)) {
+                // Create new crate visual
+                const gfx = this.add.graphics();
+                const color = crate.tier === 'gold' ? 0xffd700
+                            : crate.tier === 'silver' ? 0xc0c0c0
+                            : 0xc084fc;
+                gfx.fillStyle(color, 0.8);
+                gfx.fillRoundedRect(-size/2, -size/2, size, size, 4);
+                gfx.lineStyle(2, 0xffffff, 0.5);
+                gfx.strokeRoundedRect(-size/2, -size/2, size, size, 4);
+                gfx.setPosition(px, py);
+                gfx.setDepth(12);
+                this.crateSprites.set(crate.id, gfx);
+
+                // Cost label
+                const label = this.add.text(px, py + size/2 + 4, crate.cost + 'pt', {
+                    fontSize: '10px', color: '#fff', fontFamily: 'monospace',
+                    stroke: '#000', strokeThickness: 2
+                }).setOrigin(0.5, 0).setDepth(13);
+                this.crateLabels.set(crate.id, label);
+
+                // Spawn animation: scale bounce
+                gfx.setScale(0);
+                this.tweens.add({
+                    targets: gfx,
+                    scaleX: 1, scaleY: 1,
+                    duration: 300,
+                    ease: 'Back.easeOut'
+                });
+
+                // Gold crates get a glow pulse
+                if (crate.tier === 'gold') {
+                    this.tweens.add({
+                        targets: gfx,
+                        alpha: { from: 1, to: 0.6 },
+                        duration: 600,
+                        yoyo: true,
+                        repeat: -1
+                    });
+                }
+            } else {
+                // Update position if needed
+                const gfx = this.crateSprites.get(crate.id)!;
+                gfx.setPosition(px, py);
+                const label = this.crateLabels.get(crate.id);
+                if (label) label.setPosition(px, py + size/2 + 4);
+            }
+        }
     }
 
     renderShots(state: ServerState): void {

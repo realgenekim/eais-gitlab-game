@@ -101,6 +101,8 @@
 
 (defn- sys [] @engine/system)
 
+(defonce commentary-text (atom {:text "" :timestamp 0}))
+
 (defn authenticate [request]
   (let [token (or (get-in request [:headers "authorization"])
                   (get-in request [:query-params "token"])
@@ -116,9 +118,14 @@
   (let [body (:body request)
         player-name (get body "name" "anonymous")]
     (if-let [creds (engine/add-player! (sys) player-name)]
-      (json-response 200 {:player-id (:id creds)
-                          :token (:token creds)
-                          :message (str "Welcome, " player-name "!")})
+      (do
+        ;; Announce new challenger via commentary system
+        (reset! commentary-text
+                {:text (str "A NEW CHALLENGER HAS ENTERED: " (str/upper-case player-name) "!")
+                 :timestamp (System/currentTimeMillis)})
+        (json-response 200 {:player-id (:id creds)
+                            :token (:token creds)
+                            :message (str "Welcome, " player-name "!")}))
       (json-response 400 {:error "Game is full"}))))
 
 (defn handle-state [request]
@@ -262,9 +269,54 @@
   (if-let [result (engine/begin-game!)]
     (json-response 200 {:status "started"
                         :players (:players result)})
+    (json-response 400 {:error "Game is not in lobby or armory phase"})))
+
+(defn handle-armory-open [_request]
+  (if-let [result (engine/begin-armory!)]
+    (json-response 200 {:status "armory-opened"
+                        :players (:players result)})
     (json-response 400 {:error "Game is not in lobby phase"})))
 
-(defonce commentary-text (atom {:text "" :timestamp 0}))
+(defn handle-armory-get [request]
+  (if-let [player-id (authenticate request)]
+    (let [state (engine/get-state)
+          player (get-in state [:players player-id])
+          phase (name (engine/get-phase))]
+      (json-response 200
+                     {:phase phase
+                      :items (into {}
+                                   (map (fn [[k v]]
+                                          [(name k) (-> v
+                                                        (dissoc :effect)
+                                                        (assoc :id (name k)))]))
+                                   game.core/armory-items)
+                      :your-points (:points player 0)
+                      :your-items (vec (map name (or (:items player) [])))
+                      :your-buffs (or (:buffs player) {})
+                      :your-debuffs (or (:debuffs player) {})}))
+    (json-response 401 {:error "Invalid token"})))
+
+(defn handle-buy [request]
+  (if-let [player-id (authenticate request)]
+    (let [body (:body request)
+          item-key (keyword (get body "item"))]
+      (let [result (engine/buy-armory-item! player-id item-key)]
+        (if (:success? result)
+          (json-response 200 result)
+          (json-response 400 result))))
+    (json-response 401 {:error "Invalid token"})))
+
+(defn handle-loadout [request]
+  (if-let [player-id (authenticate request)]
+    (let [state (engine/get-state)
+          player (get-in state [:players player-id])]
+      (json-response 200
+                     {:points (:points player 0)
+                      :items (vec (map name (or (:items player) [])))
+                      :buffs (or (:buffs player) {})
+                      :debuffs (or (:debuffs player) {})
+                      :hp (:hp player)}))
+    (json-response 401 {:error "Invalid token"})))
 
 (defn handle-commentary-post [request]
   (let [body (:body request)
@@ -285,6 +337,39 @@
     {:status 200
      :headers {"Content-Type" "text/html"}
      :body (sprite-viewer/sprite-viewer-page selected frame-str)}))
+
+(defn handle-armory-page [_request]
+  {:status 200
+   :headers {"Content-Type" "text/html"}
+   :body (slurp (clojure.java.io/resource "public/armory.html"))})
+
+(defn handle-armory-state [_request]
+  "Full armory state for the spectator/test view (no auth needed)."
+  (let [state (engine/get-state)
+        phase (name (engine/get-phase))
+        players (->> (:players state)
+                     (map (fn [[id p]]
+                            {:id id
+                             :name (:name p)
+                             :points (:points p 0)
+                             :items (vec (map name (or (:items p) [])))
+                             :buffs (or (:buffs p) {})
+                             :debuffs (or (:debuffs p) {})
+                             :hp (:hp p)
+                             :alive (:alive? p)}))
+                     vec)]
+    (json-response 200
+                   {:phase phase
+                    :tick (:tick state)
+                    :players players
+                    :shop (into {}
+                                (map (fn [[k v]]
+                                       [(name k) (assoc v :id (name k))]))
+                                game.core/armory-items)
+                    :crates (vec (map (fn [[_ c]]
+                                        {:id (:id c) :x (:x c) :y (:y c)
+                                         :tier (name (:tier c)) :cost (:cost c)})
+                                      (or (:crates state) {})))})))
 
 (defn handle-server-stats [_request]
   (let [state (engine/get-state)
@@ -342,6 +427,12 @@
          ["/game/map-swap" {:post {:handler #'handle-map-swap}}]
          ["/game/lightning" {:post {:handler #'handle-lightning}}]
          ["/game/start" {:post {:handler #'handle-start}}]
+         ["/game/armory-open" {:post {:handler #'handle-armory-open}}]
+         ["/game/armory" {:get {:handler #'handle-armory-get}}]
+         ["/game/armory/state" {:get {:handler #'handle-armory-state}}]
+         ["/game/buy" {:post {:handler #'handle-buy}}]
+         ["/game/loadout" {:get {:handler #'handle-loadout}}]
+         ["/armory" {:get {:handler #'handle-armory-page}}]
          ["/game/commentary" {:get {:handler #'handle-commentary-get}
                               :post {:handler #'handle-commentary-post}}]
          ["/game/seek" {:post {:handler #'handle-seek}}]

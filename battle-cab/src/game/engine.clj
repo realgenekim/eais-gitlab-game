@@ -85,8 +85,8 @@
                               :player-id (:id creds)
                               :name player-name
                               :tick (:tick new-state)}])
-        ;; In lobby mode, push state to spectators so they see the roster update
-        (when (= :lobby @(:phase sys))
+        ;; In lobby/armory mode, push state to spectators so they see the roster update
+        (when (#{:lobby :armory} @(:phase sys))
           (when-let [on-tick (:on-tick sys)]
             (if (var? on-tick)
               (@on-tick sys new-state)
@@ -241,11 +241,28 @@
                (str (get-in state [:map :width]) "x" (get-in state [:map :height])))
      sys)))
 
-(defn begin-game!
-  "Transition from lobby to playing. Starts the tick loop."
-  ([] (begin-game! @system))
+(defn begin-armory!
+  "Transition from lobby to armory phase. Players can buy items.
+   Armory runs for armory-duration-ms (default 20s), then auto-starts game."
+  ([] (begin-armory! @system))
   ([sys]
    (when (and sys (= :lobby @(:phase sys)))
+     (reset! (:phase sys) :armory)
+     (append-events! sys [{:type :armory-opened :tick 0
+                           :players (count (:players @(:game-state sys)))}])
+     ;; Push state to spectators
+     (when-let [on-tick (:on-tick sys)]
+       (if (var? on-tick)
+         (@on-tick sys @(:game-state sys))
+         (on-tick sys @(:game-state sys))))
+     (log/info :armory-opened :players (count (:players @(:game-state sys))))
+     {:status :armory-opened :players (count (:players @(:game-state sys)))})))
+
+(defn begin-game!
+  "Transition from lobby or armory to playing. Starts the tick loop."
+  ([] (begin-game! @system))
+  ([sys]
+   (when (and sys (#{:lobby :armory} @(:phase sys)))
      (let [state @(:game-state sys)
            tick-ms (get-in state [:config :tick-ms] 500)
            timer (Timer. "game-tick" true)
@@ -264,6 +281,27 @@
        (log/info :game-begun :tick-ms tick-ms
                  :players (count (:players @(:game-state sys))))
        {:status :started :players (count (:players @(:game-state sys)))}))))
+
+(defn buy-armory-item!
+  "Buy an item during the armory phase. Returns result map."
+  ([player-id item-key] (buy-armory-item! @system player-id item-key))
+  ([sys player-id item-key]
+   (let [state @(:game-state sys)
+         [new-state result] (core/buy-item state player-id item-key)]
+     (when (:success? result)
+       (reset! (:game-state sys) new-state)
+       (append-events! sys [{:type :armory-purchase
+                             :player-id player-id
+                             :item (name item-key)
+                             :cost (:cost result)
+                             :remaining (:remaining result)
+                             :tick (:tick state)}])
+       ;; Push updated state to spectators
+       (when-let [on-tick (:on-tick sys)]
+         (if (var? on-tick)
+           (@on-tick sys new-state)
+           (on-tick sys new-state))))
+     result)))
 
 (defn pause-game!
   "Pause the tick timer. Game state frozen, server still responds."

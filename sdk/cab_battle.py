@@ -89,6 +89,45 @@ class CabBattleClient:
         """Send a raw action dict. Used by the game loop."""
         return self._action(action_dict)
 
+    # --- Armory & Loot ---
+
+    def get_armory(self):
+        """Get the armory shop inventory and your balance."""
+        try:
+            resp = requests.get(
+                f"{self.server}/game/armory",
+                headers={"Authorization": self.token},
+                timeout=3,
+            )
+            return resp.json()
+        except Exception:
+            return None
+
+    def buy(self, item_id):
+        """Buy an item from the armory. item_id: e.g. 'plasma-rounds', 'titan-shield'."""
+        try:
+            resp = requests.post(
+                f"{self.server}/game/buy",
+                headers={"Authorization": self.token},
+                json={"item": item_id},
+                timeout=3,
+            )
+            return resp.json()
+        except Exception:
+            return None
+
+    def get_loadout(self):
+        """Get your current loadout (items, buffs, debuffs, points)."""
+        try:
+            resp = requests.get(
+                f"{self.server}/game/loadout",
+                headers={"Authorization": self.token},
+                timeout=3,
+            )
+            return resp.json()
+        except Exception:
+            return None
+
     # --- Info endpoints (no auth needed) ---
 
     def get_scoreboard(self):
@@ -131,7 +170,7 @@ class CabBattleClient:
             return None
 
 
-def run_bot(name, decide_fn, server_url="http://localhost:33333", tick_delay=0.25):
+def run_bot(name, decide_fn, server_url="http://localhost:33333", tick_delay=0.25, **kwargs):
     """Run your bot in a loop. This handles joining, polling, and error recovery.
 
     Args:
@@ -151,8 +190,10 @@ def run_bot(name, decide_fn, server_url="http://localhost:33333", tick_delay=0.2
     print(f"  Watch at http://localhost:5173/?server")
     print(f"  Press Ctrl+C to stop.\n")
 
-    # Wait for lobby phase to end
+    # Wait for lobby phase to end, handle armory phase
     game_started = False
+    armory_fn = kwargs.get("armory_fn", None)
+    armory_done = False
     while not game_started:
         try:
             state = client.get_state()
@@ -162,9 +203,19 @@ def run_bot(name, decide_fn, server_url="http://localhost:33333", tick_delay=0.2
             phase = state.get("phase", "playing")
             if phase == "lobby":
                 time.sleep(0.5)
-            else:
+            elif phase == "armory" and not armory_done:
+                # Run armory strategy if provided
+                if armory_fn:
+                    print(f"  Armory is open! Shopping...")
+                    armory_fn(client)
+                    armory_done = True
+                    print(f"  Shopping done! Waiting for battle...")
+                time.sleep(0.5)
+            elif phase == "playing":
                 game_started = True
                 print(f"  Game started! Let's go!")
+            else:
+                time.sleep(0.5)
         except KeyboardInterrupt:
             print("\n  Bot stopped.")
             return
@@ -181,8 +232,8 @@ def run_bot(name, decide_fn, server_url="http://localhost:33333", tick_delay=0.2
                 time.sleep(2)
                 continue
 
-            # If game went back to lobby (restart), wait again
-            if state.get("phase") == "lobby":
+            # If game went back to lobby/armory (restart), wait again
+            if state.get("phase") in ("lobby", "armory"):
                 print("  Game restarted. Waiting in lobby...")
                 time.sleep(1)
                 continue
