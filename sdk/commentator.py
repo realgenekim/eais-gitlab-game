@@ -21,59 +21,62 @@ from elevenlabs import ElevenLabs
 
 SERVER = os.environ.get("GAME_SERVER", "http://localhost:33333")
 ELEVENLABS_KEY = os.environ.get("ELEVENLABS_API_KEY", "")
-VOICE_ID = "SOYHLrjzK2X1ezoPC6cr"  # Harry — Fierce Warrior, rough male
+VOICE_ID = "N2lVS1w4EtoT3dr4eOWO"  # Callum — Husky Trickster, Rick Sanchez energy
 
 # =============================================================================
-# Pre-written Mike Tyson commentary lines
+# Rick and Morty style + IT Operations commentary
 # =============================================================================
 
 LINES_KILL = [
-    "{killer} just DESTROYED {victim}! That's what happens when you step in the ring with a CHAMPION!",
-    "OH! {victim} just got knocked OUT! {killer} is a BEAST in this arena!",
-    "{killer} sends {victim} to the SHADOW REALM! Everybody has a plan until they get punched in the mouth!",
-    "BOOM! {victim} is DOWN! {killer} showing NO MERCY out there!",
-    "{killer} just eliminated {victim}! That was VICIOUS! I love it!",
-    "Goodnight {victim}! {killer} just put them to SLEEP!",
-    "{victim} just got WRECKED! {killer} is on a RAMPAGE!",
+    "Wubba lubba dub dub! {killer} just absolutely WRECKED {victim}! That's what you get for running unpatched in production!",
+    "Oh geez {victim}! {killer} just deployed a hotfix right to your FACE! No change advisory board needed!",
+    "{killer} sends {victim} to the shadow realm! That's worse than a P1 incident at 3 AM, Morty!",
+    "BOOM! {victim} is DOWN! {killer} just did a force push to main and it actually WORKED!",
+    "{killer} just eliminated {victim}! Somebody call the incident commander! Oh wait, there IS no incident commander!",
+    "Get schwifty! {killer} just turned {victim} into a post-mortem! Blameless, of course!",
+    "Holy cow {victim}! {killer} just rolled back your entire existence! That's what happens when you skip the CAB meeting!",
 ]
 
 LINES_DEATH = [
-    "{name} just got ELIMINATED! That is PATHETIC!",
-    "OH NO! {name} is DOWN! Get up! GET UP! ... they're not getting up!",
-    "{name} just got sent to the SHADOW REALM! Brutal!",
-    "REST IN PIECES, {name}! The arena shows NO mercy!",
-    "{name} is OUT! That was DEVASTATING to watch!",
+    "{name} just got ELIMINATED! I've seen better uptime from a Raspberry Pi in a hurricane, Morty!",
+    "Oh geez, {name} is DOWN! Their SLA just went to zero percent! Somebody page the on-call!",
+    "{name} just had a total system failure! That's what you get for not having redundancy!",
+    "REST IN PIECES {name}! That was a career limiting move right there! Worse than deleting prod!",
+    "{name} is OUT! Their mean time to recovery is looking pretty INFINITE right now!",
+    "And {name} goes down like a deployment on a Friday! When will they LEARN, Morty?!",
 ]
 
 LINES_DELIVERY = [
-    "{name} just delivered a passenger! Now THAT is how you make money in this business!",
-    "SPECIAL DELIVERY from {name}! Getting PAID out there!",
-    "{name} with the delivery! Smart AND tough! Respect!",
-    "{name} drops off a passenger! That's a hundred points BABY!",
+    "{name} just delivered a passenger! That's what we call a zero downtime deployment, baby!",
+    "Look at {name} delivering value to the customer! The auditors would be SO proud right now!",
+    "{name} with the delivery! That's continuous delivery in action, Morty! The Phoenix Project would be proud!",
+    "Oh snap! {name} just completed a value stream delivery! Somebody update the DORA metrics!",
+    "{name} drops off a passenger! Lead time to delivery? CHEF'S KISS! That's elite performance!",
 ]
 
 LINES_WAVE = [
-    "HERE THEY COME! A massive wave of enemies! This is about to get CRAZY!",
-    "INCOMING! The enemies are SWARMING! Nobody is safe!",
-    "Look at all those enemies! This arena is about to become a WARZONE!",
-    "More enemies flooding in! Who will SURVIVE?!",
+    "Oh geez Morty, a MASSIVE wave of enemies just deployed to production! No rollback plan! We're SCREWED!",
+    "INCOMING! It's like someone merged to main without running the tests! Enemies EVERYWHERE!",
+    "Holy smokes, look at all those floopies! This is worse than a cascading failure in microservices!",
+    "More enemies flooding in! This is a full blown SEV 1 incident! All hands on deck!",
 ]
 
 LINES_MASS_KILL = [
-    "MASSACRE! Someone just wiped out a whole squad of enemies! INCREDIBLE!",
-    "That was a SLAUGHTER! Enemies dropping like flies!",
-    "TOTAL DOMINATION! The enemies didn't stand a CHANCE!",
+    "Wubba lubba dub dub! That was a MASSACRE! Someone just automated their entire kill chain!",
+    "TOTAL DOMINATION! That's what we call infrastructure as CARNAGE! Beautiful!",
+    "They just wiped out a whole SQUAD! That's more efficient than a kubernetes auto-scaler on a good day!",
 ]
 
 LINES_GAME_START = [
-    "LADIES AND GENTLEMEN! Welcome to the THUNDERDOME! Let the BATTLE BEGIN!",
-    "The cage is LOCKED! The bots are LOOSE! Let's see who SURVIVES!",
-    "IT'S GO TIME! May the best bot WIN! Or at least survive!",
+    "Welcome to the THUNDERDOME, you beautiful nerds! I'm Rick Sanchez and this is the greatest bot battle in the multiverse! Let's GOOO!",
+    "Alright Morty, the bots are deployed, the arena is HOT, and somebody's about to have a very bad day! Wubba lubba dub dub!",
+    "The change freeze is OVER! The bots are loose in production! No approval needed! LET'S DO THIS!",
 ]
 
 LINES_RESPAWN = [
-    "{name} is BACK FROM THE DEAD! They want REVENGE!",
-    "{name} respawns! Round two! FIGHT!",
+    "{name} is BACK! That's some elite disaster recovery right there! Mean time to restore? IMPRESSIVE!",
+    "{name} respawns! Auto-healing infrastructure at its finest, Morty! Round TWO!",
+    "Oh snap {name} just came back! That's better failover than most Fortune 500 companies!",
 ]
 
 # =============================================================================
