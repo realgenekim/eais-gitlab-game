@@ -186,6 +186,54 @@
                      :cells-destroyed (count (:cells effect))}))
     (persistent! events)))
 
+(defn- detect-commentary
+  "Generate commentary events for the browser audio player.
+   Returns a vec of {:category 'kill'|'death'|... :name 'HUNTER'} maps.
+   Only fires on notable state transitions — not every tick."
+  [old-state new-state]
+  (let [commentary (transient [])]
+    ;; Deaths
+    (doseq [[id player] (:players new-state)]
+      (when (and (not (:alive? player))
+                 (get-in old-state [:players id :alive?]))
+        (conj! commentary {:category "death"
+                           :name (:name player)})))
+    ;; Kills (score jumped by 150+)
+    (doseq [[id player] (:players new-state)]
+      (let [old-score (get-in old-state [:players id :score] 0)]
+        (when (>= (- (:score player) old-score) 150)
+          (conj! commentary {:category "kill"
+                             :name (:name player)}))))
+    ;; Deliveries (score jumped by ~100)
+    (doseq [[id player] (:players new-state)]
+      (let [old-score (get-in old-state [:players id :score] 0)
+            delta (- (:score player) old-score)]
+        (when (and (>= delta 80) (< delta 150))
+          (conj! commentary {:category "delivery"
+                             :name (:name player)}))))
+    ;; Respawns
+    (doseq [[id player] (:players new-state)]
+      (when (and (:alive? player)
+                 (not (get-in old-state [:players id :alive?])))
+        (conj! commentary {:category "respawn"
+                           :name (:name player)})))
+    ;; Enemy wave (count jumped by 5+)
+    (let [old-enemies (count (or (:enemies old-state) {}))
+          new-enemies (count (or (:enemies new-state) {}))]
+      (when (>= (- new-enemies old-enemies) 5)
+        (conj! commentary {:category "wave"})))
+    ;; Mass kill (enemy count dropped by 4+)
+    (let [old-enemies (count (or (:enemies old-state) {}))
+          new-enemies (count (or (:enemies new-state) {}))]
+      (when (and (pos? old-enemies) (>= (- old-enemies new-enemies) 4))
+        (conj! commentary {:category "mass_kill"})))
+    ;; Wipeout — ALL players dead at once
+    (let [any-alive-old? (some (fn [[_ p]] (:alive? p)) (:players old-state))
+          any-alive-new? (some (fn [[_ p]] (:alive? p)) (:players new-state))]
+      (when (and any-alive-old? (not any-alive-new?) (seq (:players new-state)))
+        (conj! commentary {:category "wipeout"})))
+    (persistent! commentary)))
+
 (defn tick!
   "Advance the game one tick. Called by the timer."
   [sys]
@@ -193,7 +241,10 @@
     (let [commands (drain-commands! sys)
           old-state @(:game-state sys)
           new-state (core/advance-tick old-state commands)
-          events (detect-events old-state new-state commands)]
+          events (detect-events old-state new-state commands)
+          commentary (detect-commentary old-state new-state)
+          ;; Attach commentary to state so WS broadcast includes it
+          new-state (assoc new-state :commentary commentary)]
       ;; Record for replay
       (replay/record-tick! (:recorder sys) (:tick old-state) commands new-state)
       ;; Advance state

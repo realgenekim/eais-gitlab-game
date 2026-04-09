@@ -256,6 +256,108 @@
 
         let currentPhase = 'lobby';
 
+        // ============================================================
+        // Commentary Audio Player — plays pre-cached clips from server
+        // ============================================================
+        const AUDIO_BASE = SERVER + '/audio';
+        let audioManifest = {};       // {category: [hash, hash, ...]}
+        let audioCache = {};          // {hash: Audio element}
+        let audioPlaying = false;
+        let audioQueue = [];
+        let ambientTimer = null;
+        let lastCommentaryTick = -1;
+
+        // Load manifest and preload all clips
+        async function initAudio() {
+            try {
+                const resp = await fetch(AUDIO_BASE + '/manifest.json');
+                audioManifest = await resp.json();
+                let total = 0;
+                for (const [cat, hashes] of Object.entries(audioManifest)) {
+                    for (const h of hashes) {
+                        const audio = new Audio(AUDIO_BASE + '/' + h + '.mp3');
+                        audio.preload = 'auto';
+                        audioCache[h] = audio;
+                        total++;
+                    }
+                }
+                console.log('Commentary: loaded ' + total + ' audio clips');
+            } catch(e) {
+                console.warn('Commentary audio not available:', e);
+            }
+        }
+
+        function playCategory(category) {
+            const hashes = audioManifest[category];
+            if (!hashes || hashes.length === 0) return;
+            const hash = hashes[Math.floor(Math.random() * hashes.length)];
+            queueClip(hash);
+        }
+
+        function queueClip(hash) {
+            if (audioPlaying) {
+                // Max 2 in queue
+                if (audioQueue.length < 2) audioQueue.push(hash);
+                return;
+            }
+            playClip(hash);
+        }
+
+        function playClip(hash) {
+            const audio = audioCache[hash];
+            if (!audio) return;
+            audioPlaying = true;
+            // Clone so we can play overlapping if needed
+            const clone = audio.cloneNode();
+            clone.play().catch(() => {});
+            clone.onended = () => {
+                audioPlaying = false;
+                if (audioQueue.length > 0) {
+                    playClip(audioQueue.shift());
+                }
+            };
+        }
+
+        function handleCommentary(state) {
+            const commentary = state.commentary || [];
+            if (commentary.length === 0) return;
+            // Only process new commentary (not replayed ticks)
+            if (state.tick <= lastCommentaryTick) return;
+            lastCommentaryTick = state.tick;
+
+            // Priority order — pick the best event
+            const priority = ['wipeout', 'kill', 'death', 'mass_kill', 'wave', 'delivery', 'respawn'];
+            const sorted = [...commentary].sort((a, b) => {
+                const ai = priority.indexOf(a.category);
+                const bi = priority.indexOf(b.category);
+                return (ai === -1 ? 99 : ai) - (bi === -1 ? 99 : bi);
+            });
+            // Play the highest priority event
+            playCategory(sorted[0].category);
+        }
+
+        function startAmbientTimer() {
+            if (ambientTimer) return;
+            ambientTimer = setInterval(() => {
+                if (audioPlaying || audioQueue.length > 0) return;
+                // 50% ambient, 50% score callout
+                if (Math.random() < 0.5) {
+                    playCategory('ambient');
+                } else {
+                    playCategory('score');
+                }
+            }, 6000);  // every 6 seconds of silence
+        }
+
+        function stopAmbientTimer() {
+            if (ambientTimer) { clearInterval(ambientTimer); ambientTimer = null; }
+        }
+
+        // Init audio on page load
+        if (window.location.search.includes('server')) {
+            initAudio();
+        }
+
         // Show controls + scoreboard only in server mode
         if (window.location.search.includes('server')) {
             document.getElementById('controls').style.display = 'flex';
@@ -281,6 +383,10 @@
 
                 if (phase === 'playing') {
                     updateScoreboard(state.players);
+                    handleCommentary(state);
+                    startAmbientTimer();
+                } else {
+                    stopAmbientTimer();
                 }
             });
 

@@ -99,7 +99,8 @@
             :height (get-in game-state [:map :height])
             :walls walls}
       :recent-shots (:recent-shots game-state)
-      :shrink-warning shrink-warning})))
+      :shrink-warning shrink-warning
+      :commentary (or (:commentary game-state) [])})))
 
 (defn broadcast-state!
   "Push game state JSON to all connected WebSocket spectators."
