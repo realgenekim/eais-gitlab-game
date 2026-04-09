@@ -224,11 +224,11 @@ def main():
         elif result:
             print("  Equipped: " + item)
 
-    # Wait for game to start
+    # Wait for game to start — poll /game/status (no auth needed)
     print("\n  Waiting in lobby... (watch the big screen!)")
     while True:
-        state = client.get_state()
-        if state and state.get("phase") != "lobby":
+        status = client.get_status()
+        if status and status.get("phase") not in ("lobby", "armory"):
             break
         time.sleep(0.5)
     print("  GAME ON! Let's go!\n")
@@ -260,7 +260,9 @@ def main():
                 time.sleep(2)
                 continue
 
-            if state.get("phase") == "lobby":
+            # Check phase via status endpoint (no auth needed, always works)
+            status = client.get_status()
+            if status and status.get("phase") in ("lobby", "armory"):
                 time.sleep(1)
                 continue
 
