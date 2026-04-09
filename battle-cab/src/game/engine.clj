@@ -251,16 +251,16 @@
   (try
     (let [old-state @(:game-state sys)]
       (if (:round-over old-state)
-        ;; Round over — broadcast for a few seconds, then auto-pause back to lobby
-        (let [over-since (or (:round-over-tick old-state) (:tick old-state))
-              ticks-since (- (:tick old-state) over-since)]
+        ;; Round over — broadcast winner, then auto-pause back to lobby after 5 seconds
+        (let [over-at (or (:round-over-at old-state) (System/currentTimeMillis))
+              elapsed-ms (- (System/currentTimeMillis) over-at)]
           ;; Broadcast the winner state
           (when-let [on-tick (:on-tick sys)]
             (if (var? on-tick)
               (@on-tick sys old-state)
               (on-tick sys old-state)))
-          ;; After ~5 seconds (20 ticks), pause the game back to lobby
-          (when (> ticks-since 20)
+          ;; After 5 seconds, pause the game back to lobby
+          (when (> elapsed-ms 5000)
             (log/info :round-ended :round (:round old-state)
                       :winner (:round-winner old-state))
             (pause-game! sys)

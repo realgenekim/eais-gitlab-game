@@ -546,7 +546,7 @@
       (let [winner (first (keep (fn [[id p]] (when (:alive? p) (:name p))) (:players state)))]
         (-> state
             (assoc :round-over true)
-            (assoc :round-over-tick (:tick state))
+            (assoc :round-over-at (System/currentTimeMillis))
             (assoc :round-winner (or winner "Nobody"))))
       state)))
 
