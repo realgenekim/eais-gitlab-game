@@ -24,7 +24,6 @@ const configObject: Phaser.Types.Core.GameConfig = {
     },
     scene: [PreloadAssets, PlayGame, ServerGame, LobbyScene],
     physics: { default: 'arcade' },
-    pixelArt: true,  // nearest-neighbor filtering for crisp pixel art at any scale
 }
 
 new Phaser.Game(configObject);

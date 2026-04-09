@@ -13,6 +13,10 @@ interface ServerPlayer {
     alive: boolean;
     score: number;
     ammo: number;
+    grenades?: number;
+    'max-hp'?: number;
+    'shield-hp'?: number;
+    loadout?: { items: string[]; cost: number };
 }
 
 interface ServerEnemy {
@@ -50,6 +54,7 @@ export class ServerGame extends Phaser.Scene {
     playerSprites   : Map<string, Phaser.GameObjects.Sprite> = new Map();
     playerLabels    : Map<string, Phaser.GameObjects.Text> = new Map();
     playerHpBars    : Map<string, Phaser.GameObjects.Graphics> = new Map();
+    playerMaxHp     : Map<string, number> = new Map();
     enemySprites    : Map<string, Phaser.GameObjects.Sprite> = new Map();
     renderedShots   : Set<string> = new Set();  // track rendered shots by fired-tick+shooter
     shrinkGraphics  : Phaser.GameObjects.Graphics | null = null;
@@ -287,7 +292,8 @@ export class ServerGame extends Phaser.Scene {
             const x = sprite.x - w / 2;
             const y = sprite.y - 45;
             const hp = this.playerHpValues.get(id) || 500;
-            const pct = Math.max(0, hp / 500);
+            const maxHp = this.playerMaxHp.get(id) || 500;
+            const pct = Math.max(0, hp / maxHp);
             // Background
             bar.fillStyle(0x333333, 0.8);
             bar.fillRect(x, y, w, h);
@@ -373,6 +379,7 @@ export class ServerGame extends Phaser.Scene {
                     }
                     label.setText(p.name);
                     this.playerHpValues.set(p.id, p.hp);
+                    if (p['max-hp']) this.playerMaxHp.set(p.id, p['max-hp']);
                 } else {
                     sprite.setVisible(false);
                     label.setVisible(false);
@@ -391,6 +398,7 @@ export class ServerGame extends Phaser.Scene {
                 }).setOrigin(0.5).setDepth(50);
                 this.playerLabels.set(p.id, label);
                 this.playerHpValues.set(p.id, p.hp);
+                if (p['max-hp']) this.playerMaxHp.set(p.id, p['max-hp']);
 
                 if (!p.alive) { sprite.setVisible(false); label.setVisible(false); }
             }

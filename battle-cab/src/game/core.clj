@@ -618,6 +618,7 @@
                          spawn)]
            (let [max-hp (get-in player [:stats :max-hp] START-HP)
                  start-ammo (get-in player [:stats :start-ammo] 5)
+                 start-grenades (get-in player [:stats :start-grenades] 2)
                  shield (get-in player [:stats :shield-hp] 0)]
              (-> s
                  (assoc-in [:players id :alive?] true)
@@ -625,10 +626,9 @@
                  (assoc-in [:players id :x] sx)
                  (assoc-in [:players id :y] sy)
                  (assoc-in [:players id :ammo] start-ammo)
+                 (assoc-in [:players id :grenades] start-grenades)
                  (assoc-in [:players id :respawn-at] nil)
-                 ;; Restore shield on respawn
-                 (cond-> (pos? shield)
-                   (assoc-in [:players id :shield-hp] shield)))))
+                 (assoc-in [:players id :shield-hp] shield))))
          s))
      state (:players state))))
 
