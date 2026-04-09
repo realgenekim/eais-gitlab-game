@@ -145,7 +145,7 @@
       (is (= 45 (:cost result))) ;; 20 + 10 + 15
       (is (= 40 (get-in result [:effects :shoot-damage])))
       (is (= 12 (get-in result [:effects :shoot-range])))
-      (is (= 600 (get-in result [:effects :max-hp])))
+      (is (= 2500 (get-in result [:effects :max-hp])))
       (is (= 8 (get-in result [:effects :visibility-radius])))))
 
   (testing "over budget is rejected"
@@ -175,14 +175,14 @@
     (let [[state creds] (core/add-player (fresh-state) "Tank"
                                           {:armor :heavy-armor})
           player (get-in state [:players (:id creds)])]
-      (is (= 750 (:hp player)))
-      (is (= 750 (get-in player [:stats :max-hp])))))
+      (is (= 3000 (:hp player)))
+      (is (= 3000 (get-in player [:stats :max-hp])))))
 
   (testing "player with energy shield gets shield-hp"
     (let [[state creds] (core/add-player (fresh-state) "Shielded"
                                           {:armor :energy-shield})
           player (get-in state [:players (:id creds)])]
-      (is (= 50 (:shield-hp player)))))
+      (is (= 200 (:shield-hp player)))))
 
   (testing "player with extra-ammo starts with more"
     (let [[state creds] (core/add-player (fresh-state) "Ammo"
@@ -228,7 +228,7 @@
       (is (= (- core/START-HP 50) target-hp)))))
 
 (deftest shield-absorbs-damage-test
-  (testing "energy shield absorbs first 50 damage"
+  (testing "energy shield absorbs first 200 damage"
     (let [[state c1] (core/add-player (fresh-state) "Attacker")
           [state c2] (core/add-player state "Shielded"
                                        {:armor :energy-shield})
@@ -241,7 +241,7 @@
           ;; First shot: 30 damage, shield absorbs all
           state (core/apply-action state id1 {:type :shoot :direction :east})]
       (is (= core/START-HP (get-in state [:players id2 :hp])))
-      (is (= 20 (get-in state [:players id2 :shield-hp]))))))
+      (is (= 170 (get-in state [:players id2 :shield-hp]))))))
 
 (deftest speed-boost-movement-test
   (testing "speed boost moves 2 tiles per move action"
@@ -335,7 +335,7 @@
           state (core/respawn-dead-players state)
           player (get-in state [:players id])]
       (is (:alive? player))
-      (is (= 750 (:hp player)))     ;; heavy armor HP
+      (is (= 3000 (:hp player)))    ;; heavy armor HP
       (is (= 10 (:ammo player)))))) ;; extra ammo start
 
 (deftest spawn-enemies-empty-edges-test

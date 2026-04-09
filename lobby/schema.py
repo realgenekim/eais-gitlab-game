@@ -11,13 +11,13 @@ GEAR_CATALOG = {
     "sniper-rifle":     {"slot": "weapon",   "cost": 20, "effects": {"shoot-damage": 40, "shoot-range": 12}},
     "mod-7a":           {"slot": "weapon",   "cost": 35, "effects": {"shoot-damage": 100, "shoot-range": 20, "shoot-cooldown": 3}},
     "plasma-cannon":    {"slot": "weapon",   "cost": 25, "effects": {"shoot-damage": 60, "shoot-range": 5, "shoot-cooldown": 2}},
-    "light-vest":       {"slot": "armor",    "cost": 10, "effects": {"max-hp": 600}},
-    "null-frame":       {"slot": "armor",    "cost": 15, "effects": {"max-hp": 300, "speed": 3}},
-    "heavy-armor":      {"slot": "armor",    "cost": 25, "effects": {"max-hp": 750, "speed": 0}},
-    "energy-shield":    {"slot": "armor",    "cost": 20, "effects": {"shield-hp": 50}},
+    "light-vest":       {"slot": "armor",    "cost": 10, "effects": {"max-hp": 2500}},
+    "null-frame":       {"slot": "armor",    "cost": 15, "effects": {"max-hp": 1200, "speed": 3}},
+    "heavy-armor":      {"slot": "armor",    "cost": 25, "effects": {"max-hp": 3000, "speed": 0}},
+    "energy-shield":    {"slot": "armor",    "cost": 20, "effects": {"shield-hp": 200}},
     "speed-boost":      {"slot": "movement", "cost": 15, "effects": {"speed": 2}},
     "teleporter":       {"slot": "movement", "cost": 30, "effects": {"can-teleport": True, "teleport-cooldown": 20}},
-    "offset":           {"slot": "utility",  "cost": 5,  "effects": {"max-hp": 525, "shoot-damage": 35, "shoot-range": 6, "start-ammo": 6, "start-grenades": 3, "visibility-radius": 6}},
+    "offset":           {"slot": "utility",  "cost": 5,  "effects": {"max-hp": 2100, "shoot-damage": 35, "shoot-range": 6, "start-ammo": 6, "start-grenades": 3, "visibility-radius": 6}},
     "radar":            {"slot": "utility",  "cost": 15, "effects": {"visibility-radius": 8}},
     "extra-ammo":       {"slot": "utility",  "cost": 10, "effects": {"start-ammo": 10, "max-ammo": 15}},
     "grenades-plus":    {"slot": "utility",  "cost": 10, "effects": {"start-grenades": 5}},
@@ -29,7 +29,7 @@ GEAR_CATALOG = {
 
 # Default stats (no gear equipped)
 DEFAULT_STATS = {
-    "max-hp": 500,
+    "max-hp": 2000,
     "shoot-damage": 30,
     "shoot-range": 5,
     "shoot-cooldown": 0,

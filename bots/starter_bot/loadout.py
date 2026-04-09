@@ -11,9 +11,9 @@ WEAPONS (pick one):
   "plasma-cannon"     (25 pts) - 60 dmg, range 5, 2-tick cooldown
 
 ARMOR (pick one):
-  "light-vest"        (10 pts) - 600 HP (default 500)
-  "heavy-armor"       (25 pts) - 750 HP
-  "energy-shield"     (20 pts) - 50 shield HP absorbs damage first
+  "light-vest"        (10 pts) - 2500 HP (default 2000)
+  "heavy-armor"       (25 pts) - 3000 HP
+  "energy-shield"     (20 pts) - 200 shield HP absorbs damage first
 
 MOVEMENT (pick one):
   "speed-boost"       (15 pts) - move 2 tiles per action

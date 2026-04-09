@@ -10,7 +10,7 @@
 (def directions
   {:north [0 -1] :south [0 1] :east [1 0] :west [-1 0]})
 
-(def START-HP "Starting and respawn hit points for players." 500)
+(def START-HP "Starting and respawn hit points for players." 2000)
 
 ;;; ---------------------------------------------------------------------------
 ;;; Gear Catalog & Loadout System
@@ -31,19 +31,19 @@
    :plasma-cannon    {:slot :weapon :cost 25
                       :effects {:shoot-damage 60 :shoot-range 5 :shoot-cooldown 2}}
    :light-vest       {:slot :armor :cost 10
-                      :effects {:max-hp 600}}
+                      :effects {:max-hp 2500}}
    :null-frame       {:slot :armor :cost 15
-                      :effects {:max-hp 300 :speed 3}}
+                      :effects {:max-hp 1200 :speed 3}}
    :heavy-armor      {:slot :armor :cost 25
-                      :effects {:max-hp 750 :speed 0}}
+                      :effects {:max-hp 3000 :speed 0}}
    :energy-shield    {:slot :armor :cost 20
-                      :effects {:shield-hp 50}}
+                      :effects {:shield-hp 200}}
    :speed-boost      {:slot :movement :cost 15
                       :effects {:speed 2}}
    :teleporter       {:slot :movement :cost 30
                       :effects {:can-teleport true :teleport-cooldown 20}}
    :offset           {:slot :utility :cost 5
-                      :effects {:max-hp 525 :shoot-damage 35 :shoot-range 6
+                      :effects {:max-hp 2100 :shoot-damage 35 :shoot-range 6
                                 :start-ammo 6 :start-grenades 3 :visibility-radius 6}}
    :radar            {:slot :utility :cost 15
                       :effects {:visibility-radius 8}}

@@ -68,9 +68,9 @@ Before entering the arena, you equip your bot with gear. You have **100 budget p
 
 | Item | Cost | Effect |
 |------|------|--------|
-| Light Vest | 10 | 600 HP (default 500) |
-| Heavy Armor | 25 | 750 HP |
-| Energy Shield | 20 | 50 shield HP — absorbs damage first |
+| Light Vest | 10 | 2500 HP (default 2000) |
+| Heavy Armor | 25 | 3000 HP |
+| Energy Shield | 20 | 200 shield HP — absorbs damage first |
 
 ### Movement (pick one)
 
