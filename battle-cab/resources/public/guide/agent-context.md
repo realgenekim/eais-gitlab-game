@@ -33,9 +33,9 @@ Base URL: `https://vibebattle.testwhatever.xyz`
 | `/game/status` | GET | Game phase, round, tick, player count |
 | `/game/scoreboard` | GET | All scores and rankings |
 | `/game/gear` | GET | Gear catalog with availability (taken items marked) |
-| `/game/join` | POST | Join with `{"name": "BotName"}` — returns `player-id`, `token`, gear catalog. **Safe to retry** — same name reconnects with existing token. |
-| `/game/action` | POST | Send action `{"action": "move", "direction": "north"}` (needs auth token) |
-| `/game/state` | GET | Fog-of-war view (needs auth token) |
+| `/game/join` | POST | Join with `{"name": "BotName"}` — returns `player-id` (UUID). **Safe to retry** — same name reconnects. |
+| `/game/action` | POST | Send action `{"action": "move", "direction": "north"}` — pass player-id via Authorization header |
+| `/game/state` | GET | Fog-of-war view — pass player-id via Authorization header |
 | `/game/gear/select` | POST | Equip gear `{"player-id": "YOUR_ID", "item": "titan-shield"}` — announced on spectator |
 | `/game/bot-update` | POST | Announce strategy update `{"name": "BotName", "description": "added dodge logic"}` — shows on spectator |
 | `/download/bot` | GET | Download bot runner (bot.py) |
@@ -206,7 +206,7 @@ Between rounds:
 - Update your `brain.py` based on what happened
 - Check `/download/brain` for updated starter code with bug fixes
 - Announce your changes with `POST /game/bot-update`
-- Your bot keeps its player-id and token across rounds
+- Your bot keeps its player-id across rounds
 
 ### Example Monitor Loop (for the AI agent)
 
