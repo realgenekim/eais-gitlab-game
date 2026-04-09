@@ -1306,8 +1306,20 @@
     ;; New player
     (let [id (str "player-" (subs (str (random-uuid)) 0 8))
           token (str (random-uuid))
-          spawns (get-in state [:map :spawn-points] [[1 1] [18 1] [1 18] [18 18]])
-          spawn (nth spawns (mod (count (:players state)) (count spawns)))]
+          ;; Spawn near center — never in corners
+          {:keys [width height walls]} (:map state)
+          cx (quot width 2) cy (quot height 2)
+          occupied (occupied-cells state)
+          center-spawns (vec (for [x (range (- cx 4) (+ cx 5))
+                                   y (range (- cy 4) (+ cy 5))
+                                   :when (and (>= x 1) (< x (dec width))
+                                              (>= y 1) (< y (dec height))
+                                              (not (contains? (or walls #{}) [x y]))
+                                              (not (contains? occupied [x y])))]
+                               [x y]))
+          spawn (if (seq center-spawns)
+                  (nth center-spawns (mod (count (:players state)) (count center-spawns)))
+                  [(quot width 2) (quot height 2)])]
       [(-> state
            (assoc-in [:players id]
                      {:name player-name
