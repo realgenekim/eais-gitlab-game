@@ -519,9 +519,26 @@
         }
 
         // Init
-        addEvent('join', 'Armory test view loaded. Waiting for action...');
-        setInterval(poll, 500);
-        poll();
+        if (demoMode) {
+            addEvent('join', `Demo mode: scenario ${demoScenario}. Pure state, no polling. J/K to change scenario.`);
+            poll();  // Fetch once, render once, done.
+            // J/K to switch scenarios
+            document.addEventListener('keydown', (e) => {
+                let s = parseInt(demoScenario);
+                if (e.key === 'k' || e.key === 'K' || e.key === 'ArrowRight') {
+                    s = Math.min(s + 1, 2);
+                } else if (e.key === 'j' || e.key === 'J' || e.key === 'ArrowLeft') {
+                    s = Math.max(s - 1, 0);
+                } else return;
+                const url = new URL(window.location);
+                url.searchParams.set('demo', s);
+                window.location = url;
+            });
+        } else {
+            addEvent('join', 'Armory live view loaded. Polling every 500ms.');
+            setInterval(poll, 500);
+            poll();
+        }
     </script>
 </body>
 </html>
