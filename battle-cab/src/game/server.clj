@@ -239,13 +239,28 @@
 
 (defn handle-add-bot [request]
   (let [body (:body request)
-        bot-name (get body "name" (str "Bot-" (rand-int 9999)))]
+        bot-name (get body "name" (str "Bot-" (rand-int 9999)))
+        raw-loadout (get body "loadout")
+        loadout (when raw-loadout
+                  (cond-> {}
+                    (get raw-loadout "weapon")
+                    (assoc :weapon (keyword (get raw-loadout "weapon")))
+                    (get raw-loadout "armor")
+                    (assoc :armor (keyword (get raw-loadout "armor")))
+                    (get raw-loadout "movement")
+                    (assoc :movement (keyword (get raw-loadout "movement")))
+                    (get raw-loadout "utility")
+                    (assoc :utility (mapv keyword (get raw-loadout "utility")))))]
     (require 'game.bots)
-    (if-let [creds ((resolve 'game.bots/add-vs-bot!) bot-name)]
-      (json-response 200 {:status "bot-added"
-                          :name bot-name
-                          :player-id (:id creds)})
-      (json-response 400 {:error "Game is full"}))))
+    (try
+      (if-let [creds ((resolve 'game.bots/add-vs-bot!) bot-name loadout)]
+        (json-response 200 {:status "bot-added"
+                            :name bot-name
+                            :player-id (:id creds)})
+        (json-response 400 {:error "Game is full"}))
+      (catch clojure.lang.ExceptionInfo e
+        (json-response 400 {:error "Invalid loadout"
+                            :details (str (ex-data e))})))))
 
 (defn handle-frame [request]
   (let [tick-str (get-in request [:query-params "tick"])
