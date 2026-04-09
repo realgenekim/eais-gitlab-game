@@ -249,6 +249,61 @@ def speak_async(text):
 
 
 # =============================================================================
+# Ambient color commentary — fires during lulls to keep energy up
+# =============================================================================
+
+LINES_AMBIENT = [
+    # Score commentary
+    "The scoreboard is HEATING UP! Who's gonna optimize their value stream the fastest?!",
+    "Scores are climbing! This is better than watching DORA metrics improve quarter over quarter!",
+    "Every point earned in this arena is a lesson in flow efficiency! Gene Kim is taking NOTES right now!",
+    # Tension builders
+    "The arena is getting SMALLER! Just like your deployment window before a holiday freeze!",
+    "Enemies closing in from all sides! This is what Brent from The Phoenix Project felt EVERY DAY!",
+    "The pressure is ON! Remember what Gene Kim says, Morty, improvement of daily work is MORE important than daily work itself!",
+    "These bots are fighting like it's the last sprint before a regulatory audit!",
+    # Tech leader humor
+    "You know what the difference is between these bots and your DevOps team? The bots actually COMMUNICATE!",
+    "This is what happens when you give AI access to production, ladies and gentlemen! CHAOS! Beautiful chaos!",
+    "If your deployment pipeline was this exciting, nobody would skip the demo!",
+    "These bots have better incident response than most Fortune 500 companies I've seen!",
+    # Specific IT Revolution references
+    "As Gene Kim would say, the goal is to decrease the TIME from idea to production! These bots get it!",
+    "This arena is proof that the Second Way works, amplify feedback loops and watch things EXPLODE! Literally!",
+    "Remember the Five Ideals from The Unicorn Project? Locality! Simplicity! These bots are living it, Morty!",
+    "The constraint in this system is SURVIVAL! Classic Theory of Constraints, Eliyahu Goldratt would be PROUD!",
+    "This is like watching Chapter 3 of The Phoenix Project, except the payroll system is trying to KILL you!",
+    # Hype
+    "The crowd is going WILD! This is the Enterprise AI Summit and we are HERE FOR IT!",
+    "Look at those bots GO! That's the power of AI plus a competitive spirit! IT Revolution BABY!",
+    "I've seen a lot of battles in the multiverse, Morty, but this one is SPECIAL!",
+]
+
+def pick_ambient(state):
+    """Pick context-aware ambient commentary based on game state."""
+    players = state.get("players", [])
+    if not players:
+        return random.choice(LINES_AMBIENT)
+
+    # Score-based callouts
+    sorted_p = sorted(players, key=lambda p: p.get("score", 0), reverse=True)
+    leader = sorted_p[0]
+    trailer = sorted_p[-1]
+
+    score_lines = [
+        f"{leader['name']} is in the LEAD with {leader['score']} points! That's elite performance right there!",
+        f"{trailer['name']} is falling behind! Time to pivot your strategy or get left in the legacy codebase!",
+        f"{leader['name']} dominating with {leader['score']} points! That's what a high-performing team looks like!",
+        f"Score check! {leader['name']} at {leader['score']}, showing us what continuous improvement looks like!",
+    ]
+
+    # Mix ambient with score callouts
+    if random.random() < 0.4:
+        return random.choice(score_lines)
+    return random.choice(LINES_AMBIENT)
+
+
+# =============================================================================
 # Main loop
 # =============================================================================
 
@@ -259,7 +314,7 @@ def main():
 
     print("\n  ====================================")
     print("  CAB BATTLE COMMENTATOR")
-    print("  Voice: Mike Tyson mode")
+    print("  Voice: Rick Sanchez / IT Revolution")
     print(f"  Server: {SERVER}")
     print("  ====================================\n")
 
@@ -276,18 +331,18 @@ def main():
                 last_scores[n] = 0
                 last_alive[n] = True
             print(f"  GAME ON! {len(names)} players: {', '.join(names)}")
-            # Opening announcement
             speak(random.choice(LINES_GAME_START))
             break
         time.sleep(0.5)
 
-    # Main commentary loop
+    # Main commentary loop — tight timing, no dead air
     cooldown = 0
+    ambient_counter = 0
     while True:
         try:
             state = get_state()
             if not state:
-                time.sleep(0.5)
+                time.sleep(0.3)
                 continue
 
             events = detect_events(state)
@@ -295,10 +350,11 @@ def main():
             if is_speaking or cooldown > 0:
                 if cooldown > 0:
                     cooldown -= 1
-                time.sleep(0.5)
+                time.sleep(0.3)
                 continue
 
             if events:
+                # Events take priority — call the action immediately
                 priority = ["player_kill", "death", "mass_kill", "wave", "delivery", "respawn"]
                 events.sort(key=lambda e: priority.index(e[0]) if e[0] in priority else 99)
                 best = events[0]
@@ -306,9 +362,19 @@ def main():
                 text = pick_line(best[0], *best[1:])
                 if text:
                     speak_async(text)
-                    cooldown = 8  # ~4 seconds before next line
+                    cooldown = 3  # ~1 second gap after event
+                    ambient_counter = 0
+            else:
+                # No events — fill with ambient color commentary every ~5 seconds
+                ambient_counter += 1
+                if ambient_counter >= 15:  # 15 * 0.3s = ~4.5 seconds of silence triggers ambient
+                    text = pick_ambient(state)
+                    if text:
+                        speak_async(text)
+                        cooldown = 4  # slightly longer gap after ambient
+                    ambient_counter = 0
 
-            time.sleep(0.5)
+            time.sleep(0.3)
 
         except KeyboardInterrupt:
             print("\n  Commentator signing off!")
