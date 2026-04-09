@@ -349,7 +349,7 @@
                     (-> s
                         (assoc-in [:players id :alive?] true)
                         (assoc-in [:players id :hp] (if (some #(= % :juggernaut) (or (:gear player) []))
-                                                      800 500))
+                                                      1500 1000))
                         (assoc-in [:players id :ammo] 5)
                         (assoc-in [:players id :last-direction] nil)
                         (assoc-in [:players id :prev-direction] nil)

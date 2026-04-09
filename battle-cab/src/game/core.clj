@@ -10,7 +10,7 @@
 (def directions
   {:north [0 -1] :south [0 1] :east [1 0] :west [-1 0]})
 
-(def START-HP "Starting and respawn hit points for players." 500)
+(def START-HP "Starting and respawn hit points for players." 1000)
 (def START-POINTS "Starting currency for armory + in-game crates." 30)
 
 ;;; ---------------------------------------------------------------------------
@@ -1280,7 +1280,7 @@
       (let [state (update-in state [:players player-id :gear] (fnil conj []) item-key)
             ;; Apply instant gear effects
             state (case item-key
-                    :juggernaut (update-in state [:players player-id :hp] + 300)
+                    :juggernaut (update-in state [:players player-id :hp] + 500)
                     :ammo-belt (-> state
                                    (update-in [:players player-id :ammo] + 5)
                                    (assoc-in [:players player-id :max-ammo] 15))

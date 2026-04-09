@@ -44,7 +44,7 @@ export class PreloadAssets extends Phaser.Scene {
             'assets/spritesheets/items/game_items_atlas.json');
 
         // IT Revolution logo for floor watermark
-        this.load.svg('itrev-logo', 'it-rev-logo.svg', { width: 400, height: 200 });
+        this.load.svg('itrev-logo', 'arena-logo.svg', { width: 400, height: 200 });
     }
 
     create(): void {

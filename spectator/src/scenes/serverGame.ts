@@ -409,8 +409,8 @@ export class ServerGame extends Phaser.Scene {
             const h = 8;
             const x = sprite.x - w / 2;
             const y = sprite.y - 48;
-            const hp = this.playerHpValues.get(id) || 500;
-            const pct = Math.max(0, hp / 500);
+            const hp = this.playerHpValues.get(id) || 1000;
+            const pct = Math.max(0, hp / 1000);
             // Background
             bar.fillStyle(0x111111, 0.9);
             bar.fillRect(x - 1, y - 1, w + 2, h + 2);

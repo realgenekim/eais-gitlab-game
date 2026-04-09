@@ -210,7 +210,7 @@
             cursor: not-allowed;
         }
     </style>
-  <script type="module" crossorigin src="/spectator/assets/index-DhK2IlEy.js"></script>
+  <script type="module" crossorigin src="/spectator/assets/index-DhAcXhWh.js"></script>
 </head>
 <body>
     <div id="thegame"></div>
@@ -240,12 +240,8 @@
 
     <!-- Scoreboard sidebar -->
     <div id="scoreboard">
-        <h2 id="round-header">Round 1</h2>
+        <h2>Scoreboard</h2>
         <div id="sb-players"></div>
-        <div id="bot-updates-panel" style="margin-top:12px;border-top:1px solid #333;padding-top:8px;display:none;">
-            <div style="color:#ffe66d;font-size:11px;letter-spacing:0.1em;margin-bottom:6px;">LIVE UPDATES</div>
-            <div id="bot-updates-list" style="font-size:12px;color:#4ecdc4;"></div>
-        </div>
     </div>
 
     <!-- Round winner overlay -->
@@ -418,8 +414,6 @@
                 if (phase === 'playing') {
                     updateScoreboard(state.players);
                     handleCommentary(state);
-                    handleRoundState(state);
-                    handleBotUpdates(state);
                     startAmbientTimer();
                 } else {
                     stopAmbientTimer();
@@ -430,71 +424,58 @@
                 fetch(SERVER + '/game/status')
                     .then(r => r.json())
                     .then(data => {
-                        const phase = data.phase || 'lobby';
+                        var phase = data.phase || 'lobby';
                         if (phase === 'lobby' || phase === 'armory') {
                             document.getElementById('lobby-overlay').classList.add('active');
-                            const players = (data['player-names'] || []).map(n => ({name: n}));
+                            var players = (data['player-names'] || []).map(function(n){return {name:n};});
                             updateLobbyRoster(players, phase);
                         } else if (phase === 'playing' && currentPhase !== 'playing') {
                             currentPhase = 'playing';
                             document.getElementById('lobby-overlay').classList.remove('active');
                         }
-                    }).catch(() => {});
+                    }).catch(function(){});
             }
             pollLobby();
             setInterval(pollLobby, 2000);
         }
 
-        var GEAR_COLORS = {
-            'plasma-rounds':'#ff4400','titan-shield':'#0096ff','oracle-eye':'#00ff88',
-            'sprint-boots':'#ffe66d','vampiric-rounds':'#ff44aa','juggernaut':'#0096ff',
-            'ammo-belt':'#00ff88','cluster-shot':'#ff4400'
-        };
         function updateScoreboard(players) {
-            var el = document.getElementById('sb-players');
+            const el = document.getElementById('sb-players');
             if (!el || !players) return;
-            var sorted = players.slice().sort(function(a,b){return b.score-a.score;});
+            const sorted = [...players].sort((a,b) => b.score - a.score);
             el.textContent = '';
-            sorted.forEach(function(p) {
-                var row = document.createElement('div');
+            sorted.forEach(p => {
+                const row = document.createElement('div');
                 row.className = 'sb-player' + (p.alive ? '' : ' sb-dead');
-                row.style.cssText = 'display:block;padding:8px 10px;margin:4px 0;border-bottom:1px solid #222;';
 
-                var topLine = document.createElement('div');
-                topLine.style.cssText = 'display:flex;justify-content:space-between;align-items:center;';
-
-                var nameEl = document.createElement('span');
-                nameEl.style.cssText = 'color:#fff;font-size:15px;font-weight:bold;';
+                const left = document.createElement('div');
+                const nameEl = document.createElement('div');
+                nameEl.className = 'sb-name';
                 nameEl.textContent = p.name;
+                const statsEl = document.createElement('div');
+                statsEl.className = 'sb-stats';
+                const items = p.items || [];
+                const buffs = Object.keys(p.buffs || {});
+                const debuffs = Object.keys(p.debuffs || {});
+                let statsText = 'Ammo:' + (p.ammo || '?') + ' HP:' + (p.alive ? p.hp : 0);
+                if (items.length > 0) statsText += ' | ' + items.length + ' items';
+                if (debuffs.length > 0) statsText += ' | CURSED';
+                statsEl.textContent = statsText;
+                left.appendChild(nameEl);
+                left.appendChild(statsEl);
 
-                var scoreEl = document.createElement('span');
-                scoreEl.style.cssText = 'color:#ffe66d;font-size:15px;font-weight:bold;';
+                const right = document.createElement('div');
+                const scoreEl = document.createElement('div');
+                scoreEl.className = 'sb-score';
                 scoreEl.textContent = p.score + ' pts';
+                const hpEl = document.createElement('div');
+                hpEl.className = 'sb-hp';
+                hpEl.textContent = p.alive ? (p.points || 0) + ' gold' : 'DEAD';
+                right.appendChild(scoreEl);
+                right.appendChild(hpEl);
 
-                topLine.appendChild(nameEl);
-                topLine.appendChild(scoreEl);
-                row.appendChild(topLine);
-
-                var statsLine = document.createElement('div');
-                statsLine.style.cssText = 'color:#888;font-size:11px;margin-top:2px;';
-                statsLine.textContent = (p.alive ? 'HP:' + p.hp : 'ELIMINATED') + ' | Ammo:' + (p.ammo || 0);
-                row.appendChild(statsLine);
-
-                // Gear loadout
-                var gear = p.gear || p.items || [];
-                if (gear.length > 0) {
-                    var gearLine = document.createElement('div');
-                    gearLine.style.cssText = 'margin-top:4px;display:flex;flex-wrap:wrap;gap:3px;';
-                    gear.forEach(function(g) {
-                        var badge = document.createElement('span');
-                        var color = GEAR_COLORS[g] || '#888';
-                        badge.style.cssText = 'font-size:9px;padding:1px 5px;border-radius:3px;border:1px solid ' + color + ';color:' + color + ';';
-                        badge.textContent = g.replace(/-/g,' ');
-                        gearLine.appendChild(badge);
-                    });
-                    row.appendChild(gearLine);
-                }
-
+                row.appendChild(left);
+                row.appendChild(right);
                 el.appendChild(row);
             });
         }
@@ -662,61 +643,24 @@
 
         // Round state handling
         var lastRoundOver = false;
-        // handleRoundState defined below with audio support
-
-        // Bot update notifications
-        var seenUpdates = 0;
-        function handleBotUpdates(state) {
-            var updates = state['bot-updates'] || [];
-            if (updates.length === 0) return;
-            var panel = document.getElementById('bot-updates-panel');
-            var list = document.getElementById('bot-updates-list');
-            if (updates.length > seenUpdates) {
-                panel.style.display = 'block';
-                list.textContent = '';
-                // Show last 5 updates
-                var recent = updates.slice(-5);
-                for (var i = recent.length - 1; i >= 0; i--) {
-                    var div = document.createElement('div');
-                    div.style.cssText = 'padding:3px 0;border-bottom:1px solid #222;';
-                    div.textContent = recent[i].name + ' updated strategy!';
-                    list.appendChild(div);
-                }
-                seenUpdates = updates.length;
-            }
-        }
-
-        // Round state — detect winner, show overlay
-        var lastRoundOver = false;
         function handleRoundState(state) {
             var roundNum = state.round || 1;
             var rh = document.getElementById('round-header');
             if (rh) rh.textContent = 'Round ' + roundNum + ' of 3';
-
             var overlay = document.getElementById('round-winner-overlay');
             if (!overlay) return;
-
             if (state['round-over'] && !lastRoundOver) {
                 var winnerEl = document.getElementById('winner-name');
                 if (winnerEl) winnerEl.textContent = state['round-winner'] || '???';
                 overlay.style.display = 'flex';
                 lastRoundOver = true;
-                // Play winner announcement then stop all audio
                 stopAmbientTimer();
-                voiceEnqueue(function(done) { playCachedClip('game_over', function() {
-                    done();
-                    // Stop any further audio
-                    voiceBusy = false;
-                    voiceQueue = [];
-                    stopAmbientTimer();
-                }); });
+                voiceEnqueue(function(done) { playCachedClip('game_over', function() { done(); voiceBusy = false; voiceQueue = []; stopAmbientTimer(); }); });
             } else if (!state['round-over']) {
                 overlay.style.display = 'none';
                 lastRoundOver = false;
             }
         }
-
-        // Bot update notifications on scoreboard
         var seenUpdates = 0;
         function handleBotUpdates(state) {
             var updates = state['bot-updates'] || [];
@@ -735,17 +679,12 @@
             }
             seenUpdates = updates.length;
         }
-
-        // Hook into gameState event for round + bot updates
         window.addEventListener('gameState', function(e2) {
             var s = e2.detail;
-            if (s.phase === 'playing') {
-                handleRoundState(s);
-                handleBotUpdates(s);
-            }
+            if (s.phase === 'playing') { handleRoundState(s); handleBotUpdates(s); }
         });
 
-        // moveBot removed
+        // moveBot removed — server-side bots handle their own movement + shooting
     </script>
 
 </body>
