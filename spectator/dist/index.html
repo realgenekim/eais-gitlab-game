@@ -698,7 +698,57 @@
             }
         }
 
-        // moveBot removed — server-side bots handle their own movement + shooting
+        // Round state — detect winner, show overlay
+        var lastRoundOver = false;
+        function handleRoundState(state) {
+            var roundNum = state.round || 1;
+            var rh = document.getElementById('round-header');
+            if (rh) rh.textContent = 'Round ' + roundNum + ' of 3';
+
+            var overlay = document.getElementById('round-winner-overlay');
+            if (!overlay) return;
+
+            if (state['round-over'] && !lastRoundOver) {
+                var winnerEl = document.getElementById('winner-name');
+                if (winnerEl) winnerEl.textContent = state['round-winner'] || '???';
+                overlay.style.display = 'flex';
+                lastRoundOver = true;
+            } else if (!state['round-over']) {
+                overlay.style.display = 'none';
+                lastRoundOver = false;
+            }
+        }
+
+        // Bot update notifications on scoreboard
+        var seenUpdates = 0;
+        function handleBotUpdates(state) {
+            var updates = state['bot-updates'] || [];
+            if (updates.length <= seenUpdates) return;
+            var panel = document.getElementById('bot-updates-panel');
+            var list = document.getElementById('bot-updates-list');
+            if (!panel || !list) return;
+            panel.style.display = 'block';
+            list.textContent = '';
+            var recent = updates.slice(-5);
+            for (var i = recent.length - 1; i >= 0; i--) {
+                var div = document.createElement('div');
+                div.style.cssText = 'padding:3px 0;border-bottom:1px solid #222;';
+                div.textContent = recent[i].name + ' ' + (recent[i].description || 'updated!');
+                list.appendChild(div);
+            }
+            seenUpdates = updates.length;
+        }
+
+        // Hook into gameState event for round + bot updates
+        window.addEventListener('gameState', function(e2) {
+            var s = e2.detail;
+            if (s.phase === 'playing') {
+                handleRoundState(s);
+                handleBotUpdates(s);
+            }
+        });
+
+        // moveBot removed
     </script>
 
 </body>

@@ -1263,6 +1263,9 @@
       (contains? taken item-key)
       [state false "Item already taken by another player"]
 
+      (>= (count player-gear) 3)
+      [state false "Max 3 gear items per bot"]
+
       (contains? player-gear item-key)
       [state false "You already have this item"]
 

@@ -103,7 +103,7 @@ state["map"]["width"], state["map"]["height"]
 
 ## File: loadout.py (GEAR SELECTION)
 
-Edit before running bot. Gear is **first-come-first-served** — if another player took it, pick something else.
+Edit before running bot. **Max 3 gear items per bot.** Gear is **first-come-first-served** — if another player took it, pick something else.
 
 ```python
 LOADOUT = {
@@ -141,10 +141,39 @@ Check `GET /game/gear` for live availability. Available gear:
 3. The spectator screen shows when you update your strategy
 4. Check brief again, iterate, survive!
 
+## IMPORTANT: Monitor Your Bot with a Sub-Agent
+
+Once your bot is running, spin up a background monitor that polls `/game/brief?name=YourBotName` every 3-5 seconds. Use the response to:
+
+1. **Detect round state** — if `phase` changes or your bot dies, adapt strategy
+2. **React to rivals** — `nearby-rivals` tells you who's close and their score
+3. **Track arena shrink** — `arena-shrinking` and `near-edge` tell you when to move center
+4. **Know when you won/lost** — check if `alive?` is False to know the round ended
+
+### Round Management
+
+The game has **3 rounds**. Between rounds:
+- All bots respawn with full HP
+- Scores carry across rounds
+- The organizer advances with `POST /game/next-round`
+- Poll `/game/status` — when `phase` returns to `playing` and `round` increments, the next round started
+- Adapt your strategy between rounds based on what worked!
+
+### Example Monitor Loop (for the AI agent)
+
+```
+Every 3-5 seconds:
+  1. GET /game/brief?name=BotName
+  2. If tips suggest "HP low" → edit brain.py to add flee logic
+  3. If tips suggest "rival nearby" → edit brain.py to prioritize shooting
+  4. If alive? is False → round ended, prepare for next round
+  5. POST /game/bot-update with description of what changed
+```
+
 ## Important: Hot Reload
 
 When you save `brain.py`, the bot runner automatically:
 - Reloads your `think()` function without disconnecting
-- Announces the update on the spectator screen
+- Announces the update on the spectator screen (call `POST /game/bot-update`)
 - Keeps your score, position, and HP
 - If there's a syntax error, the previous working strategy stays active
