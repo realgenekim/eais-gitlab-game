@@ -210,14 +210,14 @@
             cursor: not-allowed;
         }
     </style>
-  <script type="module" crossorigin src="/assets/index-DNkVNqnd.js"></script>
+  <script type="module" crossorigin src="/spectator/assets/index-DhK2IlEy.js"></script>
 </head>
 <body>
     <div id="thegame"></div>
 
     <!-- Lobby overlay -->
     <div id="lobby-overlay">
-        <div id="lobby-title">Cab Battle</div>
+        <div id="lobby-title">Vibe Battle</div>
         <div id="lobby-subtitle">Waiting for players to join...</div>
         <div id="lobby-roster">
             <h3>Players</h3>
@@ -250,7 +250,7 @@
     <div id="subtitle-bar"></div>
 
     <script>
-        const SERVER = 'http://localhost:33333';
+        const SERVER = window.location.origin;
         let botNum = 0;
         const names = ['Rick-Alpha','Rick-Beta','Rick-Gamma','Rick-Delta',
                         'Rick-Echo','Rick-Foxtrot','Rick-Golf','Rick-Hotel'];
@@ -382,12 +382,12 @@
         }
 
         // Init audio on page load
-        if (window.location.search.includes('server')) {
+        if (true) {
             initAudio();
         }
 
         // Show controls + scoreboard only in server mode
-        if (window.location.search.includes('server')) {
+        if (true) {
             document.getElementById('controls').style.display = 'flex';
             document.getElementById('scoreboard').style.display = 'block';
 
@@ -398,12 +398,6 @@
 
                 if (phase === 'lobby' || phase === 'armory') {
                     currentPhase = phase;
-                    document.getElementById('lobby-overlay').classList.add('active');
-                    document.getElementById('lobby-title').textContent =
-                        phase === 'armory' ? 'The Armory' : 'Cab Battle';
-                    document.getElementById('lobby-subtitle').textContent =
-                        phase === 'armory' ? 'Buy your loadout!' : 'Waiting for players to join...';
-                    updateLobbyRoster(state.players || [], phase);
                 } else if ((currentPhase === 'lobby' || currentPhase === 'armory') && phase === 'playing') {
                     currentPhase = 'playing';
                     document.getElementById('lobby-overlay').classList.remove('active');
@@ -418,14 +412,23 @@
                 }
             });
 
-            // Check initial phase
-            fetch(SERVER + '/game/status')
-                .then(r => r.json())
-                .then(data => {
-                    if (data.phase === 'lobby') {
-                        document.getElementById('lobby-overlay').classList.add('active');
-                    }
-                }).catch(() => {});
+            function pollLobby() {
+                fetch(SERVER + '/game/status')
+                    .then(r => r.json())
+                    .then(data => {
+                        const phase = data.phase || 'lobby';
+                        if (phase === 'lobby' || phase === 'armory') {
+                            document.getElementById('lobby-overlay').classList.add('active');
+                            const players = (data['player-names'] || []).map(n => ({name: n}));
+                            updateLobbyRoster(players, phase);
+                        } else if (phase === 'playing' && currentPhase !== 'playing') {
+                            currentPhase = 'playing';
+                            document.getElementById('lobby-overlay').classList.remove('active');
+                        }
+                    }).catch(() => {});
+            }
+            pollLobby();
+            setInterval(pollLobby, 2000);
         }
 
         function updateScoreboard(players) {
@@ -626,7 +629,7 @@
                 }
             } catch(e) {}
         }
-        if (window.location.search.includes('server')) {
+        if (true) {
             setInterval(pollCommentary, 1000);
         }
 

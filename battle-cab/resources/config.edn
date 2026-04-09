@@ -4,12 +4,12 @@
 
  ;; ===== Players =====
  :max-players          8
- :visibility-radius    5      ;; fog-of-war manhattan radius
- :respawn-ticks        10     ;; ticks dead before respawn
+ :visibility-radius    8      ;; bigger vision so bots see each other sooner
+ :respawn-ticks        6      ;; fast respawn, keep the action going
 
  ;; ===== Combat =====
  :shoot-range          20
- :shoot-damage         30
+ :shoot-damage         50     ;; hits hurt more — faster kills, more exciting
  :kill-bonus           150    ;; points for killing another player
  :max-ammo             10
  :ammo-regen-ticks     5      ;; ticks between ammo regen
@@ -18,8 +18,8 @@
  :max-passengers       6
 
  ;; ===== Battle Royale Shrink =====
- :shrink-start         200    ;; tick when first ring closes
- :shrink-interval      150    ;; ticks between each ring (~5 min total game)
+ :shrink-start         100    ;; shrink starts at tick 100 (~25 sec) — forces bots together fast
+ :shrink-interval      80     ;; rings close every 20 seconds
  :shrink-warn-ticks    10     ;; fire warning before shrink
 
  ;; ===== Lightning =====

@@ -126,7 +126,8 @@ export class PreloadAssets extends Phaser.Scene {
         }
 
         // Route to correct scene based on URL
-        const useServer = window.location.search.includes('server');
+        // Always use ServerGame when not on localhost
+        const useServer = window.location.hostname !== 'localhost' || window.location.search.includes('server');
         this.scene.start(useServer ? 'ServerGame' : 'PlayGame');
     }
 }
