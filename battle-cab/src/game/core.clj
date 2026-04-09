@@ -34,7 +34,15 @@
    :ammo-belt       {:name "Ammo Belt"       :cost 5  :type :utility :effect :ammo-regen-2x  :duration nil
                      :desc "Double ammo regen (permanent)"}
    :cluster-shot    {:name "Cluster Shot"    :cost 5  :type :weapon  :effect :cluster        :duration 60
-                     :desc "Shots hit 3-wide (60 ticks)"}})
+                     :desc "Shots hit 3-wide (60 ticks)"}
+   :sniper-scope    {:name "Sniper Scope"    :cost 10 :type :weapon  :effect :range-2x      :duration nil
+                     :desc "Double shot range to 40 tiles (permanent)"}
+   :rapid-fire      {:name "Rapid Fire"      :cost 8  :type :weapon  :effect :rapid-fire    :duration nil
+                     :desc "Shoot every tick instead of every other (permanent)"}
+   :shockwave       {:name "Shockwave"       :cost 12 :type :weapon  :effect :knockback-2x  :duration nil
+                     :desc "Double knockback distance on hit (permanent)"}
+   :phantom-dash    {:name "Phantom Dash"    :cost 10 :type :utility :effect :dodge-chance   :duration nil
+                     :desc "30% chance to dodge incoming shots (permanent)"}})
 
 (def crate-loot-table
   "Possible contents of in-game loot crates by tier."
@@ -379,7 +387,8 @@
   [state player-id {:keys [direction]}]
   (let [player (get-in state [:players player-id])
         [dx dy] (get directions (keyword direction) [0 0])
-        range- (get-in state [:config :shoot-range] 5)
+        base-range (get-in state [:config :shoot-range] 5)
+        range- (if (has-gear? player :sniper-scope) (* 2 base-range) base-range)
         base-damage (get-in state [:config :shoot-damage] 30)
         ;; Gear: plasma-rounds = 2x damage
         damage (if (has-gear? player :plasma-rounds) (* 2 base-damage) base-damage)
@@ -449,6 +458,9 @@
                                     (has-debuff? player :glass-cannon) (* 3))
                   ;; Target damage reduction
                   target (get-in state [:players hit-id])
+                  ;; Phantom dash: 30% dodge chance
+                  dodged? (and (has-gear? target :phantom-dash) (< (rand) 0.3))
+                  effective-damage (if dodged? 0 effective-damage)
                   effective-damage (cond-> effective-damage
                                     (has-gear? target :titan-shield) (quot 2)
                                     (has-buff? target :damage-halved) (quot 2)
@@ -474,7 +486,8 @@
                 ;; Alive hit — damage + knockback 2 cells away from shooter
                 (-> state
                     (assoc-in [:players hit-id :hp] new-hp)
-                    (apply-knockback-player hit-id shooter-x shooter-y 2)
+                    (apply-knockback-player hit-id shooter-x shooter-y
+                                            (if (has-gear? player :shockwave) 4 2))
                     ;; Lifesteal: heal shooter 15 HP per hit
                     (cond-> (has-buff? player :lifesteal)
                       (update-in [:players player-id :hp]

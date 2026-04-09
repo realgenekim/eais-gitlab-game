@@ -7,7 +7,7 @@ export const GameOptions : any = {
         width               : 1344,     // 21 tiles × 64px
         height              : 1216      // 19 tiles × 64px
     },
-    gameBackgroundColor     : 0x222222, // game background color
+    gameBackgroundColor     : 0x1a1a2e, // lighter floor so logo shows better
 
     playerSpeed             : 100,      // player speed, in pixels per second
     enemySpeed              : 50,       // enemy speed, in pixels per second

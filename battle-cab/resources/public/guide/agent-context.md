@@ -134,14 +134,24 @@ LOADOUT = {
 ```
 
 Check `GET /game/gear` for live availability. Available gear:
+
+**Weapons:**
 - `plasma-rounds` — 2x shot damage (permanent)
+- `vampiric-rounds` — heal 15 HP per hit (permanent)
+- `cluster-shot` — shots hit 3-wide (temporary)
+- `sniper-scope` — double shot range to 40 tiles (permanent)
+- `rapid-fire` — faster shooting (permanent)
+- `shockwave` — double knockback on hit, fling rivals further (permanent)
+
+**Defense:**
 - `titan-shield` — 50% damage reduction (permanent)
+- `juggernaut` — +500 bonus HP (instant, 1500 total)
+- `phantom-dash` — 30% chance to dodge incoming shots (permanent)
+
+**Utility:**
 - `oracle-eye` — double vision radius (permanent)
 - `sprint-boots` — move twice per tick (temporary)
-- `vampiric-rounds` — heal 15 HP per hit (permanent)
-- `juggernaut` — +300 bonus HP (instant, total 800 HP)
 - `ammo-belt` — double ammo regen (permanent)
-- `cluster-shot` — shots hit 3-wide (temporary)
 
 ## Strategy Guide for Elimination Mode
 

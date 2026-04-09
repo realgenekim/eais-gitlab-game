@@ -240,7 +240,7 @@ export class ServerGame extends Phaser.Scene {
             const cx = this.arenaOffsetX + (this.mapWidth * this.tileSize) / 2;
             const cy = this.arenaOffsetY + (this.mapHeight * this.tileSize) / 2;
             const logo = this.add.image(cx, cy, 'itrev-logo');
-            logo.setAlpha(0.08);
+            logo.setAlpha(0.15);
             logo.setDepth(0);  // behind everything
             const targetW = this.mapWidth * this.tileSize * 0.5;
             logo.setScale(targetW / logo.width);
