@@ -192,7 +192,7 @@
           new-state (core/move-enemies state)]
       ;; Enemy should NOT be on [3,3] (player's cell)
       (is (not= [3 3] [(get-in new-state [:enemies "e1" :x])
-                        (get-in new-state [:enemies "e1" :y])]))
+                       (get-in new-state [:enemies "e1" :y])]))
       (is (no-cell-sharing? new-state)))))
 
 (deftest enemies-cannot-stack-test
@@ -293,3 +293,39 @@
       ;; The A-B-A should be blocked
       (is (= x-before-third x-after-third)
           "A-B-A oscillation pattern should be blocked"))))
+
+(deftest armory-item-shape-test
+  (testing "buy-item stores keywords, server converts to strings for HTML"
+    (let [state (fresh-state)
+          [state creds] (core/add-player state "TestBot")
+          id (:id creds)
+          state (assoc-in state [:players id :points] core/START-POINTS)
+          [state _] (core/buy-item state id :plasma-rounds)
+          [state _] (core/buy-item state id :ammo-belt)
+          items (get-in state [:players id :items])]
+      (is (every? keyword? items)
+          "core stores items as keywords")
+      (is (= [:plasma-rounds :ammo-belt] items))
+      (is (= ["plasma-rounds" "ammo-belt"] (vec (map name items)))
+          "(map name items) produces the strings the armory HTML expects")))
+
+  (testing "buy-item deducts points correctly"
+    (let [state (fresh-state)
+          [state creds] (core/add-player state "TestBot2")
+          id (:id creds)
+          state (assoc-in state [:players id :points] 30)
+          [state _] (core/buy-item state id :plasma-rounds)
+          [state _] (core/buy-item state id :titan-shield)]
+      (is (= 3 (get-in state [:players id :points]))
+          "30 - 15 (plasma) - 12 (titan) = 3")))
+
+  (testing "buy-item rejects when insufficient points"
+    (let [state (fresh-state)
+          [state creds] (core/add-player state "TestBot3")
+          id (:id creds)
+          state (assoc-in state [:players id :points] 5)
+          [state result] (core/buy-item state id :plasma-rounds)]
+      (is (false? (:success? result))
+          "should reject buy when not enough points")
+      (is (= 5 (get-in state [:players id :points]))
+          "points should be unchanged after failed buy"))))
