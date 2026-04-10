@@ -5,6 +5,7 @@
             [game.maps :as maps]
             [game.replay :as replay]
             [clojure.java.io :as io]
+            [clojure.string :as str]
             [taoensso.timbre :as log])
   (:import [java.util Timer TimerTask]))
 
@@ -196,7 +197,21 @@
    Browser uses Web Speech API to speak the text in real time."
   [old-state new-state]
   (let [commentary (transient [])
-        wave-num (or (:wave-number new-state) 0)]
+        wave-num (or (:wave-number new-state) 0)
+        tick (:tick new-state)]
+    ;; Gear callout in first 10 ticks — announce each bot's loadout
+    (when (and (>= tick 3) (<= tick 8)
+               (zero? (mod tick 2)))
+      (let [players (vec (vals (:players new-state)))
+            idx (quot (- tick 3) 2)
+            player (when (< idx (count players)) (nth players idx))]
+        (when (and player (seq (:gear player)))
+          (let [gear-names (map (fn [g] (get-in core/armory-items [g :name] (name g)))
+                                (:gear player))]
+            (conj! commentary {:category "ambient" :priority 7
+                               :text (str (:name player) " is packing "
+                                          (str/join " and " gear-names)
+                                          "! Watch out!")})))))
     ;; Deaths — who died?
     (doseq [[id player] (:players new-state)]
       (when (and (not (:alive? player))
