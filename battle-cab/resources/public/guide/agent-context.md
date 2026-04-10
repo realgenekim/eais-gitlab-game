@@ -1,8 +1,35 @@
 # Bot Battle Arena — AI Agent Context
 
-You are helping a contestant build a bot for a live elimination battle arena at the Enterprise AI Summit.
+You are helping a contestant build a bot for a live elimination battle arena at the Enterprise AI Summit, sponsored by Xalt.
 
 **Game Server: `https://vibebattle.testwhatever.xyz`**
+
+---
+
+## Hey Human! Here's What You Need to Know
+
+Welcome to Vibe Battle! You'll use your AI coding assistant to build and improve a fighting bot. Here's the workflow:
+
+1. **Your AI agent reads this page** and knows everything about the game
+2. **Tell your agent what you want**: "Make my bot aggressive" or "Focus on survival"
+3. **Your agent edits `brain.py`** — the bot reloads automatically, no restart needed
+4. **Watch the big screen** — see your bot fight live and tell your agent to adjust
+
+### What Your Agent Can Do For You
+- **Build your strategy** — edit `brain.py` with combat, dodge, and survival logic
+- **Pick your gear** — equip 3 items via the API (weapons, defense, utility)
+- **Monitor the battle** — poll `/game/brief?name=YourBot` for live status and tips
+- **Self-repair** — detect problems and auto-fix your strategy mid-battle
+- **Announce updates** — post to `/game/bot-update` so the audience sees your changes
+
+### Quick Commands to Tell Your Agent
+- "Make my bot shoot everything it sees"
+- "Add dodge logic for incoming bullets"
+- "Make my bot stay near the center — the edges are dangerous"
+- "Pick the best gear for an aggressive build"
+- "Monitor my bot and fix any problems automatically"
+
+---
 
 ## Game Format
 
@@ -98,7 +125,7 @@ The `think(state)` function is called 4 times per second. Return `(action, direc
 ### State structure
 ```python
 state["you"]["x"], state["you"]["y"]       # position on the grid
-state["you"]["hp"]                          # health (1000 max, 0 = eliminated)
+state["you"]["hp"]                          # health (2000 max, 0 = eliminated)
 state["you"]["ammo"]                        # bullets (regens over time, max 10)
 state["you"]["score"]                       # current score (persists across rounds)
 state["you"]["alive?"]                      # True/False — if False, you're out this round
@@ -115,9 +142,9 @@ state["map"]["width"], state["map"]["height"]
 
 ### Game Mechanics
 - **Elimination** — die once, out for the round. Last bot standing wins.
-- **1000 HP** — base health (juggernaut gives 1500)
+- **2000 HP** — base health (juggernaut gives 2500)
 - **Vision radius 8** — you can see 8 tiles around you
-- **Shoot damage 50** — each hit does 50 damage (1000 HP = 20 hits to kill, or 10 with plasma-rounds)
+- **Shoot damage 50** — each hit does 50 damage (2000 HP = 40 hits to kill, or 20 with plasma-rounds)
 - **Shooting** — line-of-sight only, same row OR column, range 20 (40 with sniper-scope)
 - **Knockback** — getting hit pushes you 2 tiles away (4 with shockwave gear)
 - **Phantom dash** — 30% dodge chance if equipped
@@ -147,7 +174,7 @@ Check `GET /game/gear` for live availability. Available gear:
 
 **Defense:**
 - `titan-shield` — 50% damage reduction (permanent)
-- `juggernaut` — +500 bonus HP (instant, 1500 total)
+- `juggernaut` — +500 bonus HP (instant, 2500 total)
 - `phantom-dash` — 30% chance to dodge incoming shots (permanent)
 
 **Utility:**

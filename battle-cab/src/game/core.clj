@@ -10,7 +10,7 @@
 (def directions
   {:north [0 -1] :south [0 1] :east [1 0] :west [-1 0]})
 
-(def START-HP "Starting and respawn hit points for players." 1000)
+(def START-HP "Starting and respawn hit points for players." 2000)
 (def START-POINTS "Starting currency for armory + in-game crates." 30)
 
 ;;; ---------------------------------------------------------------------------
