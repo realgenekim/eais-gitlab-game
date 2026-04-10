@@ -153,7 +153,7 @@ state["map"]["width"], state["map"]["height"]
 
 ## File: loadout.py (GEAR SELECTION)
 
-Edit before running bot. **Max 3 gear items per bot.** Gear is **first-come-first-served** — if another player took it, pick something else.
+Edit before running bot. **Max 3 gear items per bot.** Gear is **pick any 3 you want** — if another player took it, pick something else.
 
 ```python
 LOADOUT = {

@@ -1261,13 +1261,12 @@
   (set (mapcat (fn [[_ p]] (or (:gear p) [])) (:players state))))
 
 (defn available-gear
-  "Return the armory catalog with availability. Taken items marked :available false."
+  "Return the full armory catalog. All items available — no global exclusivity."
   [state]
-  (let [taken (taken-gear state)]
-    (into {}
-          (map (fn [[k v]]
-                 [k (assoc v :available (not (contains? taken k)))])
-               armory-items))))
+  (into {}
+        (map (fn [[k v]]
+               [k (assoc v :available true)])
+             armory-items)))
 
 (defn select-gear
   "Player selects a gear item. Returns [updated-state success?].
@@ -1279,9 +1278,6 @@
     (cond
       (not (contains? armory-items item-key))
       [state false "Item does not exist"]
-
-      (contains? taken item-key)
-      [state false "Item already taken by another player"]
 
       (>= (count player-gear) 3)
       [state false "Max 3 gear items per bot"]
