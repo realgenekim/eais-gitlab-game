@@ -850,6 +850,16 @@
                     :get {:handler #'handle-signup-list}}]
          ["/signup/clear" {:post {:handler #'handle-signup-clear}}]
          ["/agent-context" {:get {:handler #'handle-agent-context}}]
+         ["/tips" {:get {:handler (fn [req]
+                                    (let [md (slurp (clojure.java.io/resource "public/guide/TIPS.md"))
+                                          accept (or (get-in req [:headers "accept"]) "")]
+                                      (if (str/includes? accept "text/html")
+                                        {:status 200
+                                         :headers {"Content-Type" "text/html; charset=utf-8"}
+                                         :body (str "<!DOCTYPE html><html><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'><title>Vibe Battle Tips</title><script src='https://cdn.jsdelivr.net/npm/marked/marked.min.js'></script><link rel='stylesheet' href='https://cdn.jsdelivr.net/npm/github-markdown-css@5/github-markdown-dark.min.css'><style>body{background:#0d1117;padding:40px 20px;}.markdown-body{max-width:900px;margin:0 auto;}</style></head><body><article class='markdown-body' id='c'></article><script>document.getElementById('c').innerHTML=marked.parse(" (json/write-str md) ");</script></body></html>")}
+                                        {:status 200
+                                         :headers {"Content-Type" "text/plain; charset=utf-8"}
+                                         :body md})))}}]
          ["/download/bot" {:get {:handler (fn [_] {:status 200
                                                     :headers {"Content-Type" "text/plain; charset=utf-8"}
                                                     :body (slurp (clojure.java.io/resource "public/guide/bot.py"))})}}]

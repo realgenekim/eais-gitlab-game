@@ -323,6 +323,18 @@ When `round-over: true` appears in `/game/status`:
 4. Announce your changes via `/game/bot-update`
 5. Wait for `phase: playing` to resume
 
+## Losing? Get Battle-Tested Tips
+
+If the human's bot is losing rounds or struggling, fetch `GET /tips` for proven strategies from experienced players. Key tips to implement immediately:
+
+- **Spray shots at close range** — exact alignment is rare. Shoot toward any enemy within 5 tiles even if diagonal
+- **Shoot INSIDE your edge-escape logic** — don't let survival code block combat. Check for shots before fleeing
+- **Best gear combo**: plasma-rounds + vampiric-rounds + titan-shield (deal 100 dmg, heal 15, take only 25)
+- **Zigzag chase** — alternate X and Y movement each tick to cross enemy row/column faster
+- **Position on the CENTER side of enemies** — so knockback pushes you inward, not off the map
+
+Full tips and code examples: `GET /tips` (rendered page) or fetch as plain text for implementation details.
+
 ## Check for Updated Starter Files
 
 The game organizers may push fixes to `bot.py` and `brain.py` during the event. Before each round, check for updates:
