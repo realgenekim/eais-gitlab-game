@@ -98,7 +98,7 @@ The `think(state)` function is called 4 times per second. Return `(action, direc
 ### State structure
 ```python
 state["you"]["x"], state["you"]["y"]       # position on the grid
-state["you"]["hp"]                          # health (500 max, 0 = eliminated)
+state["you"]["hp"]                          # health (1000 max, 0 = eliminated)
 state["you"]["ammo"]                        # bullets (regens over time, max 10)
 state["you"]["score"]                       # current score (persists across rounds)
 state["you"]["alive?"]                      # True/False — if False, you're out this round
@@ -115,12 +115,14 @@ state["map"]["width"], state["map"]["height"]
 
 ### Game Mechanics
 - **Elimination** — die once, out for the round. Last bot standing wins.
+- **1000 HP** — base health (juggernaut gives 1500)
 - **Vision radius 8** — you can see 8 tiles around you
-- **Shoot damage 50** — each hit does 50 damage (500 HP = 10 hits to kill)
-- **Shooting** — line-of-sight only, same row OR column, range 20
-- **Knockback** — getting hit pushes you 2 tiles away from the shooter
-- **Arena shrinks** at ~25 seconds, then every ~20 seconds — stay near center (10, 9)
-- **Ammo regens** 1 bullet every 5 ticks (max 10)
+- **Shoot damage 50** — each hit does 50 damage (1000 HP = 20 hits to kill, or 10 with plasma-rounds)
+- **Shooting** — line-of-sight only, same row OR column, range 20 (40 with sniper-scope)
+- **Knockback** — getting hit pushes you 2 tiles away (4 with shockwave gear)
+- **Phantom dash** — 30% dodge chance if equipped
+- **Arena shrinks** at ~25 seconds, then every ~20 seconds — stay near center (10, 9). Walls kill instantly!
+- **Ammo regens** 1 bullet every 5 ticks (max 10, max 15 with ammo-belt)
 
 ## File: loadout.py (GEAR SELECTION)
 
