@@ -314,7 +314,10 @@
                                            " — kill for +150 pts!"))
                                 (> rank 1)
                                 (conj (str "You're rank " rank " — leader has "
-                                           (:score (first scoreboard)) " pts")))})))))
+                                           (:score (first scoreboard)) " pts"))
+                                ;; Breadcrumb for secret items
+                                (>= (:tick state) 50)
+                                (conj "The arena whispers of hidden power... GET /game/secrets"))})))))
 
 (defn handle-action [request]
   (let [state (engine/get-state)
@@ -416,6 +419,7 @@
     (require 'game.bots)
     ((resolve 'game.bots/stop-all-bots!))
     (engine/stop-game!)
+    (reset! ws/avatar-store {})
     (engine/start-game! {:on-tick #'on-tick-all
                          :game-map game-map})
     (json-response 200 {:status "restarted" :map map-id :tick 0})))
@@ -580,6 +584,64 @@
                        (:players state))]
         (reset! (:game-state (sys)) new-state)
         (json-response 200 {:status "next-round" :round new-round})))))
+
+;;; ---------------------------------------------------------------------------
+;;; Custom Avatars — contestants upload their own sprite
+;;; ---------------------------------------------------------------------------
+
+(defn handle-avatar-upload [request]
+  (if-let [player-id (authenticate request)]
+    (let [content-type (get-in request [:headers "content-type"] "")
+          allowed-types #{"image/png" "image/svg+xml" "image/jpeg" "image/gif"}
+          max-size (* 512 1024)]
+      (if-not (allowed-types content-type)
+        (json-response 400 {:error "Unsupported image type"
+                            :allowed (vec allowed-types)})
+        (let [body (:body request)
+              bytes (cond
+                      (instance? java.io.InputStream body)
+                      (.readAllBytes ^java.io.InputStream body)
+                      (bytes? body) body
+                      :else nil)]
+          (if (or (nil? bytes) (> (alength bytes) max-size))
+            (json-response 400 {:error "Image too large (max 512KB)"})
+            (do
+              (swap! ws/avatar-store assoc player-id
+                     {:content-type content-type :bytes bytes})
+              (log/info :avatar-uploaded :player player-id
+                        :type content-type :size (alength bytes))
+              (json-response 200 {:status "ok" :message "Avatar uploaded!"}))))))
+    (json-response 401 {:error "Invalid token"})))
+
+(defn handle-avatar-get [request]
+  (let [player-id (get-in request [:path-params :player-id])]
+    (if-let [{:keys [content-type bytes]} (get @ws/avatar-store player-id)]
+      {:status 200
+       :headers {"Content-Type" content-type
+                 "Cache-Control" "public, max-age=3600"
+                 "Access-Control-Allow-Origin" "*"}
+       :body (java.io.ByteArrayInputStream. bytes)}
+      (json-response 404 {:error "No avatar"}))))
+
+;;; ---------------------------------------------------------------------------
+;;; Secret Items — hidden endpoints for vibe coders who explore the API
+;;; ---------------------------------------------------------------------------
+
+(defn handle-secret-equip [item-key request]
+  (if-let [player-id (authenticate request)]
+    (let [state (engine/get-state)
+          [new-state success? msg] (core/equip-secret state player-id item-key)]
+      (if success?
+        (do
+          (reset! (:game-state (sys)) new-state)
+          (json-response 200 {:status "unlocked" :message msg}))
+        (json-response 400 {:error msg})))
+    (json-response 401 {:error "Invalid token"})))
+
+(defn handle-secret-hint [_request]
+  (json-response 200 {:message "You found something... but what are you looking for?"
+                       :hint "The arena hides power beyond the armory. Try the shadows, the void, the pulse, the mirror, the pull."
+                       :whisper "POST with your auth token to claim what's hidden."}))
 
 (defn handle-start [_request]
   (log/info :game-start-requested :phase (engine/get-phase)
@@ -889,6 +951,16 @@
                               :post {:handler #'handle-commentary-post}}]
          ["/game/seek" {:post {:handler #'handle-seek}}]
          ["/game/resume" {:post {:handler #'handle-resume}}]
+         ;; Custom avatar upload/serve
+         ["/game/avatar" {:post {:handler #'handle-avatar-upload}}]
+         ["/game/avatar/:player-id" {:get {:handler #'handle-avatar-get}}]
+         ;; Secret items — hidden endpoints, not in docs
+         ["/game/secrets" {:get {:handler #'handle-secret-hint}}]
+         ["/game/shadow"  {:post {:handler (fn [r] (handle-secret-equip :phase-cloak r))}}]
+         ["/game/void"    {:post {:handler (fn [r] (handle-secret-equip :teleporter r))}}]
+         ["/game/pulse"   {:post {:handler (fn [r] (handle-secret-equip :emp-blast r))}}]
+         ["/game/mirror"  {:post {:handler (fn [r] (handle-secret-equip :shadow-clone r))}}]
+         ["/game/pull"    {:post {:handler (fn [r] (handle-secret-equip :gravity-well r))}}]
          ;; Tools
          ["/server-stats" {:get {:handler #'handle-server-stats}}]
          ["/test" {:get {:handler #'handle-test}}]

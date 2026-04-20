@@ -44,6 +44,19 @@
    :phantom-dash    {:name "Phantom Dash"    :cost 10 :type :utility :effect :dodge-chance   :duration nil
                      :desc "30% chance to dodge incoming shots (permanent)"}})
 
+(def secret-items
+  "Hidden items — not in the catalog. Only discoverable by exploring the API."
+  {:phase-cloak    {:name "Phase Cloak"    :type :utility :effect :phase-cloak    :duration 60
+                    :desc "Invisible to all players for 60 ticks. Shots still work."}
+   :teleporter     {:name "Teleporter"     :type :utility :effect :teleport       :duration nil
+                    :desc "Instantly warp to a random open cell. One-time use."}
+   :emp-blast      {:name "EMP Blast"      :type :weapon  :effect :emp            :duration nil
+                    :desc "Strip all buffs from every player in vision range. One-time use."}
+   :shadow-clone   {:name "Shadow Clone"   :type :utility :effect :shadow-clone   :duration 40
+                    :desc "Spawn a decoy that mimics your last movement. Enemies attack it."}
+   :gravity-well   {:name "Gravity Well"   :type :weapon  :effect :gravity-well   :duration nil
+                    :desc "Pull all nearby players/enemies 2 cells toward you. One-time use."}})
+
 (def crate-loot-table
   "Possible contents of in-game loot crates by tier."
   {:gold   {:cost-range [15 20]
@@ -203,7 +216,8 @@
         others (->> (:players game-state)
                     (remove (fn [[id _]] (= id player-id)))
                     (filter (fn [[_ p]] (and (:alive? p)
-                                             (visible [(:x p) (:y p)]))))
+                                             (visible [(:x p) (:y p)])
+                                             (not (has-buff? p :phase-cloak)))))
                     (map (fn [[id p]]
                            {:id id :x (:x p) :y (:y p)
                             :has-passenger (some? (:passenger p))})))
@@ -1301,6 +1315,80 @@
   "Find existing player entry by name. Returns [id player] or nil."
   [state player-name]
   (first (filter (fn [[_ p]] (= (:name p) player-name)) (:players state))))
+
+(defn equip-secret
+  "Equip a hidden item. These bypass the normal catalog — no taken-gear check.
+   Returns [updated-state success? msg]."
+  [state player-id item-key]
+  (let [player (get-in state [:players player-id])
+        item (get secret-items item-key)]
+    (cond
+      (nil? player)
+      [state false "Player not found"]
+
+      (nil? item)
+      [state false "???"]
+
+      (some #{item-key} (or (:gear player) []))
+      [state false "You already have this"]
+
+      :else
+      (let [new-state (-> state
+                          (update-in [:players player-id :gear] (fnil conj []) item-key)
+                          ;; Apply effect immediately
+                          (cond->
+                            (= (:effect item) :phase-cloak)
+                            (assoc-in [:players player-id :buffs :phase-cloak]
+                                      {:expires-at (+ (:tick state) (:duration item))})
+
+                            (= (:effect item) :teleport)
+                            (as-> s
+                              (let [open (filter #(cell-free? s %)
+                                                 (for [x (range (get-in s [:map :width]))
+                                                       y (range (get-in s [:map :height]))]
+                                                   [x y]))
+                                    [tx ty] (rand-nth (vec open))]
+                                (-> s
+                                    (assoc-in [:players player-id :x] tx)
+                                    (assoc-in [:players player-id :y] ty))))
+
+                            (= (:effect item) :emp)
+                            (as-> s
+                              (let [px (:x player) py (:y player)
+                                    radius (if (has-buff? player :vision-2x) 10 5)]
+                                (reduce (fn [st [pid p]]
+                                          (if (and (not= pid player-id)
+                                                   (:alive? p)
+                                                   (<= (manhattan-distance [px py] [(:x p) (:y p)]) radius))
+                                            (assoc-in st [:players pid :buffs] {})
+                                            st))
+                                        s (:players s))))
+
+                            (= (:effect item) :shadow-clone)
+                            (as-> s
+                              (let [clone-id (str "enemy-clone-" (subs (str (random-uuid)) 0 6))]
+                                (assoc-in s [:enemies clone-id]
+                                          {:x (:x player) :y (:y player) :hp 1
+                                           :type :decoy :score 0
+                                           :direction (or (:last-direction player) :south)})))
+
+                            (= (:effect item) :gravity-well)
+                            (as-> s
+                              (let [px (:x player) py (:y player)]
+                                (reduce (fn [st [pid p]]
+                                          (if (and (not= pid player-id) (:alive? p)
+                                                   (<= (manhattan-distance [px py] [(:x p) (:y p)]) 5))
+                                            (let [[kx ky _] (knockback-dest st (:x p) (:y p)
+                                                                            ;; Invert: pull TOWARD player
+                                                                            (- (* 2 (:x p)) px)
+                                                                            (- (* 2 (:y p)) py)
+                                                                            2 [px py])]
+                                              (-> st
+                                                  (assoc-in [:players pid :x] kx)
+                                                  (assoc-in [:players pid :y] ky)))
+                                            st))
+                                        s (:players s))))))]
+        [new-state true (str "SECRET UNLOCKED: " (:name item) " — " (:desc item))]))))
 
 (defn add-player
   "Add a player or reconnect to existing one.

@@ -17,6 +17,7 @@ interface ServerPlayer {
     items: string[];
     buffs: Record<string, any>;
     debuffs: Record<string, any>;
+    'has-avatar'?: boolean;
 }
 
 interface ServerEnemy {
@@ -72,6 +73,8 @@ export class ServerGame extends Phaser.Scene {
     lastWallCount   : number = -1;
     playerAvatars   : Map<string, string> = new Map();  // player-id → rick variant
     nextAvatarIndex : number = 0;
+    customAvatarLoaded : Set<string> = new Set();     // player-ids with loaded custom textures
+    customAvatarLoading: Set<string> = new Set();     // player-ids currently loading
     lastEnemyCount  : number = 0;
     waveNumber      : number = 0;
     statusText      : Phaser.GameObjects.Text;
@@ -188,7 +191,10 @@ export class ServerGame extends Phaser.Scene {
         this.ws.onerror = () => {};
     }
 
-    getAvatar(playerId: string): { key: string; prefix: string } {
+    getAvatar(playerId: string): { key: string; prefix: string; custom: boolean } {
+        if (this.customAvatarLoaded.has(playerId)) {
+            return { key: `custom-${playerId}`, prefix: '', custom: true };
+        }
         if (!this.playerAvatars.has(playerId)) {
             const variant = RICK_VARIANTS[this.nextAvatarIndex % RICK_VARIANTS.length];
             this.playerAvatars.set(playerId, variant);
@@ -196,7 +202,42 @@ export class ServerGame extends Phaser.Scene {
         }
         const variant = this.playerAvatars.get(playerId)!;
         const prefix = variant.toLowerCase().replace(/[^a-z0-9]/g, '');
-        return { key: variant, prefix };
+        return { key: variant, prefix, custom: false };
+    }
+
+    loadCustomAvatar(playerId: string): void {
+        if (this.customAvatarLoading.has(playerId) || this.customAvatarLoaded.has(playerId)) return;
+        this.customAvatarLoading.add(playerId);
+
+        const serverUrl = GameOptions.serverUrl || 'http://localhost:33333';
+        const url = `${serverUrl}/game/avatar/${playerId}`;
+        const textureKey = `custom-${playerId}`;
+
+        fetch(url)
+            .then(resp => {
+                if (!resp.ok) throw new Error('No avatar');
+                return resp.blob();
+            })
+            .then(blob => {
+                const img = new Image();
+                img.src = URL.createObjectURL(blob);
+                img.onload = () => {
+                    if (!this.textures.exists(textureKey)) {
+                        this.textures.addImage(textureKey, img);
+                    }
+                    this.customAvatarLoaded.add(playerId);
+                    this.customAvatarLoading.delete(playerId);
+                    // Swap sprite if already rendered with Rick texture
+                    if (this.playerSprites.has(playerId)) {
+                        const sprite = this.playerSprites.get(playerId)!;
+                        sprite.setTexture(textureKey);
+                        sprite.setDisplaySize(this.tileSize, this.tileSize);
+                        sprite.stop();
+                    }
+                };
+                img.onerror = () => { this.customAvatarLoading.delete(playerId); };
+            })
+            .catch(() => { this.customAvatarLoading.delete(playerId); });
     }
 
     gridToPixel(gx: number, gy: number): [number, number] {
@@ -471,6 +512,10 @@ export class ServerGame extends Phaser.Scene {
         for (const p of state.players) {
             seenIds.add(p.id);
             const [targetX, targetY] = this.gridToPixel(p.x, p.y);
+            // Trigger custom avatar loading if server says they have one
+            if (p['has-avatar']) {
+                this.loadCustomAvatar(p.id);
+            }
             const avatar = this.getAvatar(p.id);
 
             if (this.playerSprites.has(p.id)) {
@@ -489,7 +534,12 @@ export class ServerGame extends Phaser.Scene {
                     this.tweens.add({ targets: sprite, x: targetX, y: targetY, duration: tickMs, ease: 'Linear' });
                     this.tweens.add({ targets: label, x: targetX, y: targetY - 65, duration: tickMs, ease: 'Linear' });
 
-                    if (Math.abs(dx) > 2 || Math.abs(dy) > 2) {
+                    if (avatar.custom) {
+                        // Custom avatar: no animations, just flip on horizontal movement
+                        if (Math.abs(dx) > 2) {
+                            sprite.setFlipX(dx < 0);
+                        }
+                    } else if (Math.abs(dx) > 2 || Math.abs(dy) > 2) {
                         if (Math.abs(dy) > Math.abs(dx)) {
                             sprite.play(dy > 0 ? `${avatar.prefix}-walk-down` : `${avatar.prefix}-walk-up`, true);
                             sprite.setFlipX(false);
@@ -580,11 +630,18 @@ export class ServerGame extends Phaser.Scene {
                     label.setVisible(false);
                 }
             } else {
-                // New player — use assigned avatar, down_1 frame (consistent size)
-                const sprite = this.add.sprite(targetX, targetY,
-                    avatar.key, `${avatar.key}_down_1`);
-                sprite.setScale(0.5);
-                sprite.setDepth(10);
+                // New player — custom avatar or Rick variant
+                let sprite: Phaser.GameObjects.Sprite;
+                if (avatar.custom) {
+                    sprite = this.add.sprite(targetX, targetY, avatar.key);
+                    sprite.setDisplaySize(this.tileSize, this.tileSize);
+                    sprite.setDepth(10);
+                } else {
+                    sprite = this.add.sprite(targetX, targetY,
+                        avatar.key, `${avatar.key}_down_1`);
+                    sprite.setScale(0.5);
+                    sprite.setDepth(10);
+                }
                 this.playerSprites.set(p.id, sprite);
 
                 const label = this.add.text(targetX, targetY - 65, p.name, {
